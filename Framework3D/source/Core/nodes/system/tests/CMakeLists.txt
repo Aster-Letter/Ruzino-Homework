@@ -1,0 +1,2 @@
+add_nodes(SRC_DIRS test_node TARGET_NAME test_nodes)
+add_dependencies(node_system_test test_nodes)
