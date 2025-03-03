@@ -4,8 +4,8 @@ The assignments for the computer graphics course for 2024，Spring.
 # Build
 首先执行git系列操作
 ```
-git fetch upstream
-git merge upstream/main
+git clone https://github.com/T7imal/DGP_2025.git
+cd DGP_2025
 git submodule update --init --recursive
 ```
 然后安装下方依赖。
@@ -145,10 +145,10 @@ python configure.py --all --build_variant Debug
 
 ![image-2](images/image_2.png)
 
-右击下图箭头位置“/”处，选择“Create/Mesh”即可创建一个网格节点窗口
+右击下图箭头位置“/”处，选择“Create/Mesh”即可创建一个名为`mesh_0`的目录。如图所示：
 
 ![image-3](images/image_3.png)
 
-右击节点编辑窗口，选择并添加节点，例如通过`create_grid`和`write_polyscope`即可创建一个yz平面上的网格，并显示在`Polyscope Renderer`窗口中，转动视角即可看到网格，如图所示：
+右击`mesh_0`，选择“Edit”即可打开节点编辑窗口。右击节点编辑窗口，选择并添加节点，例如通过`create_grid`和`write_polyscope`即可创建一个yz平面上的网格，并显示在`Polyscope Renderer`窗口中，转动视角即可看到网格，如图所示：
 
 ![image-4](images/image_4.png)

@@ -500,6 +500,7 @@ void PolyscopeRenderer::ProcessInputEvents()
                         pickResult.second != pick_result[0].second) {
                         input_pick_triggered = true;
                     }
+                    polyscope::pick::setSelection(pickResult);
                     pick_result[0] = pickResult;
                 }
 
