@@ -2,6 +2,7 @@
 
 #include "GCore/Components.h"
 #include "GCore/Components/MeshOperand.h"
+#include "GCore/Components/VolumeComponent.h"
 #include "GCore/Components/XformComponent.h"
 #include "Logger/Logger.h"
 #include "global_stage.hpp"
@@ -63,6 +64,15 @@ Geometry Geometry::CreateMesh()
     std::shared_ptr<MeshComponent> mesh =
         std::make_shared<MeshComponent>(&geometry);
     geometry.attach_component(mesh);
+    return std::move(geometry);
+}
+
+Geometry Geometry::CreateVolume()
+{
+    Geometry geometry;
+    std::shared_ptr<VolumeComponent> volume =
+        std::make_shared<VolumeComponent>(&geometry);
+    geometry.attach_component(volume);
     return std::move(geometry);
 }
 

@@ -153,6 +153,8 @@ struct NODES_CORE_API ExeParams {
         }
     }
 
+    void set_error(const char* str) const;
+
    private:
     int get_input_index(const char* identifier) const;
     std::vector<size_t> get_input_group_indices(

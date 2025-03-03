@@ -6,6 +6,10 @@
 #include "nodes/core/socket.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
+void ExeParams::set_error(const char* str) const
+{
+    node_.set_error(str);
+}
 
 int ExeParams::get_input_index(const char* identifier) const
 {

@@ -56,6 +56,7 @@ struct NODES_CORE_API Node {
 
     mutable nlohmann::json storage_info;
     mutable entt::meta_any storage;
+    mutable std::string error_message;
 
     explicit Node(NodeTree* node_tree, int id, const char* idname);
 
@@ -64,6 +65,7 @@ struct NODES_CORE_API Node {
     SocketGroup* find_socket_group(
         const std::string& group_name,
         PinKind inout);
+    void set_error(const char* str) const;
 
     Node(NodeTree* node_tree, const char* idname);
     virtual ~Node();

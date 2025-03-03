@@ -102,9 +102,9 @@ void ClosestHit(
     var prim_id = PrimitiveIndex();
     VertexData vertex = get_interpolated_vertex(instance_id, prim_id, attrib.barycentric);
 
-    // if (dot(WorldRayDirection(), vertex.normalW) >= 0.0) {
-    //     vertex.normalW = -vertex.normalW;
-    // }
+    if (dot(WorldRayDirection(), vertex.normalW) >= 0.0) {
+        vertex.normalW = -vertex.normalW;
+    }
 
     // UniformSampleGenerator s;
 

@@ -5,11 +5,13 @@
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usdShade/material.h>
 #include <pxr/usd/usdShade/materialBindingAPI.h>
+#include <pxr/usd/usdVol/openVDBAsset.h>
 
 #include "GCore/Components/CurveComponent.h"
 #include "GCore/Components/MaterialComponent.h"
 #include "GCore/Components/MeshOperand.h"
 #include "GCore/Components/PointsComponent.h"
+#include "GCore/Components/VolumeComponent.h"
 #include "GCore/Components/XformComponent.h"
 #include "GCore/geom_payload.hpp"
 #include "geom_node_base.h"
@@ -46,6 +48,8 @@ NODE_EXECUTION_FUNCTION(write_usd)
     auto points = geometry.get_component<PointsComponent>();
 
     auto curve = geometry.get_component<CurveComponent>();
+
+    auto volume = geometry.get_component<VolumeComponent>();
 
     assert(!(points && mesh));
 
@@ -130,6 +134,19 @@ NODE_EXECUTION_FUNCTION(write_usd)
                                       : pxr::UsdGeomTokens->nonperiodic);
 #endif
         }
+    }
+    else if (volume) {
+        auto openvdb_asset = pxr::UsdVolOpenVDBAsset::Define(stage, sdf_path);
+
+        // Save the volume grid onto the disk
+        auto file_name = "volume" + sdf_path.GetName() +
+                         std::to_string(time.GetValue()) + ".vdb";
+        volume->write_disk(file_name);
+        openvdb_asset.CreateFilePathAttr().Set(pxr::SdfAssetPath(file_name));
+    }
+    else {
+        params.set_error("No valid geometry component found");
+        return false;
     }
 
     // Material and Texture

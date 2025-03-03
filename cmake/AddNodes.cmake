@@ -38,7 +38,8 @@ function(GEN_NODES_JSON TARGET_NAME)
     endforeach()
 
     # Convert the list of directories and files to a semicolon-separated string
-    string(REPLACE ";" " " NODES_DIRS_STR "${ABS_NODES_DIRS}")
+    set (NODES_DIRS_STR "${ABS_NODES_DIRS}")
+    # string(REPLACE ";" " " NODES_DIRS_STR "${ABS_NODES_DIRS}")
     string(REPLACE ";" " " NODES_FILES_STR "${ABS_NODES_FILES}")
     string(REPLACE ";" " " CONVERSIONS_DIRS_STR "${ABS_CONVERSIONS_DIRS}")
     string(REPLACE ";" " " CONVERSIONS_FILES_STR "${ABS_CONVERSIONS_FILES}")

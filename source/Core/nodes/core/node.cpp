@@ -96,6 +96,11 @@ SocketGroup* Node::find_socket_group(
     return group->get();
 }
 
+void Node::set_error(const char* str) const
+{
+    error_message = std::string(str);
+}
+
 Node::Node(NodeTree* node_tree, const char* idname)
     : ui_name("Unknown"),
       tree_(node_tree)
