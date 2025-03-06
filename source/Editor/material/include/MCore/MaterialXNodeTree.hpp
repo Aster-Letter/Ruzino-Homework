@@ -40,8 +40,6 @@ class MCORE_API MaterialXNodeTree : public NodeTree {
 
         if (_graphDoc) {
             buildUiBaseGraph(_graphDoc);
-            //_currGraphElem = _graphDoc;
-            //_prevUiNode = nullptr;
         }
     }
 
