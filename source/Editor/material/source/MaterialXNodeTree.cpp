@@ -888,18 +888,11 @@ NodeLink* MaterialXNodeTree::add_link(
 
     {
         // If the accepting node already has a link, remove it
-        // if (to_sock->_connected) {
-        //    for (auto iter = links.begin(); iter != links.end(); ++iter) {
-        //        if (iter->_endAttr == end_attr) {
-        //            // Found existing link - remove it; adapted from
-        //            // deleteLink note: ed::BreakLinks doesn't work as the
-        //            // order ends up inaccurate
-        //            deleteLinkInfo(iter->_startAttr, iter->_endAttr);
-        //            links.erase(iter);
-        //            break;
-        //        }
-        //    }
-        //}
+        if (to_sock->directly_linked_links.size() > 0) {
+            assert(to_sock->directly_linked_links.size() == 1);
+
+            delete_link(to_sock->directly_linked_links[0]->ID);
+        }
 
         if (getMaterialXNode(uiDownNode) || getMaterialXNodeGraph(uiDownNode)) {
             mx::InputPtr connectingInput = nullptr;

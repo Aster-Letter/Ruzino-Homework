@@ -92,6 +92,8 @@ struct NODES_CORE_API Node {
 
     [[nodiscard]] const std::vector<NodeSocket*>& get_outputs() const;
 
+    std::vector<Node*> getOutputConnections() const;
+
     bool valid();
 
     void generate_sockets_based_on_declaration(

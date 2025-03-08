@@ -83,9 +83,8 @@ class MCORE_API MaterialXNodeTree : public NodeTree {
 
     void delete_link(
         LinkId linkid,
-        bool refresh_topology,
-        bool remove_from_group) override;
-
+        bool refresh_topology = true,
+        bool remove_from_group = true) override;
 
     // bool edgeExists(UiEdge newEdge);
 
