@@ -95,6 +95,46 @@ void SurfaceNodeSlang::emitFunctionDefinition(
     GenContext& context,
     ShaderStage& stage) const
 {
+    const SlangShaderGenerator& shadergen =
+        static_cast<const SlangShaderGenerator&>(context.getShaderGenerator());
+
+    DEFINE_SHADER_STAGE(stage, Stage::PIXEL)
+    {
+        // struct BSDF { float3 response; float3 throughput; float thickness;
+        // float ior; };
+        std::string _functionName = "mx_surface_eval";
+        shadergen.emitLine(
+            "void " + _functionName +
+                "(float3 L, float3 V, float3 N, float3 P, out BSDF "
+                "result)",
+            stage);
+
+        auto bsdfInput = node.getInput("bsdf");
+        auto bsdf = bsdfInput->getConnectedSibling();
+
+        shadergen.emitLine("float3 N = normalize(N)", stage);
+        shadergen.emitLine("float3 V = normalize(V)", stage);
+        shadergen.emitLine("float3 L = normalize(L)", stage);
+        shadergen.emitLine("float3 P = P", stage);
+
+        context.pushClosureContext(&_callReflection);
+        shadergen.emitFunctionCall(*bsdf, context, stage);
+        context.popClosureContext();
+
+        shadergen.emitLine(
+            "result.response += " + bsdf->getOutput()->getVariable() +
+                ".response",
+            stage);
+
+        shadergen.emitLine(
+            "result.throughput *= " + bsdf->getOutput()->getVariable() +
+                ".throughput",
+            stage);
+
+        shadergen.emitLine("return result", stage);
+
+        shadergen.emitScopeEnd(stage);
+    }
 }
 
 void SurfaceNodeSlang::emitFunctionCall(

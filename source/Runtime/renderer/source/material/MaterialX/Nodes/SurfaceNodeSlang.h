@@ -12,20 +12,33 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Surface node implementation for SLANG
-class HD_USTC_CG_API SurfaceNodeSlang : public SlangImplementation
-{
-  public:
+class HD_USTC_CG_API SurfaceNodeSlang : public SlangImplementation {
+   public:
     SurfaceNodeSlang();
 
     static ShaderNodeImplPtr create();
 
-    void createVariables(const ShaderNode& node, GenContext& context, Shader& shader) const override;
+    void createVariables(
+        const ShaderNode& node,
+        GenContext& context,
+        Shader& shader) const override;
+    void emitFunctionDefinition(
+        const ShaderNode& node,
+        GenContext& context,
+        ShaderStage& stage) const override;
 
-    void emitFunctionCall(const ShaderNode& node, GenContext& context, ShaderStage& stage) const override;
+    void emitFunctionCall(
+        const ShaderNode& node,
+        GenContext& context,
+        ShaderStage& stage) const override;
 
-    virtual void emitLightLoop(const ShaderNode& node, GenContext& context, ShaderStage& stage, const string& outColor) const;
+    virtual void emitLightLoop(
+        const ShaderNode& node,
+        GenContext& context,
+        ShaderStage& stage,
+        const string& outColor) const;
 
-  protected:
+   protected:
     /// Closure contexts for calling closure functions.
     mutable ClosureContext _callReflection;
     mutable ClosureContext _callTransmission;

@@ -112,9 +112,9 @@ Hd_USTC_CG_Material::Hd_USTC_CG_Material(SdfPath const& id) : HdMaterial(id)
             { "usd/hd_USTC_CG/resources/libraries" }, searchPath, libraries);
         shader_gen_context_->registerSourceCodeSearchPath(searchPath);
 
-        shader_gen_context_->pushUserData(
-            mx::HW::USER_DATA_BINDING_CONTEXT,
-            std::make_shared<BinglessContext>());
+        //shader_gen_context_->pushUserData(
+        //    mx::HW::USER_DATA_BINDING_CONTEXT,
+        //    std::make_shared<BinglessContext>());
     });
 }
 
