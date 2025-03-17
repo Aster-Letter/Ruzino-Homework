@@ -108,6 +108,7 @@ void SurfaceNodeSlang::emitFunctionDefinition(
                 "(float3 L, float3 V, float3 N, float3 P, out BSDF "
                 "result)",
             stage);
+        shadergen.emitScopeBegin(stage);
 
         auto bsdfInput = node.getInput("bsdf");
         auto bsdf = bsdfInput->getConnectedSibling();
@@ -181,6 +182,7 @@ void SurfaceNodeSlang::emitFunctionCall(
     {
         VariableBlock& vertexData = stage.getInputBlock(HW::VERTEX_DATA);
         const string prefix = shadergen.getVertexDataPrefix(vertexData);
+        shadergen.emitComment("Surface node generation", stage);
 
         // Declare the output variable
         const ShaderOutput* output = node.getOutput();
@@ -241,40 +243,41 @@ void SurfaceNodeSlang::emitFunctionCall(
 
             emitLightLoop(node, context, stage, outColor);
 
-            //
-            // Handle indirect lighting.
-            //
-            shadergen.emitComment("Ambient occlusion", stage);
-            if (context.getOptions().hwAmbientOcclusion) {
-                ShaderPort* texcoord = vertexData[HW::T_TEXCOORD + "_0"];
-                shadergen.emitLine(
-                    "float2 ambOccUv = mx_transform_uv(" + prefix +
-                        texcoord->getVariable() + ", float2(1.0), float2(0.0))",
-                    stage);
-                shadergen.emitLine(
-                    "occlusion = lerp(1.0, texture(" + HW::T_AMB_OCC_MAP +
-                        ", ambOccUv).x, " + HW::T_AMB_OCC_GAIN + ")",
-                    stage);
-            }
-            else {
-                shadergen.emitLine("occlusion = 1.0", stage);
-            }
-            shadergen.emitLineBreak(stage);
+            ////
+            //// Handle indirect lighting.
+            ////
+            // shadergen.emitComment("Ambient occlusion", stage);
+            // if (context.getOptions().hwAmbientOcclusion) {
+            //     ShaderPort* texcoord = vertexData[HW::T_TEXCOORD + "_0"];
+            //     shadergen.emitLine(
+            //         "float2 ambOccUv = mx_transform_uv(" + prefix +
+            //             texcoord->getVariable() + ", float2(1.0),
+            //             float2(0.0))",
+            //         stage);
+            //     shadergen.emitLine(
+            //         "occlusion = lerp(1.0, texture(" + HW::T_AMB_OCC_MAP +
+            //             ", ambOccUv).x, " + HW::T_AMB_OCC_GAIN + ")",
+            //         stage);
+            // }
+            // else {
+            //     shadergen.emitLine("occlusion = 1.0", stage);
+            // }
+            // shadergen.emitLineBreak(stage);
 
-            shadergen.emitComment("Add environment contribution", stage);
-            shadergen.emitScopeBegin(stage);
+            // shadergen.emitComment("Add environment contribution", stage);
+            // shadergen.emitScopeBegin(stage);
 
-            context.pushClosureContext(&_callIndirect);
-            shadergen.emitFunctionCall(*bsdf, context, stage);
-            context.popClosureContext();
+            // context.pushClosureContext(&_callIndirect);
+            // shadergen.emitFunctionCall(*bsdf, context, stage);
+            // context.popClosureContext();
 
-            shadergen.emitLineBreak(stage);
-            shadergen.emitLine(
-                outColor + " += occlusion * " +
-                    bsdf->getOutput()->getVariable() + ".response",
-                stage);
-            shadergen.emitScopeEnd(stage);
-            shadergen.emitLineBreak(stage);
+            // shadergen.emitLineBreak(stage);
+            // shadergen.emitLine(
+            //     outColor + " += occlusion * " +
+            //         bsdf->getOutput()->getVariable() + ".response",
+            //     stage);
+            // shadergen.emitScopeEnd(stage);
+            // shadergen.emitLineBreak(stage);
         }
 
         //
@@ -377,16 +380,19 @@ void SurfaceNodeSlang::emitLightLoop(
 
         shadergen.emitComment(
             "Calculate the BSDF response for this light source", stage);
-        context.pushClosureContext(&_callReflection);
-        shadergen.emitFunctionCall(*bsdf, context, stage);
-        context.popClosureContext();
+
+        shadergen.emitLine("BSDF bsdfResult", stage);
+        shadergen.emitLine("mx_surface_eval(L, V, N, P, bsdfResult)", stage);
+
+        // context.pushClosureContext(&_callReflection);
+        // shadergen.emitFunctionCall(*bsdf, context, stage);
+        // context.popClosureContext();
 
         shadergen.emitLineBreak(stage);
 
         shadergen.emitComment("Accumulate the light's contribution", stage);
         shadergen.emitLine(
-            outColor + " += lightShader.intensity * " +
-                bsdf->getOutput()->getVariable() + ".response",
+            outColor + " += lightShader.intensity * bsdfResult.response",
             stage);
 
         shadergen.emitScopeEnd(stage);

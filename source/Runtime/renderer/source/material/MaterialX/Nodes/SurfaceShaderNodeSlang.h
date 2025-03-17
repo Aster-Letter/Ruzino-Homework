@@ -6,23 +6,29 @@
 #ifndef MATERIALX_SURFACESHADERNODESLANG_H
 #define MATERIALX_SURFACESHADERNODESLANG_H
 
-#include "../Export.h"
 #include <MaterialXGenShader/Nodes/SourceCodeNode.h>
 
-MATERIALX_NAMESPACE_BEGIN
+#include "../Export.h"
+#include "SourceCodeNodeSlang.h"
 
+MATERIALX_NAMESPACE_BEGIN
 /// SurfaceShader node implementation for SLANG
 /// Used for all surface shaders implemented in source code.
-class HD_USTC_CG_API SurfaceShaderNodeSlang : public SourceCodeNode
-{
-  public:
+class HD_USTC_CG_API SurfaceShaderNodeSlang : public SourceCodeNodeSlang {
+   public:
     static ShaderNodeImplPtr create();
 
     const string& getTarget() const override;
 
-    void createVariables(const ShaderNode& node, GenContext& context, Shader& shader) const override;
+    void createVariables(
+        const ShaderNode& node,
+        GenContext& context,
+        Shader& shader) const override;
 
-    void emitFunctionCall(const ShaderNode& node, GenContext& context, ShaderStage& stage) const override;
+    void emitFunctionCall(
+        const ShaderNode& node,
+        GenContext& context,
+        ShaderStage& stage) const override;
 };
 
 MATERIALX_NAMESPACE_END

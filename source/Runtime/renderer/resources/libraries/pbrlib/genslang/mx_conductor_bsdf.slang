@@ -1,4 +1,4 @@
-#include "lib/mx_microfacet_specular.slang"
+import pbrlib.genslang.lib.mx_microfacet_specular;
 
 void mx_conductor_bsdf_reflection(float3 L, float3 V, float3 P, float occlusion, float weight, float3 ior_n, float3 ior_k, float2 roughness, float3 N, float3 X, int distribution, inout BSDF bsdf)
 {

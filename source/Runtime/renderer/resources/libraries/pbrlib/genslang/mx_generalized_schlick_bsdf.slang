@@ -1,4 +1,4 @@
-#include "lib/mx_microfacet_specular.slang"
+import pbrlib.genslang.lib.mx_microfacet_specular;
 
 void mx_generalized_schlick_bsdf_reflection(float3 L, float3 V, float3 P, float occlusion, float weight, float3 color0, float3 color90, float exponent, float2 roughness, float3 N, float3 X, int distribution, int scatter_mode, inout BSDF bsdf)
 {

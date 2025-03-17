@@ -1,8 +1,8 @@
 #ifndef MX_MICROFACET_SPECULAR
 #define MX_MICROFACET_SPECULAR
 
-import stdlib.genslang.lib.mx_math;
-import pbrlib.genslang.lib.mx_microfacet;
+__exported import stdlib.genslang.lib.mx_math;
+__exported import pbrlib.genslang.lib.mx_microfacet;
 
 // Fresnel model options.
 const int FRESNEL_MODEL_DIELECTRIC = 0;
@@ -393,9 +393,9 @@ void mx_fresnel_conductor_phase_polarized(
     float3 U = sqrt((A + B) / 2.0);
     float3 V = max(float3(0.0), sqrt((B - A) / 2.0));
 
-    phiS = atan(
+    phiS = atan2(
         2.0 * eta1 * V * cosTheta, U * U + V * V - mx_square(eta1 * cosTheta));
-    phiP = atan(
+    phiP = atan2(
         2.0 * eta1 * eta2 * eta2 * cosTheta *
             (2.0 * k2 * U - (float3(1.0) - k2 * k2) * V),
         mx_square(eta2 * eta2 * (float3(1.0) + k2 * k2) * cosTheta) -
@@ -670,7 +670,7 @@ float3 mx_refraction_solid_sphere(float3 R, float3 N, float ior)
 float2 mx_latlong_projection(float3 dir)
 {
     float latitude = -asin(dir.y) * M_PI_INV + 0.5;
-    float longitude = atan(dir.x, -dir.z) * M_PI_INV * 0.5 + 0.5;
+    float longitude = atan2(dir.x, -dir.z) * M_PI_INV * 0.5 + 0.5;
     return float2(longitude, latitude);
 }
 
@@ -682,7 +682,7 @@ float3 mx_latlong_map_lookup(
 {
     float3 envDir = normalize(mul(transform, float4(dir, 0.0)).xyz);
     float2 uv = mx_latlong_projection(envDir);
-    return textureLod(envSampler, uv, lod).rgb;
+    return envSampler.SampleLevel(uv, lod).rgb;
 }
 
 // Return the mip level with the appropriate coverage for a filtered importance

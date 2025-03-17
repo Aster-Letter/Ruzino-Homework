@@ -1,9 +1,19 @@
+import stdlib.genslang.mx_bsdf;
+import pbrlib.genslang.lib.mx_environment_prefilter;
 #include "lib/mx_microfacet_sheen.slang"
 
-void mx_sheen_bsdf_reflection(float3 L, float3 V, float3 P, float occlusion, float weight, float3 color, float roughness, float3 N, inout BSDF bsdf)
+void mx_sheen_bsdf_reflection(
+    float3 L,
+    float3 V,
+    float3 P,
+    float occlusion,
+    float weight,
+    float3 color,
+    float roughness,
+    float3 N,
+    inout BSDF bsdf)
 {
-    if (weight < M_FLOAT_EPS)
-    {
+    if (weight < M_FLOAT_EPS) {
         return;
     }
 
@@ -15,7 +25,8 @@ void mx_sheen_bsdf_reflection(float3 L, float3 V, float3 P, float occlusion, flo
     float NdotV = clamp(dot(N, V), M_FLOAT_EPS, 1.0);
     float NdotH = clamp(dot(N, H), M_FLOAT_EPS, 1.0);
 
-    float3 fr = color * mx_imageworks_sheen_brdf(NdotL, NdotV, NdotH, roughness);
+    float3 fr =
+        color * mx_imageworks_sheen_brdf(NdotL, NdotV, NdotH, roughness);
     float dirAlbedo = mx_imageworks_sheen_dir_albedo(NdotV, roughness);
     bsdf.throughput = float3(1.0 - dirAlbedo * weight);
 
@@ -24,10 +35,15 @@ void mx_sheen_bsdf_reflection(float3 L, float3 V, float3 P, float occlusion, flo
     bsdf.response = fr * NdotL * occlusion * weight;
 }
 
-void mx_sheen_bsdf_indirect(float3 V, float weight, float3 color, float roughness, float3 N, inout BSDF bsdf)
+void mx_sheen_bsdf_indirect(
+    float3 V,
+    float weight,
+    float3 color,
+    float roughness,
+    float3 N,
+    inout BSDF bsdf)
 {
-    if (weight < M_FLOAT_EPS)
-    {
+    if (weight < M_FLOAT_EPS) {
         return;
     }
 

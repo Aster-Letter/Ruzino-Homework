@@ -1,16 +1,34 @@
-#include "mx_microfacet_specular.slang"
+import pbrlib.genslang.lib.mx_microfacet_specular;
 
-// Return the mip level associated with the given alpha in a prefiltered environment.
+cbuffer EnvironmentPrefilterData : register(b0)
+{
+    float4x4 u_envMatrix;
+    float3 u_envLightIntensity;
+    int u_envRadianceMips;
+    int u_envIrradianceMips;
+    Sampler2D u_envRadiance;
+    Sampler2D u_envIrradiance;
+};
+
+// Return the mip level associated with the given alpha in a prefiltered
+// environment.
 float mx_latlong_alpha_to_lod(float alpha)
 {
     float lodBias = (alpha < 0.25) ? sqrt(alpha) : 0.5 * alpha + 0.375;
     return lodBias * float(u_envRadianceMips - 1);
 }
 
-float3 mx_environment_radiance(float3 N, float3 V, float3 X, float2 alpha, int distribution, FresnelData fd)
+float3 mx_environment_radiance(
+    float3 N,
+    float3 V,
+    float3 X,
+    float2 alpha,
+    int distribution,
+    FresnelData fd)
 {
     N = mx_forward_facing_normal(N, V);
-    float3 L = fd.refraction ? mx_refraction_solid_sphere(-V, N, fd.ior.x) : -reflect(V, N);
+    float3 L = fd.refraction ? mx_refraction_solid_sphere(-V, N, fd.ior.x)
+                             : -reflect(V, N);
 
     float NdotV = clamp(dot(N, V), M_FLOAT_EPS, 1.0);
 
@@ -19,7 +37,8 @@ float3 mx_environment_radiance(float3 N, float3 V, float3 X, float2 alpha, int d
     float G = mx_ggx_smith_G2(NdotV, NdotV, avgAlpha);
     float3 FG = fd.refraction ? float3(1.0) - (F * G) : F * G;
 
-    float3 Li = mx_latlong_map_lookup(L, u_envMatrix, mx_latlong_alpha_to_lod(avgAlpha), u_envRadiance);
+    float3 Li = mx_latlong_map_lookup(
+        L, u_envMatrix, mx_latlong_alpha_to_lod(avgAlpha), u_envRadiance);
     return Li * FG * u_envLightIntensity;
 }
 

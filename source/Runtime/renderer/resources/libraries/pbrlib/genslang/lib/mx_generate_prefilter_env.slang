@@ -1,4 +1,4 @@
-#include "mx_microfacet_specular.slang"
+import pbrlib.genslang.lib.mx_microfacet_specular;
 
 // Construct an orthonormal basis from a unit floattor.
 // https://graphics.pixar.com/library/OrthonormalB/paper.pdf

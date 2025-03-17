@@ -29,6 +29,7 @@
 #include "Logger/Logger.h"
 #include "Nodes/BitangentNodeSlang.h"
 #include "Nodes/BlurNodeSlang.h"
+#include "Nodes/ClosureSourceCodeNodeSlang.h"
 #include "Nodes/CompoundNodeSlang.h"
 #include "Nodes/GeomColorNodeSlang.h"
 #include "Nodes/GeomPropValueNodeSlang.h"
@@ -39,6 +40,7 @@
 #include "Nodes/LightShaderNodeSlang.h"
 #include "Nodes/NormalNodeSlang.h"
 #include "Nodes/NumLightsNodeSlang.h"
+#include "Nodes/SourceCodeNodeSlang.h"
 #include "Nodes/SurfaceNodeSlang.h"
 #include "Nodes/TangentNodeSlang.h"
 #include "Nodes/UnlitSurfaceNodeSlang.h"
@@ -689,33 +691,33 @@ void SlangShaderGenerator::emitPixelStage(
     emitLineBreak(stage);
 
     //// Determine whether lighting is required
-    //bool lighting = requiresLighting(graph);
+    // bool lighting = requiresLighting(graph);
 
     //// Define directional albedo approach
-    //if (lighting || context.getOptions().hwWriteAlbedoTable ||
-    //    context.getOptions().hwWriteEnvPrefilter) {
-    //    emitLine(
-    //        "#define DIRECTIONAL_ALBEDO_METHOD " +
-    //            std::to_string(
-    //                int(context.getOptions().hwDirectionalAlbedoMethod)),
-    //        stage,
-    //        false);
-    //    emitLineBreak(stage);
-    //}
+    // if (lighting || context.getOptions().hwWriteAlbedoTable ||
+    //     context.getOptions().hwWriteEnvPrefilter) {
+    //     emitLine(
+    //         "#define DIRECTIONAL_ALBEDO_METHOD " +
+    //             std::to_string(
+    //                 int(context.getOptions().hwDirectionalAlbedoMethod)),
+    //         stage,
+    //         false);
+    //     emitLineBreak(stage);
+    // }
 
     //// Add lighting support
-    //if (lighting) {
-    //    if (context.getOptions().hwMaxActiveLightSources > 0) {
-    //        const unsigned int maxLights =
-    //            std::max(1u, context.getOptions().hwMaxActiveLightSources);
-    //        emitLine(
-    //            "#define " + HW::LIGHT_DATA_MAX_LIGHT_SOURCES + " " +
-    //                std::to_string(maxLights),
-    //            stage,
-    //            false);
-    //    }
-    //    emitSpecularEnvironment(context, stage);
-    //    emitTransmissionRender(context, stage);
+    // if (lighting) {
+    //     if (context.getOptions().hwMaxActiveLightSources > 0) {
+    //         const unsigned int maxLights =
+    //             std::max(1u, context.getOptions().hwMaxActiveLightSources);
+    //         emitLine(
+    //             "#define " + HW::LIGHT_DATA_MAX_LIGHT_SOURCES + " " +
+    //                 std::to_string(maxLights),
+    //             stage,
+    //             false);
+    //     }
+    //     emitSpecularEnvironment(context, stage);
+    //     emitTransmissionRender(context, stage);
 
     //    if (context.getOptions().hwMaxActiveLightSources > 0) {
     //        emitLightData(context, stage);
@@ -723,12 +725,12 @@ void SlangShaderGenerator::emitPixelStage(
     //}
 
     //// Add shadowing support
-    //bool shadowing = (lighting && context.getOptions().hwShadowMap) ||
-    //                 context.getOptions().hwWriteDepthMoments;
-    //if (shadowing) {
-    //    emitLibraryInclude(
-    //        "pbrlib/genslang/lib/mx_shadow.slang", context, stage);
-    //}
+    // bool shadowing = (lighting && context.getOptions().hwShadowMap) ||
+    //                  context.getOptions().hwWriteDepthMoments;
+    // if (shadowing) {
+    //     emitLibraryInclude(
+    //         "pbrlib/genslang/lib/mx_shadow.slang", context, stage);
+    // }
 
     // Emit directional albedo table code.
     if (context.getOptions().hwWriteAlbedoTable) {
@@ -757,8 +759,8 @@ void SlangShaderGenerator::emitPixelStage(
     else {
         _tokenSubstitutions[ShaderGenerator::T_FILE_TRANSFORM_UV] =
             "mx_transform_uv";
-    }
-
+    } 
+      
     // Emit uv transform code globally if needed.
     if (context.getOptions().hwAmbientOcclusion) {
         emitLibraryInclude(
@@ -767,10 +769,10 @@ void SlangShaderGenerator::emitPixelStage(
             context,
             stage);
     }
-
     // emitLightFunctionDefinitions(graph, context, stage);
-
+      
     // Emit function definitions for all nodes in the graph.
+
     emitFunctionDefinitions(graph, context, stage);
 
     const ShaderGraphOutputSocket* outputSocket = graph.getOutputSocket();
@@ -790,12 +792,11 @@ void SlangShaderGenerator::emitPixelStage(
         context,
         stage,
         false);
-
     emitLine(
         "in " + vertexData.getName() + " " + vertexData.getInstance() + ")",
         stage,
-        false);
-
+        false); 
+     
     emitFunctionBodyBegin(graph, context, stage);
 
     if (graph.hasClassification(ShaderNode::Classification::CLOSURE) &&
@@ -1078,10 +1079,10 @@ ShaderNodeImplPtr SlangShaderGenerator::getImplementation(
         if (!impl) {
             // Fall back to source code implementation.
             if (outputType->isClosure()) {
-                impl = ClosureSourceCodeNode::create();
+                impl = ClosureSourceCodeNodeSlang::create();
             }
             else {
-                impl = SourceCodeNode::create();
+                impl = SourceCodeNodeSlang::create();
             }
         }
     }

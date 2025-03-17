@@ -190,13 +190,13 @@ class ShaderGeneratorTester {
     virtual void setTestStages() = 0;
 
     // Add files in to not examine
-    virtual void addSkipFiles() {};
+    virtual void addSkipFiles() { };
 
     // Add nodedefs to not examine
-    virtual void addSkipNodeDefs() {};
+    virtual void addSkipNodeDefs() { };
 
     // Add files to be skipped while loading libraries
-    virtual void addSkipLibraryFiles() {};
+    virtual void addSkipLibraryFiles() { };
 
     // Add color management
     virtual void addColorManagement();
@@ -250,7 +250,7 @@ class ShaderGeneratorTester {
         const std::string& optionsFilePath);
 
     // Allow the tester to alter the document, e.g., by flattening file names.
-    virtual void preprocessDocument(mx::DocumentPtr doc) {};
+    virtual void preprocessDocument(mx::DocumentPtr doc) { };
 
     // Compile generated source code. Default implementation does nothing.
     virtual void compileSource(
@@ -267,7 +267,7 @@ class ShaderGeneratorTester {
 
     // Get implementation "whitelist" for those implementations that have
     // been skipped for checking
-    virtual void getImplementationWhiteList(mx::StringSet& /*whiteList*/) {};
+    virtual void getImplementationWhiteList(mx::StringSet& /*whiteList*/) { };
 
     mx::ShaderGeneratorPtr _shaderGenerator;
     const std::string _targetString;
@@ -712,7 +712,12 @@ inline void ShaderGeneratorTester::compileSource(
             error_string);
 
         if (!error_string.empty()) {
-            //assert(false);
+            std::ofstream logFile;
+            logFile.open("shader_compile_error.log");
+            logFile << error_string;
+            logFile.close();
+
+            assert(false);
         }
     }
 }

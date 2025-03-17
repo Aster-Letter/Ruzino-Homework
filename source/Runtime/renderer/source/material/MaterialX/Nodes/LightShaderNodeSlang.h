@@ -9,11 +9,12 @@
 #include "../SlangShaderGenerator.h"
 #include <MaterialXGenShader/Nodes/SourceCodeNode.h>
 
-MATERIALX_NAMESPACE_BEGIN
+#include "SourceCodeNodeSlang.h"
 
+MATERIALX_NAMESPACE_BEGIN
 /// LightShader node implementation for SLANG
 /// Used for all light shaders implemented in source code.
-class HD_USTC_CG_API LightShaderNodeSlang : public SourceCodeNode
+class HD_USTC_CG_API LightShaderNodeSlang : public SourceCodeNodeSlang
 {
   public:
     LightShaderNodeSlang();
