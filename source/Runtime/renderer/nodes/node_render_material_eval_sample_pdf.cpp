@@ -84,8 +84,9 @@ NODE_EXECUTION_FUNCTION(material_eval_sample_pdf)
     // Set the program variables
 
     ProgramVars program_vars(resource_allocator, raytrace_compiled);
-    program_vars["SceneBVH"] = params.get_global_payload<RenderGlobalPayload&>()
-                                   .InstanceCollection->get_tlas();
+    program_vars["SceneBVH"] =
+        params.get_global_payload<RenderGlobalPayload &>()
+            .InstanceCollection->get_tlas();
     program_vars["hitObjects"] = hit_info_buffer;
     program_vars["in_PixelTarget"] = in_pixel_target_buffer;
     program_vars["PixelTarget"] = pixel_target_buffer;
@@ -116,7 +117,15 @@ NODE_EXECUTION_FUNCTION(material_eval_sample_pdf)
     context.announce_miss("Miss");
     context.announce_miss("ShadowMiss", 1);
 
-    for (auto material : global_payload.get_materials()) {
+    auto &materials = global_payload.get_materials();
+
+    for (auto material : materials) {
+        auto location = material.second->GetMaterialLocation();
+
+        if (location == -1) {
+            continue;
+        }
+
         context.announce_callable(
             "getColor",
             material.second->GetMaterialLocation(),

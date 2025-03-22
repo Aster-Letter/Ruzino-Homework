@@ -48,6 +48,9 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
 
         std::vector<std::thread> compile_threads;
         for (auto& material : *render_param->material_map) {
+            if (!material.second) {
+                continue;
+            }
             if (material.second->shader_compiled()) {
                 continue;
             }

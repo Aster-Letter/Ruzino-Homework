@@ -2,7 +2,7 @@ struct MaterialDataBlob {
     uint data[32];
 }
 StructuredBuffer<MaterialDataBlob> materialBuffer;
-ByteAddressBuffer t_BindlessTextures[] : register(t0, space2);
+Sampler2D t_BindlessTextures[] : register(t0, space2);
 
 void main()
 {

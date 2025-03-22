@@ -61,9 +61,12 @@ const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_RPRIM_TYPES = {
 };
 
 const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_SPRIM_TYPES = {
-    HdPrimTypeTokens->camera,      HdPrimTypeTokens->simpleLight,
-    HdPrimTypeTokens->sphereLight, HdPrimTypeTokens->domeLight,
-    HdPrimTypeTokens->material,
+    HdPrimTypeTokens->camera,         HdPrimTypeTokens->simpleLight,
+    HdPrimTypeTokens->sphereLight,    HdPrimTypeTokens->domeLight,
+    HdPrimTypeTokens->material,       HdPrimTypeTokens->drawTarget,
+    HdPrimTypeTokens->extComputation, HdPrimTypeTokens->cylinderLight,
+    HdPrimTypeTokens->diskLight,      HdPrimTypeTokens->distantLight,
+    HdPrimTypeTokens->rectLight,      HdPrimTypeTokens->imageShader
 };
 
 const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_BPRIM_TYPES = {
@@ -281,6 +284,8 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
         auto material = new Hd_USTC_CG_Material(sprimId);
         materials[sprimId] = material;
 
+        assert(materials[sprimId] != nullptr);
+
         return material;
     }
     else if (
@@ -317,6 +322,9 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
     else if (typeId == HdPrimTypeTokens->material) {
         auto material = new Hd_USTC_CG_Material(SdfPath::EmptyPath());
         materials[SdfPath::EmptyPath()] = material;
+
+        assert(materials[SdfPath::EmptyPath()] != nullptr);
+
         return material;
     }
     else if (

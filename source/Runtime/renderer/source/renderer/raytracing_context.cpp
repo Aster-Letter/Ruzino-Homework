@@ -133,6 +133,10 @@ void RaytracingContext::finish_announcing_shader_names()
         resource_allocator_.destroy(miss);
     }
 
+    hit_group_shaders.clear();
+    callable_shaders.clear();
+    miss_shaders.clear();
+
     auto local_program = program;
 
     if (ray_generation_program)
@@ -200,6 +204,13 @@ void RaytracingContext::finish_announcing_shader_names()
 
     for (int i = 0; i < callable_names.size(); ++i) {
         auto callable = callable_names[i];
+
+        bool is_placeholder = callable.empty();
+
+        if (is_placeholder) {
+            callable_shaders.push_back(nullptr);
+            continue;
+        }
 
         local_program = program;
 

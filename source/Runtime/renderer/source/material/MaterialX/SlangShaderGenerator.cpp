@@ -413,6 +413,7 @@ void SlangShaderGenerator::emitVertexStage(
         stage,
         false);
     emitFunctionBodyBegin(graph, context, stage);
+
     emitLine(
         "float4 hPositionWorld = mul(" + HW::T_WORLD_MATRIX + ", float4(" +
             HW::T_IN_POSITION + ", 1.0))",
@@ -800,9 +801,18 @@ void SlangShaderGenerator::emitPixelStage(
         stage,
         false);
 
+    auto& syntax = getSyntax();
+
+    const string& type = syntax.getTypeName(Type::VECTOR3);
+    emitLine(type + " " + HW::DIR_L + ", ", stage, false);
+    emitLine(type + " " + HW::DIR_V + ", ", stage, false);
+
+    emitLine("in MaterialDataBlob data", stage, false);
+
     if (!vertexData.empty()) {
         emitLine(
-            "in " + vertexData.getName() + " " + vertexData.getInstance() + ")",
+            ", in " + vertexData.getName() + " " + vertexData.getInstance() +
+                ")",
             stage,
             false);
     }
@@ -811,6 +821,8 @@ void SlangShaderGenerator::emitPixelStage(
     }
 
     emitFunctionBodyBegin(graph, context, stage);
+
+    emitLine("$BindlessDataLoading", stage);
 
     if (graph.hasClassification(ShaderNode::Classification::CLOSURE) &&
         !graph.hasClassification(ShaderNode::Classification::SHADER)) {
