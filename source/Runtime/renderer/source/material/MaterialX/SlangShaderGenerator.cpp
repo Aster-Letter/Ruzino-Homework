@@ -950,7 +950,7 @@ void SlangShaderGenerator::emitPixelStage(
         }
     }
 
-    emitLine("out1 = float4(1,0,0,1)", stage);
+    emitLine("out1 = float4(out1 ,1)", stage);
 
     // End main function
     emitFunctionBodyEnd(graph, context, stage);

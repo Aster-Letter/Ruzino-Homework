@@ -85,9 +85,15 @@ class BindlessContext : public HwResourceBindingContext {
         return fetch_data;
     }
 
+    MaterialDataBlob& get_material_data()
+    {
+        return material_data;
+    }
+
    private:
     std::string fetch_data = "";
     unsigned int data_location = 0;
+    MaterialDataBlob material_data;
 };
 
 //
@@ -126,16 +132,36 @@ void BindlessContext::emitResourceBindings(
                 size_t numComponents = 0;
 
                 if (type == Type::FLOAT) {
+                    auto val = uniform->getValue()->asA<float>();
+                    memcpy(
+                        &material_data.data[data_location],
+                        &val,
+                        sizeof(float));
+
                     dataFetch = "asfloat(data.data[" +
                                 std::to_string(data_location++) + "])";
+
                     numComponents = 1;
                 }
                 else if (type == Type::INTEGER || type == Type::STRING) {
+                    if (type == Type::INTEGER) {
+                        auto val = uniform->getValue()->asA<int>();
+                        memcpy(
+                            &material_data.data[data_location],
+                            &val,
+                            sizeof(int));
+                    }
                     dataFetch = "asint(data.data[" +
                                 std::to_string(data_location++) + "])";
                     numComponents = 1;
                 }
                 else if (type == Type::VECTOR2) {
+                    auto val = uniform->getValue()->asA<Vector2>();
+                    memcpy(
+                        &material_data.data[data_location],
+                        &val,
+                        sizeof(Vector2));
+
                     dataFetch = "float2(asfloat(data.data[" +
                                 std::to_string(data_location++) +
                                 "]), asfloat(data.data[" +
@@ -143,6 +169,21 @@ void BindlessContext::emitResourceBindings(
                     numComponents = 2;
                 }
                 else if (type == Type::VECTOR3 || type == Type::COLOR3) {
+                    if (type == Type::COLOR3) {
+                        auto val = uniform->getValue()->asA<Color3>();
+                        memcpy(
+                            &material_data.data[data_location],
+                            &val,
+                            sizeof(Color3));
+                    }
+                    else {
+                        auto val = uniform->getValue()->asA<Vector3>();
+                        memcpy(
+                            &material_data.data[data_location],
+                            &val,
+                            sizeof(Vector3));
+                    }
+
                     dataFetch = "float3(asfloat(data.data[" +
                                 std::to_string(data_location++) +
                                 "]), asfloat(data.data[" +
@@ -152,6 +193,11 @@ void BindlessContext::emitResourceBindings(
                     numComponents = 3;
                 }
                 else if (type == Type::COLOR4) {
+                    auto val = uniform->getValue()->asA<Color4>();
+                    memcpy(
+                        &material_data.data[data_location],
+                        &val,
+                        sizeof(Color4));
                     dataFetch = "float4(asfloat(data.data[" +
                                 std::to_string(data_location++) +
                                 "]), asfloat(data.data[" +
@@ -163,6 +209,11 @@ void BindlessContext::emitResourceBindings(
                     numComponents = 4;
                 }
                 else if (type == Type::MATRIX44) {
+                    auto val = uniform->getValue()->asA<Matrix44>();
+                    memcpy(
+                        &material_data.data[data_location],
+                        &val,
+                        sizeof(Matrix44));
                     dataFetch = "float4x4(";
                     for (int i = 0; i < 16; i++) {
                         dataFetch += "asfloat(data.data[" +
@@ -174,6 +225,7 @@ void BindlessContext::emitResourceBindings(
                     numComponents = 16;
                 }
                 else if (type == Type::DISPLACEMENTSHADER) {
+                    auto val = uniform->getValue();
                     // Load vector3 and float for displacement shader
                     std::string vectorPart = "float3(asfloat(data.data[" +
                                              std::to_string(data_location++) +
@@ -240,10 +292,30 @@ void BindlessContext::emitResourceBindings(
 
     if (resources.getName() == HW::VERTEX_DATA) {
         for (auto vertexdata_member : resources.getVariableOrder()) {
-            std::cout << "VertexData " << vertexdata_member->getName()
-                      << " = vd." << vertexdata_member->getName() << ";\n";
+            if (vertexdata_member->getName() == HW::T_POSITION_WORLD) {
+                fetch_data += "vd." + vertexdata_member->getName() +
+                              " = vertexInfo.posW;\n";
+            }
+            else if (vertexdata_member->getName() == HW::T_NORMAL_WORLD) {
+                fetch_data += "vd." + vertexdata_member->getName() +
+                              " = vertexInfo.normalW;\n";
+            }
+            else if (vertexdata_member->getName() == HW::T_TANGENT_WORLD) {
+                fetch_data +=
+                    "vd." + vertexdata_member->getName() +
+                    " = vertexInfo.tangentW.xyz * vertexInfo.tangentW.w;\n";
+            }
+            else {
+                if (vertexdata_member->getType() == Type::VECTOR2) {
+                    fetch_data += "vd." + vertexdata_member->getName() +
+                                  " = vertexInfo.texC;\n";
+                }
+            }
         }
     }
+
+    fetch_data =
+        mx::replaceSubstrings(fetch_data, generator.getTokenSubstitutions());
 
     generator.emitLineBreak(stage);
 }
@@ -440,6 +512,10 @@ void Hd_USTC_CG_Material::MtlxGenerateShader(
             shader_gen_context_->getUserData<BindlessContext>(
                 mx::HW::USER_DATA_BINDING_CONTEXT);
         get_data_code = context->get_data_code();
+
+        material_data = context->get_material_data();
+
+        material_data_handle->write_data(&material_data);
     }
 }
 
@@ -651,10 +727,7 @@ static std::string slang_source_code_fallback = R"(
 
 struct VertexData
 {
-    float2 i_geomprop_st;
-    float3 tangentWorld;
-    float3 normalWorld;
-    float3 positionWorld;
+    float foo;
 };
 
 import Scene.VertexInfo;
@@ -672,7 +745,7 @@ struct CallableData
 [shader("callable")]
 void $getColor(inout CallableData data)
 {
-    data.color = float4(1, 0, 0, 1);
+    data.color = float4(1, 0, 1, 1);
 }
 
 )";

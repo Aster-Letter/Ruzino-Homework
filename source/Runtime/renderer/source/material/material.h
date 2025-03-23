@@ -1,4 +1,6 @@
 #pragma once
+#include <complex.h>
+
 #include "Logger/Logger.h"
 #include "MaterialX/SlangShaderGenerator.h"
 #include "api.h"
@@ -88,7 +90,8 @@ class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
         SdfPath& surfTerminalPath,
         HdMaterialNode2 const*& surfTerminal);
 
-    DeviceMemoryPool<MaterialData>::MemoryHandle material_data_handle;
+    DeviceMemoryPool<MaterialDataBlob>::MemoryHandle material_data_handle;
+    MaterialDataBlob material_data;
 
     static MaterialX::GenContextPtr shader_gen_context_;
     static MaterialX::DocumentPtr libraries;
