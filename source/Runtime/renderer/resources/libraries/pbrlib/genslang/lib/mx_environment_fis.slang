@@ -34,8 +34,8 @@ float3 mx_environment_radiance(float3 N, float3 V, float3 X, float2 alpha, int d
         // Sample the environment light from the given direction.
         float3 Lw = tangentToWorld * L;
         float pdf = mx_ggx_NDF(H, alpha) * G1V / (4.0 * NdotV);
-        float lod = mx_latlong_compute_lod(Lw, pdf, float(u_envRadianceMips - 1), envRadianceSamples);
-        float3 sampleColor = mx_latlong_map_lookup(Lw, u_envMatrix, lod, u_envRadiance);
+        float lod = mx_latlong_compute_lod(Lw, pdf, float(u_envPrefilterData.u_envRadianceMips - 1), envRadianceSamples);
+        float3 sampleColor = mx_latlong_map_lookup(Lw, u_envPrefilterData.u_envMatrix, lod, u_envPrefilterData.u_envRadiance);
 
         // Compute the Fresnel term.
         float3 F = mx_compute_fresnel(VdotH, fd);
@@ -59,11 +59,11 @@ float3 mx_environment_radiance(float3 N, float3 V, float3 X, float2 alpha, int d
     radiance /= G1V * float(envRadianceSamples);
 
     // Return the final radiance.
-    return radiance * u_envLightIntensity;
+    return radiance * u_envPrefilterData.u_envLightIntensity;
 }
 
 float3 mx_environment_irradiance(float3 N)
 {
-    float3 Li = mx_latlong_map_lookup(N, u_envMatrix, 0.0, u_envIrradiance);
-    return Li * u_envLightIntensity;
+    float3 Li = mx_latlong_map_lookup(N, u_envPrefilterData.u_envMatrix, 0.0, u_envPrefilterData.u_envIrradiance);
+    return Li * u_envPrefilterData.u_envLightIntensity;
 }

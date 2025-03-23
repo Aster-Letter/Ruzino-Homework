@@ -84,7 +84,7 @@ extension MaterialSystem
         \return Shading data struct.
     */
     ShadingData prepareShadingData(
-        const VertexData v, const uint materialID, const float3 viewDir)
+        const VertexInfo v, const uint materialID, const float3 viewDir)
     {
         ShadingData sd = {};
 

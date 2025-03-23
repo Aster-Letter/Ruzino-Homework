@@ -32,7 +32,7 @@ StaticVertexData load_vertex(MeshDesc mesh_data, uint vertex_id)
     return data;
 }
 
-VertexData get_interpolated_vertex(
+VertexInfo get_interpolated_vertex(
     uint instance_id,
     uint primitive_id,
     float2 baricentric2)

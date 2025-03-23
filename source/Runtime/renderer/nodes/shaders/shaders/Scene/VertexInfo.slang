@@ -35,7 +35,7 @@ USTC_CG_NAMESPACE_OPEN_SCOPE
     The bitangent should be computed: cross(normal, tangent.xyz) * tangent.w.
     The tangent space is orthogonalized in prepareShadingData().
 */
-struct VertexData
+struct VertexInfo
 {
     float3 posW;            ///< Position in world space.
     float3 normalW;         ///< Shading normal in world space (normalized).

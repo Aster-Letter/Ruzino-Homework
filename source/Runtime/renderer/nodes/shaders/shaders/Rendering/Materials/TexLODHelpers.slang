@@ -725,7 +725,7 @@ void computeRayDifferentialRefraction(inout RayDiff rayDiff, float3 rayDir, floa
     \param[out] dUVdx The differential of the texture coordinates in pixel coordinate x.
     \param[out] dUVdy The differential of the texture coordinates in pixel coordinate y.
 */
-void refractRayDiffUsingVertexData(VertexData v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float3 refractedDir, float eta, float4x4 worldMat, float3x3 worldInvTransposeMat,
+void refractRayDiffUsingVertexData(VertexInfo v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float3 refractedDir, float eta, float4x4 worldMat, float3x3 worldInvTransposeMat,
     inout RayDiff rayDiff, out float2 dUVdx, out float2 dUVdy)
 {
     float3 unnormalizedN;   // Non-normalized interpolated normal for ray differential scatter.
@@ -824,7 +824,7 @@ void prepareVerticesForRayDiffs(float3 rayDir, StaticVertexData vertices[3], flo
      \param[out] dUVdx Differential texture coordinates wrt x.
      \param[out] dUVdy Differential texture coordinates wrt y.
 */
-void prepareRayDiffAtHitPoint(VertexData v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float4x4 worldMat, float3x3 worldInvTransposeMat,
+void prepareRayDiffAtHitPoint(VertexInfo v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float4x4 worldMat, float3x3 worldInvTransposeMat,
     RayDiff rayDiff, out float3 unnormalizedN, out float3 normals[3], out float2 dBarydx, out float2 dBarydy, out float2 dUVdx, out float2 dUVdy)
 {
     float3 edge01, edge02;
@@ -845,7 +845,7 @@ void prepareRayDiffAtHitPoint(VertexData v, StaticVertexData triangleVertices[3]
     \param[out] dUVdx The differential of the texture coordinates in pixel coordinate x.
     \param[out] dUVdy The differential of the texture coordinates in pixel coordinate y.
 */
-void reflectRayDiffUsingVertexData(VertexData v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float4x4 worldMat, float3x3 worldInvTransposeMat,
+void reflectRayDiffUsingVertexData(VertexInfo v, StaticVertexData triangleVertices[3], float3 barycentrics, float3 rayDir, float4x4 worldMat, float3x3 worldInvTransposeMat,
     inout RayDiff rayDiff, out float2 dUVdx, out float2 dUVdy)
 {
     float3 unnormalizedN;   // Non-normalized interpolated normal for ray differential scatter.

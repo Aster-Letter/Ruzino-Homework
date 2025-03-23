@@ -52,7 +52,9 @@ class BindlessContext : public HwResourceBindingContext {
 
     void initialize() override
     {
-        fetch_data = "";
+        fetch_data =
+            "MaterialDataBlob data = materialBuffer[material_id];\n VertexData "
+            "vd; \n";
         data_location = 0;
     }
 
@@ -60,6 +62,7 @@ class BindlessContext : public HwResourceBindingContext {
     {
         const ShaderGenerator& generator = context.getShaderGenerator();
         generator.emitLine("import Scene.BindlessMaterial", stage);
+        generator.emitLine("import Scene.VertexInfo", stage);
     }
 
     // Emit uniforms with binding information
@@ -119,134 +122,95 @@ void BindlessContext::emitResourceBindings(
             auto& syntax = generator.getSyntax();
 
             if (type != Type::FILENAME) {
-                if (type == Type::VECTOR3) {
-                    string float3_string =
-                        "asfloat(data.data[" + std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) + "])";
+                std::string dataFetch;
+                size_t numComponents = 0;
 
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + float3_string +
-                                  ";\n";
+                if (type == Type::FLOAT) {
+                    dataFetch = "asfloat(data.data[" +
+                                std::to_string(data_location++) + "])";
+                    numComponents = 1;
                 }
-                else if (type == Type::FLOAT) {
-                    string float_string = "asfloat(data.data[" +
-                                          std::to_string(data_location++) +
-                                          "])";
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + float_string +
-                                  ";\n";
-                }
-                else if (type == Type::INTEGER) {
-                    string int_string = "asint(data.data[" +
-                                        std::to_string(data_location++) + "])";
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + int_string +
-                                  ";\n";
-                }
-                else if (type == Type::MATRIX44) {
-                    std::ostringstream matrix_stream;
-                    matrix_stream << "float4x4(";
-
-                    // Create matrix with 4 rows of 4 elements each
-                    for (int row = 0; row < 4; row++) {
-                        for (int col = 0; col < 4; col++) {
-                            matrix_stream << "asfloat(data.data["
-                                          << data_location++ << "])";
-                            // Add comma after every element except the last
-                            // one
-                            if (!(row == 3 && col == 3)) {
-                                matrix_stream << ", ";
-                            }
-                        }
-                    }
-
-                    matrix_stream << ")";
-                    string matrix_string = matrix_stream.str();
-
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + matrix_string +
-                                  ";\n";
-                }
-                else if (type == Type::COLOR3) {
-                    string float3_string =
-                        "asfloat(data.data[" + std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) + "])";
-
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + float3_string +
-                                  ";\n";
-                }
-                else if (type == Type::COLOR4) {
-                    string float4_string =
-                        "asfloat(data.data[" + std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) + "])";
-
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + float4_string +
-                                  ";\n";
+                else if (type == Type::INTEGER || type == Type::STRING) {
+                    dataFetch = "asint(data.data[" +
+                                std::to_string(data_location++) + "])";
+                    numComponents = 1;
                 }
                 else if (type == Type::VECTOR2) {
-                    string float2_string =
-                        "asfloat(data.data[" + std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) + "])";
-
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + float2_string +
-                                  ";\n";
+                    dataFetch = "float2(asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) + "]))";
+                    numComponents = 2;
+                }
+                else if (type == Type::VECTOR3 || type == Type::COLOR3) {
+                    dataFetch = "float3(asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) + "]))";
+                    numComponents = 3;
+                }
+                else if (type == Type::COLOR4) {
+                    dataFetch = "float4(asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) +
+                                "]), asfloat(data.data[" +
+                                std::to_string(data_location++) + "]))";
+                    numComponents = 4;
+                }
+                else if (type == Type::MATRIX44) {
+                    dataFetch = "float4x4(";
+                    for (int i = 0; i < 16; i++) {
+                        dataFetch += "asfloat(data.data[" +
+                                     std::to_string(data_location++) + "])";
+                        if (i < 15)
+                            dataFetch += ", ";
+                    }
+                    dataFetch += ")";
+                    numComponents = 16;
                 }
                 else if (type == Type::DISPLACEMENTSHADER) {
-                    // First load the float3 and float parameters for the
-                    // displacement shader
-                    string float3_string =
-                        "asfloat(data.data[" + std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) +
-                        "]), asfloat(data.data[" +
-                        std::to_string(data_location++) + "])";
-
-                    string float_string = "asfloat(data.data[" +
-                                          std::to_string(data_location++) +
-                                          "])";
-
-                    // Initialize the displacement shader with the float3 and
-                    // float parameters
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " +
-                                  "displacementshader(float3(" + float3_string +
-                                  "), " + float_string + ");\n";
+                    // Load vector3 and float for displacement shader
+                    std::string vectorPart = "float3(asfloat(data.data[" +
+                                             std::to_string(data_location++) +
+                                             "]), asfloat(data.data[" +
+                                             std::to_string(data_location++) +
+                                             "]), asfloat(data.data[" +
+                                             std::to_string(data_location++) +
+                                             "]))";
+                    std::string floatPart = "asfloat(data.data[" +
+                                            std::to_string(data_location++) +
+                                            "])";
+                    dataFetch = "displacementshader(" + vectorPart + ", " +
+                                floatPart + ")";
+                    numComponents = 4;
                 }
-                else if (type == Type::STRING) {
-                    string int_string = "asint(data.data[" +
-                                        std::to_string(data_location++) + "])";
-                    fetch_data += syntax.getTypeName(type) + " " +
-                                  uniform->getName() + " = " + int_string +
-                                  ";\n";
-                }
-
                 else {
                     log::warning(
                         ("Unsupported uniform type: " + type->getName())
                             .c_str());
                 }
 
-                // generator.emitLineBegin(stage);
-                // generator.emitVariableDeclaration(
-                //     uniform, EMPTY_STRING, context, stage, true);
-                // generator.emitString(Syntax::SEMICOLON, stage);
-                // generator.emitLineEnd(stage, false);
+                if (numComponents > 0) {
+                    fetch_data += syntax.getTypeName(type) + " " +
+                                  uniform->getName() + " = " + dataFetch +
+                                  ";\n";
+                }
             }
+            else {
+                log::warning(
+                    ("Unsupported uniform type: " + type->getName()).c_str());
+            }
+
+            // generator.emitLineBegin(stage);
+            // generator.emitVariableDeclaration(
+            //     uniform, EMPTY_STRING, context, stage, true);
+            // generator.emitString(Syntax::SEMICOLON, stage);
+            // generator.emitLineEnd(stage, false);
         }
 
         // Second, emit all sampler uniforms as separate uniforms with separate
@@ -655,23 +619,97 @@ unsigned Hd_USTC_CG_Material::GetMaterialLocation() const
 
 // HLSL callable shader
 static std::string slang_source_code = R"(
-// Simple callable shader that returns a red color
+import Scene.VertexInfo;
 
-ConstantBuffer<float> cb : register(b0);
+ConstantBuffer<float> cb;
 
 struct CallableData
 {
     float4 color;
+    float3 L;
+    float3 V;
+    uint materialID;
+    VertexInfo vertexInfo;
 };
 
 [shader("callable")]
 void getColor(inout CallableData data)
 {
-        float4 color = float4(1.0f, 0.0f, 0.0f, 1.0f);
-    // Set the payload
-        data.color = color;
+    eval(data.color, data.L, data.V, data.materialID, data.vertexInfo);
+    data.color = float4(0, 1, 0, 1);
+return;
+}
 
-    return;
+)";
+
+// HLSL callable shader
+static std::string slang_source_code_fallback = R"(
+
+struct VertexData
+{
+    float2 i_geomprop_st;
+    float3 tangentWorld;
+    float3 normalWorld;
+    float3 positionWorld;
+};
+
+
+void IMP_UsdPrimvarReader_vector2(VertexData vd, int varname, float2 fallback, out float2 out1)
+{
+    float2 primvar_out = vd.i_geomprop_st;
+    out1 = primvar_out;
+}
+
+import stdlib.genslang.lib.mx_transform_uv;
+
+void mx_image_color4(
+    Sampler2D tex_sampler,
+    int layer,
+    float4 defaultval,
+    float2 texcoord,
+    int uaddressmode,
+    int vaddressmode,
+    int filtertype,
+    int framerange,
+    int frameoffset,
+    int frameendaction,
+    float2 uv_scale,
+    float2 uv_offset,
+    out float4 result)
+{
+    float2 uv = mx_transform_uv(texcoord, uv_scale, uv_offset);
+    result = tex_sampler.SampleLevel(uv, 0.0);
+}
+
+void IMP_UsdUVTexture_23(VertexData vd, Sampler2D file, float2 st, int wrapS, int wrapT, float4 fallback, float4 scale, float4 bias, out float r, out float g, out float b, out float a, out float3 rgb)
+{
+    float4 image_reader_out = float4(0.0);
+    mx_image_color4(file, 0, fallback, st, wrapS, wrapT, 1, 0, 0, 0, float2(1.000000, 1.000000), float2(0.000000, 0.000000), image_reader_out);
+    float4 image_scale_out = image_reader_out * scale;
+    float4 image_bias_out = image_scale_out + bias;
+    r = image_bias_out.x;
+    g = image_bias_out.y;
+    b = image_bias_out.z;
+    a = image_bias_out.w;
+    rgb = float3(image_bias_out.x, image_bias_out.y, image_bias_out.z);
+}
+
+import Scene.VertexInfo;
+ConstantBuffer<float> cb;
+
+struct CallableData
+{
+    float4 color;
+    float3 L;
+    float3 V;
+    uint materialID;
+    VertexInfo vertexInfo;
+};
+
+[shader("callable")]
+void getColor(inout CallableData data)
+{
+    data.color = float4(1, 0, 0, 1);
 }
 
 )";
@@ -680,30 +718,43 @@ void Hd_USTC_CG_Material::ensure_shader_compiled(const ShaderFactory& factory)
 {
     if (!program) {
         if (!shader_source.empty()) {
-            ProgramDesc mtlx_desc;
-            mtlx_desc.set_source_code(shader_source);
-            auto mtlx_program = factory.createProgram(mtlx_desc);
-        }
-
-        // replace the $BindlessDataLoading in shader_source with the
-        // get_data_code
-        std::string to_replace = "$BindlessDataLoading";
-        size_t pos = shader_source.find(to_replace);
-        if (pos != std::string::npos) {
-            shader_source.replace(pos, to_replace.length(), get_data_code);
-        }
+            // if (false) {
+            // replace the $BindlessDataLoading in shader_source with the
+            // get_data_code
+            std::string to_replace = "$BindlessDataLoading";
+            size_t pos = shader_source.find(to_replace);
+            if (pos != std::string::npos) {
+                shader_source.replace(pos, to_replace.length(), get_data_code);
+            }
 #ifndef _NDEBUG
-        std::ofstream out(
-            "generated_shaders/" + std::to_string(this->GetMaterialLocation()) +
-            ".slang");
-        out << shader_source;
-        out.close();
+            std::ofstream out(
+                "generated_shaders/" +
+                std::to_string(this->GetMaterialLocation()) + ".slang");
+            out << shader_source;
+            out.close();
 #endif
+            ProgramDesc mtlx_desc;
+            mtlx_desc.set_source_code(shader_source + slang_source_code);
+            mtlx_desc.set_entry_name("getColor");
+            program = factory.createProgram(mtlx_desc);
 
-        ProgramDesc desc;
-        desc.set_source_code(slang_source_code).set_entry_name("getColor");
+            if (!program->get_error_string().empty()) {
+                std::ofstream out("generated_shaders/errorlog.txt");
+                out << program->get_error_string();
+                out.close();
 
-        program = factory.createProgram(desc);
+                assert(false);
+            }
+
+            assert(program->getBufferPointer());
+        }
+        else {
+            ProgramDesc mtlx_desc;
+            mtlx_desc.set_source_code(slang_source_code_fallback);
+            mtlx_desc.set_entry_name("getColor");
+            program = factory.createProgram(mtlx_desc);
+            assert(program->getBufferPointer());
+        }
     }
 }
 

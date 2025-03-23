@@ -98,7 +98,7 @@ HitInfo traceSceneRayImpl<let Flags : int>(const bool useAlphaTest, inout RayQue
         {
             // Alpha test for non-opaque geometry.
             const TriangleHit hit = getCandidateTriangleHit(rayQuery);
-            const VertexData v = gScene.getVertexData(hit);
+            const VertexInfo v = gScene.getVertexData(hit);
             const uint materialID = gScene.getMaterialID(hit.instanceID);
 
             if (gScene.materials.alphaTest(v, materialID, 0.f)) continue;
@@ -261,7 +261,7 @@ bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout
         {
             // Alpha test for non-opaque geometry.
             const TriangleHit hit = getCandidateTriangleHit(rayQuery);
-            const VertexData v = gScene.getVertexData(hit);
+            const VertexInfo v = gScene.getVertexData(hit);
             const uint materialID = gScene.getMaterialID(hit.instanceID);
 
             if (gScene.materials.alphaTest(v, materialID, 0.f)) continue;

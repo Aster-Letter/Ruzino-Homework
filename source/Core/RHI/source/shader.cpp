@@ -106,7 +106,7 @@ std::string ProgramDesc::get_profile() const
         case nvrhi::ShaderType::ClosestHit: return "ch_6_6";
         case nvrhi::ShaderType::Miss: return "ms_6_6";
         case nvrhi::ShaderType::Intersection: return "is_6_6";
-        case nvrhi::ShaderType::Callable: return "cs_6_6";
+        case nvrhi::ShaderType::Callable: return "lib_6_6";
         case nvrhi::ShaderType::AllRayTracing: return "lib_6_6";
         case nvrhi::ShaderType::All: return "lib_6_6";
     }
@@ -296,13 +296,15 @@ void ShaderFactory::modify_vulkan_binding_shift(
 }
 ShaderReflectionInfo ShaderFactory::shader_reflect(
     slang::IComponentType* component,
-    nvrhi::ShaderType shader_type) const
+    nvrhi::ShaderType shader_type,
+    slang::IBlob** diagnostic) const
 {
     ShaderReflectionInfo ret;
     std::map<std::string, std::tuple<unsigned, unsigned>>& binding_locations =
         ret.binding_locations;
 
-    slang::ShaderReflection* programReflection = component->getLayout(0);
+    slang::ShaderReflection* programReflection =
+        component->getLayout(0, diagnostic);
 
     // slang::EntryPointReflection* entryPoint =
     //     programReflection->findEntryPointByName(entryPointName);
@@ -521,6 +523,9 @@ void ShaderFactory::populate_vk_options(
             error_string = (const char*)diagnostics->getBufferPointer(); \
         }                                                                \
         return;                                                          \
+    }                                                                    \
+    else if (diagnostics) {                                              \
+        log::warning((const char*)diagnostics->getBufferPointer());      \
     }
 
 void ShaderFactory::SlangCompile(
@@ -535,11 +540,13 @@ void ShaderFactory::SlangCompile(
     Slang::ComPtr<ISlangSharedLibrary>& ppSharedLirary,
     std::string& error_string,
     SlangCompileTarget target,
-    Slang::ComPtr<slang::IComponentType>* linkedProgram) const
+    Slang::ComPtr<slang::IComponentType>* linkedProgram1) const
 {
     auto stage = ConvertShaderTypeToSlangStage(shaderType);
 
-    auto profile_id = getGlobalSession()->findProfile(profile);
+    auto global_session = getGlobalSession();
+
+    auto profile_id = global_session->findProfile(profile);
 
     std::vector<slang::CompilerOptionEntry> vk_compiler_options;
 
@@ -590,7 +597,7 @@ void ShaderFactory::SlangCompile(
 
     SlangResult result;
 
-    result = getGlobalSession()->createSession(
+    result = global_session->createSession(
         compile_session_desc, p_compile_session.writeRef());
 
     Slang::ComPtr<slang::IModule> module;
@@ -601,14 +608,20 @@ void ShaderFactory::SlangCompile(
         assert(result == SLANG_OK);
     }
 
+    static std::atomic<unsigned> shader_id = 0;
+
     auto load_module = [&](slang::ISession* session) {
         slang::IModule* ret;
         if (!sourceCode.empty())
+
+        {
+            auto id = shader_id++;
             ret = session->loadModuleFromSourceString(
-                path.filename().generic_string().c_str(),
-                path.generic_string().c_str(),
+                (std::to_string(id) + path.filename().generic_string()).c_str(),
+                (std::to_string(id) + path.generic_string()).c_str(),
                 sourceCode.c_str(),
                 diagnostics.writeRef());
+        }
 
         else {
             ret = session->loadModule(
@@ -634,6 +647,8 @@ void ShaderFactory::SlangCompile(
     Slang::ComPtr<slang::IEntryPoint> entry;
 
     if (!std::string(entryPoint).empty()) {
+        CHECK_REPORTED_ERROR();
+
         result = module->findAndCheckEntryPoint(
             entryPoint, stage, entry.writeRef(), diagnostics.writeRef());
         CHECK_REPORTED_ERROR();
@@ -641,32 +656,35 @@ void ShaderFactory::SlangCompile(
     }
 
     Slang::ComPtr<slang::IComponentType> program;
-    p_compile_session->createCompositeComponentType(
-        components.data(), components.size(), program.writeRef());
-
-    Slang::ComPtr<slang::IComponentType> localLinkedProgram;
-    if (!linkedProgram) {
-        linkedProgram = std::addressof(localLinkedProgram);
-    }
-
-    result = program->link(linkedProgram->writeRef());
+    result = p_compile_session->createCompositeComponentType(
+        components.data(),
+        components.size(),
+        program.writeRef(),
+        diagnostics.writeRef());
 
     CHECK_REPORTED_ERROR();
 
-    shader_reflection = shader_reflect(linkedProgram->get(), shaderType);
+    Slang::ComPtr<slang::IComponentType> linkedProgram;
+
+    result = program->link(linkedProgram.writeRef(), diagnostics.writeRef());
+
+    CHECK_REPORTED_ERROR();
+
+    shader_reflection =
+        shader_reflect(linkedProgram.get(), shaderType, diagnostics.writeRef());
+    CHECK_REPORTED_ERROR();
 
     if (target == SLANG_SHADER_HOST_CALLABLE) {
-        result =
-            (*linkedProgram)
-                ->getEntryPointHostCallable(
-                    0, 0, ppSharedLirary.writeRef(), diagnostics.writeRef());
+        result = linkedProgram->getEntryPointHostCallable(
+            0, 0, ppSharedLirary.writeRef(), diagnostics.writeRef());
         CHECK_REPORTED_ERROR();
         assert(result == SLANG_OK);
     }
     else {
-        result = (*linkedProgram)
-                     ->getTargetCode(
-                         0, ppResultBlob.writeRef(), diagnostics.writeRef());
+        result = linkedProgram->getTargetCode(
+            0, ppResultBlob.writeRef(), diagnostics.writeRef());
+
+        assert(ppResultBlob);
 
         CHECK_REPORTED_ERROR();
         assert(result == SLANG_OK);

@@ -790,7 +790,7 @@ void SlangShaderGenerator::emitPixelStage(
 
     const VariableBlock& vertexData = stage.getInputBlock(HW::VERTEX_DATA);
 
-    emitLine("void main(", stage, false);
+    emitLine("void eval(", stage, false);
 
     const VariableBlock& outputs = stage.getOutputBlock(HW::PIXEL_OUTPUTS);
     emitVariableDeclarations(
@@ -807,18 +807,8 @@ void SlangShaderGenerator::emitPixelStage(
     emitLine(type + " " + HW::DIR_L + ", ", stage, false);
     emitLine(type + " " + HW::DIR_V + ", ", stage, false);
 
-    emitLine("in MaterialDataBlob data", stage, false);
-
-    if (!vertexData.empty()) {
-        emitLine(
-            ", in " + vertexData.getName() + " " + vertexData.getInstance() +
-                ")",
-            stage,
-            false);
-    }
-    else {
-        emitLine(")", stage, false);
-    }
+    emitLine("in uint material_id, ", stage, false);
+    emitLine("in VertexInfo vertexInfo)", stage, false);
 
     emitFunctionBodyBegin(graph, context, stage);
 

@@ -80,7 +80,8 @@ class RHI_API ShaderFactory {
     void modify_vulkan_binding_shift(nvrhi::BindingLayoutItem& item) const;
     ShaderReflectionInfo shader_reflect(
         slang::IComponentType* component,
-        nvrhi::ShaderType shader_type) const;
+        nvrhi::ShaderType shader_type,
+        slang::IBlob** diagnostic) const;
 
     static constexpr int SRV_OFFSET = 0;
     static constexpr int SAMPLER_OFFSET = 128;

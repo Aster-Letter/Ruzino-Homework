@@ -414,7 +414,7 @@ struct MaterialSystem {
         \return True if hit should be ignored/discarded.
     */
     bool alphaTest<L : ITextureSampler>(
-        const VertexData v,
+        const VertexInfo v,
         const uint materialID,
         L lod)
     {
@@ -442,7 +442,7 @@ struct MaterialSystem {
         \param[in] lod Fixed texture level of detail.
         \return True if hit should be ignored/discarded.
     */
-    bool alphaTest(const VertexData v, const uint materialID, const float lod)
+    bool alphaTest(const VertexInfo v, const uint materialID, const float lod)
     {
         ExplicitLodTextureSampler explicitLOD = { lod };
         return alphaTest(v, materialID, explicitLOD);

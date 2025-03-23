@@ -76,7 +76,7 @@ GeometryInstanceID getGeometryInstanceID()
    PrimitiveIndex()). \param[in] attribs Intersection attributes provided by
    DXR. \return Interpolated vertex attributes.
 */
-VertexData getVertexData(
+VertexInfo getVertexData(
     GeometryInstanceID instanceID,
     uint triangleIndex,
     BuiltInTriangleIntersectionAttributes attribs)
@@ -96,7 +96,7 @@ VertexData getVertexData(
    computations involving individual vertices. \return Interpolated vertex
    attributes.
 */
-VertexData getVertexData(
+VertexInfo getVertexData(
     GeometryInstanceID instanceID,
     uint triangleIndex,
     BuiltInTriangleIntersectionAttributes attribs,
@@ -117,7 +117,7 @@ VertexData getVertexData(
    mesh (= PrimitiveIndex()). \param[in] attribs Intersection attributes
    provided by DXR. \return Interpolated vertex attributes.
 */
-VertexData getVertexDataRayCones(
+VertexInfo getVertexDataRayCones(
     GeometryInstanceID instanceID,
     uint triangleIndex,
     BuiltInTriangleIntersectionAttributes attribs)

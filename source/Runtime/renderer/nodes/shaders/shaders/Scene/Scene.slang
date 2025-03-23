@@ -466,14 +466,14 @@ float3 getFaceNormalInObjectSpace(
 //         Barycentric coordinates in the triangle. \return Interpolated vertex
 //         attributes.
 //     */
-VertexData computeVertexData(
+VertexInfo computeVertexData(
     const StaticVertexData vertices[3],
     const float4x4 worldMat,
     const float3x3 worldInvTransposeMat,
     const bool isFrontFaceCW,
     const float3 barycentrics)
 {
-    VertexData v = {};
+    VertexInfo v = {};
 
     v.posW = vertices[0].position * barycentrics[0];
     v.posW += vertices[1].position * barycentrics[1];
@@ -519,7 +519,7 @@ VertexData computeVertexData(
 //         computations involving individual vertices. \return Interpolated
 //         vertex attributes.
 //     */
-//     VertexData getVertexData(const GeometryInstanceID instanceID, const uint
+//     VertexInfo getVertexData(const GeometryInstanceID instanceID, const uint
 //     triangleIndex, const float3 barycentrics, out StaticVertexData
 //     vertices[3])
 //     {
@@ -540,7 +540,7 @@ VertexData computeVertexData(
 //         \param[in] barycentrics Barycentric coordinates in the triangle.
 //         \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexData(const GeometryInstanceID instanceID, const uint
+//     VertexInfo getVertexData(const GeometryInstanceID instanceID, const uint
 //     triangleIndex, const float3 barycentrics)
 //     {
 //         StaticVertexData vertices[3];
@@ -552,7 +552,7 @@ VertexData computeVertexData(
 //         \param[in] hit Triangle hit info.
 //         \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexData(const TriangleHit hit)
+//     VertexInfo getVertexData(const TriangleHit hit)
 //     {
 //         return getVertexData(hit.instanceID, hit.primitiveIndex,
 //         hit.getBarycentricWeights());
@@ -564,7 +564,7 @@ VertexData computeVertexData(
 //         computations involving individual vertices. \return Interpolated
 //         vertex attributes.
 //     */
-//     VertexData getVertexData(const TriangleHit hit, out StaticVertexData
+//     VertexInfo getVertexData(const TriangleHit hit, out StaticVertexData
 //     vertices[3])
 //     {
 //         return getVertexData(hit.instanceID, hit.primitiveIndex,
@@ -575,7 +575,7 @@ VertexData computeVertexData(
 //         \param[in] hit Displaced triangle hit info.
 //         \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexData(const DisplacedTriangleHit hit, const float3
+//     VertexInfo getVertexData(const DisplacedTriangleHit hit, const float3
 //     viewDir)
 //     {
 //         const uint3 vtxIndices = getIndices(hit.instanceID,
@@ -586,7 +586,7 @@ VertexData computeVertexData(
 //         gScene.getWorldMatrix(hit.instanceID); const float3x3
 //         worldInvTransposeMat =
 //         getInverseTransposeWorldMatrix(hit.instanceID); const bool
-//         isFrontFaceCW = isObjectFrontFaceCW(hit.instanceID); VertexData v =
+//         isFrontFaceCW = isObjectFrontFaceCW(hit.instanceID); VertexInfo v =
 //         computeVertexData(vertices, worldMat, worldInvTransposeMat,
 //         isFrontFaceCW, barycentrics);
 
@@ -628,11 +628,11 @@ VertexData computeVertexData(
 //        \param[in] barycentrics Barycentric coordinates in the triangle.
 //        \return Interpolated vertex attributes.
 //    */
-//     VertexData getVertexDataRayCones(const GeometryInstanceID instanceID,
+//     VertexInfo getVertexDataRayCones(const GeometryInstanceID instanceID,
 //     const uint triangleIndex, const float3 barycentrics)
 //     {
 //         StaticVertexData triangleVertices[3];
-//         VertexData v = getVertexData(instanceID, triangleIndex, barycentrics,
+//         VertexInfo v = getVertexData(instanceID, triangleIndex, barycentrics,
 //         triangleVertices); v.coneTexLODValue =
 //         computeRayConeTriangleLODValue(triangleVertices,
 //         float3x3(getWorldMatrix(instanceID))); return v;
@@ -823,11 +823,11 @@ VertexData computeVertexData(
 //         curve. \param[in] uv UV parameters (between 0 and 1) of the ray-curve
 //         hit point. \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexDataFromCurve(const GeometryInstanceID instanceID,
+//     VertexInfo getVertexDataFromCurve(const GeometryInstanceID instanceID,
 //     const uint curveSegIndex, const float2 uv)
 //     {
 //         const uint v0Index = getFirstCurveVertexIndex(instanceID,
-//         curveSegIndex); VertexData v = {};
+//         curveSegIndex); VertexInfo v = {};
 
 //         StaticCurveVertexData vertices[2] = { getCurveVertex(v0Index),
 //         getCurveVertex(v0Index + 1) };
@@ -868,7 +868,7 @@ VertexData computeVertexData(
 //         \param[in] hit Curve hit info.
 //         \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexDataFromCurve(const CurveHit hit)
+//     VertexInfo getVertexDataFromCurve(const CurveHit hit)
 //     {
 //         return getVertexDataFromCurve(hit.instanceID, hit.primitiveIndex,
 //         hit.barycentrics);
@@ -886,7 +886,7 @@ VertexData computeVertexData(
 //     uint curveSegIndex, const float2 uv)
 //     {
 //         const uint v0Index = getFirstCurveVertexIndex(instanceID,
-//         curveSegIndex); VertexData v = {};
+//         curveSegIndex); VertexInfo v = {};
 
 //         float3 positions[2] = { prevCurveVertices[v0Index].position,
 //         prevCurveVertices[v0Index + 1].position }; float radii[2] = {
@@ -927,9 +927,9 @@ VertexData computeVertexData(
 //     \param[in] posW The world position of the hit point.
 //     \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexDataFromSDFGrid(const SDFGridHit hit, float3 posW)
+//     VertexInfo getVertexDataFromSDFGrid(const SDFGridHit hit, float3 posW)
 //     {
-//         VertexData v;
+//         VertexInfo v;
 
 //         const GeometryInstanceData instance =
 //         geometryInstances[hit.instanceID.index]; const SDFGrid sdfGrid =
@@ -964,7 +964,7 @@ VertexData computeVertexData(
 //     \param[in] rayDir The normalized direction of the ray that led to the
 //     hit. \return Interpolated vertex attributes.
 //     */
-//     VertexData getVertexDataFromSDFGrid(const SDFGridHit hit, float3
+//     VertexInfo getVertexDataFromSDFGrid(const SDFGridHit hit, float3
 //     rayOrigin, float3 rayDir)
 //     {
 //         return getVertexDataFromSDFGrid(hit, rayOrigin + rayDir *

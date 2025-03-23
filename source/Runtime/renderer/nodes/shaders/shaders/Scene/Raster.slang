@@ -106,11 +106,11 @@ VSOut defaultVS(VSIn vIn)
 /** Setup vertex data based on interpolated vertex attributes.
     \param[in] vsOut Interpolated vertex attributes.
     \param[in] faceNormalW Face normal in world space (normalized).
-    \return VertexData struct.
+    \return VertexInfo struct.
 */
-VertexData prepareVertexData(VSOut vsOut, float3 faceNormalW)
+VertexInfo prepareVertexData(VSOut vsOut, float3 faceNormalW)
 {
-    VertexData v;
+    VertexInfo v;
     v.posW = vsOut.posW;
     v.texC = vsOut.texC;
     v.normalW = normalize(vsOut.normalW);
@@ -129,7 +129,7 @@ VertexData prepareVertexData(VSOut vsOut, float3 faceNormalW)
 ShadingData prepareShadingData(VSOut vsOut, uint triangleIndex, float3 viewDir)
 {
     float3 faceNormal = gScene.getFaceNormalW(vsOut.instanceID, triangleIndex);
-    VertexData v = prepareVertexData(vsOut, faceNormal);
+    VertexInfo v = prepareVertexData(vsOut, faceNormal);
     return gScene.materials.prepareShadingData(v, vsOut.materialID, viewDir);
 }
 
@@ -142,6 +142,6 @@ ShadingData prepareShadingData(VSOut vsOut, uint triangleIndex, float3 viewDir)
 bool alphaTest<L:ITextureSampler>(VSOut vsOut, uint triangleIndex, L lod)
 {
     float3 faceNormal = gScene.getFaceNormalW(vsOut.instanceID, triangleIndex);
-    VertexData v = prepareVertexData(vsOut, faceNormal);
+    VertexInfo v = prepareVertexData(vsOut, faceNormal);
     return gScene.materials.alphaTest(v, vsOut.materialID, lod);
 }

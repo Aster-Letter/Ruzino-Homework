@@ -31,12 +31,12 @@
 
 #ifdef HOST_CODE
 #include "utils/Math/PackedFormats.h"
-#include "VertexData.slang"
+#include "VertexInfo.slang"
 #else
 import Utils.Math.PackedFormats;
 import Utils.SlangUtils;
 import Utils.Attributes;
-__exported import Scene.VertexData;
+__exported import Scene.VertexInfo;
 #endif
 
 USTC_CG_NAMESPACE_OPEN_SCOPE

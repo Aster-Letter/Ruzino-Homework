@@ -77,6 +77,10 @@ struct ShadowPayload {
 struct CallableData
 {
     float4 color;
+    float3 L;
+    float3 V;
+    uint materialID;
+    VertexInfo vertexInfo;
 };
 
 // Closest hit shader
@@ -105,7 +109,7 @@ void ClosestHit(
 
     var instance_id = InstanceID();
     var prim_id = PrimitiveIndex();
-    VertexData vertex = get_interpolated_vertex(instance_id, prim_id, attrib.barycentric);
+    VertexInfo vertex = get_interpolated_vertex(instance_id, prim_id, attrib.barycentric);
 
     if (dot(WorldRayDirection(), vertex.normalW) >= 0.0) {
         vertex.normalW = -vertex.normalW;
