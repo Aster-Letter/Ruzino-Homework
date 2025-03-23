@@ -149,6 +149,7 @@ void ClosestHit(
     callData.L = world_ray_dir; 
     callData.V = -WorldRayDirection();
     callData.color = float4(0, 0, 0, 1);
+    callData.materialID = material_id;
     CallShader(material_id, callData);
     result *= callData.color.rgb;
 
