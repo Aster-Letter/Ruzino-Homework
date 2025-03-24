@@ -385,12 +385,12 @@ void SurfaceNodeSlang::emitLightLoop(
         shadergen.emitLineBreak(stage);
 
         shadergen.emitComment("Accumulate the light's contribution", stage);
-        //shadergen.emitLine(
-        //    outColor + " += " + bsdf->getOutput()->getVariable() + ".response",
-        //    stage);
-
         shadergen.emitLine(
-            outColor + " =  specular_bsdf1_out.response;", stage);
+            outColor + " += " + bsdf->getOutput()->getVariable() + ".response",
+            stage);
+
+        // shadergen.emitLine(outColor + " =  diffuse_bsdf_out.response;",
+        // stage);
 
         shadergen.emitLineBreak(stage);
     }

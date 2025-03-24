@@ -62,7 +62,7 @@ struct RHI_API ProgramDesc {
                lhs.lastWriteTime == rhs.lastWriteTime &&
                lhs.shaderType == rhs.shaderType &&
                lhs.nvapi_support == rhs.nvapi_support &&
-               lhs.macros == rhs.macros;
+               lhs.macros == rhs.macros && lhs.source_code == rhs.source_code;
     }
 
     friend bool operator!=(const ProgramDesc& lhs, const ProgramDesc& rhs)

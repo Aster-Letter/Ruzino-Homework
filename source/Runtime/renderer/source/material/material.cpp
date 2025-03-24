@@ -804,16 +804,15 @@ void Hd_USTC_CG_Material::ensure_shader_ready()
             TF_WARN("Failed to save generated shader: %s", e.what());
         }
 #endif
+        final_shader_source = eval_shader_source + slang_source_code;
     }
     else {
         // Use fallback shader if no source is available
-        eval_shader_source = slang_source_code_fallback;
         if (material_name.empty()) {
             material_name = "fallback";
         }
+        final_shader_source = slang_source_code_fallback;
     }
-
-    final_shader_source = eval_shader_source + slang_source_code;
 
     // Replace the callable function name with the material name in all code
     constexpr char FUNC_PLACEHOLDER[] = "$getColor";

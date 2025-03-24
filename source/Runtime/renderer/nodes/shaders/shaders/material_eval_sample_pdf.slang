@@ -129,13 +129,14 @@ void ClosestHit(
     float3 ray_dir =
         sample_cosine_hemisphere_concentric(random_float2(seed), pdf);
 
+    float3 light_pos = float3(4, 4, 9)/2;
+
     bool valid;
     ShadingFrame sf =
         ShadingFrame.createSafe(vertex.normalW, vertex.tangentW, valid);
-    vertex.tangentW.xyz = sf.T;
-    vertex.tangentW.w = 1.0f;
 
     var world_ray_dir = sf.fromLocal(ray_dir);
+    world_ray_dir = normalize(light_pos - vertex.posW);
 
     RayDesc shadow_ray_desc;
     shadow_ray_desc.Origin = vertex.posW + vertex.normalW * 0.001;
@@ -153,14 +154,17 @@ void ClosestHit(
     CallableData callData;
     callData.vertexInfo = vertex;
 
-    callData.L = -world_ray_dir;
+    callData.L = world_ray_dir;
     callData.V = -WorldRayDirection();
     callData.color = float4(0, 0, 0, 1);
     callData.materialID = material_id;
     CallShader(material_id, callData);
     result *= callData.color.rgb;
 
-    Eval[id] = float4(result, 1);
+    Eval[id] = float4(
+        100*result / length(light_pos - vertex.posW) /
+            length(light_pos - vertex.posW),
+        1);
     // Eval[id] = float4(0.5 + 0.5 * vertex.tangentW.xyz, 1);
     // * float4(hitObjects[id].rays.throughput.toFloat3(), 1.0);
 

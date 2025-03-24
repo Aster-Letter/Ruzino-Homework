@@ -262,10 +262,10 @@ void Hd_USTC_CG_Mesh::create_gpu_resources(Hd_USTC_CG_RenderParam* render_param)
         device->executeCommandList(m_CommandList);
         device->waitForIdle();
         device->runGarbageCollection();
-    }
 
-    descriptor_handle = descriptor_table->CreateDescriptorHandle(
-        nvrhi::BindingSetItem::RawBuffer_SRV(0, vertexBuffer));
+        descriptor_handle = descriptor_table->CreateDescriptorHandle(
+            nvrhi::BindingSetItem::RawBuffer_SRV(0, vertexBuffer));
+    }
 
     MeshDesc mesh_desc;
     mesh_desc.vbOffset = 0;
