@@ -895,8 +895,6 @@ void Hd_USTC_CG_Material::ensure_shader_ready(const ShaderFactory& factory)
 
     // Combine shader parts into final source
 
-    //shader = factory.compile_shader()
-
     shader_ready = true;
 }
 
