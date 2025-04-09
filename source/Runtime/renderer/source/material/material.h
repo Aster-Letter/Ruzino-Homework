@@ -45,6 +45,7 @@ class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
     unsigned GetMaterialLocation() const;
 
     std::string GetShader(const ShaderFactory& factory);
+    ProgramHandle GetProgram(const ShaderFactory& factory);
 
     std::string GetMaterialName() const
     {

@@ -455,4 +455,10 @@ std::string Hd_USTC_CG_Material::GetShader(const ShaderFactory& factory)
     return final_shader_source;
 }
 
+ProgramHandle Hd_USTC_CG_Material::GetProgram(const ShaderFactory& factory)
+{
+    ensure_shader_ready(factory);
+    return final_program;
+}
+
 USTC_CG_NAMESPACE_CLOSE_SCOPE

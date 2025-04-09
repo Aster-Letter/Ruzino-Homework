@@ -134,7 +134,7 @@ class GlobalSessionPool {
     }
 
    public:
-    GlobalSessionPool() : maxSessions(4)
+    GlobalSessionPool() : maxSessions(16)
     {
     }
 
@@ -196,6 +196,7 @@ class GlobalSessionPool {
         while (!cachedSessions.empty()) {
             cachedSessions.pop();
         }
+        totalSessionCount = 0;
     }
 };
 
@@ -601,6 +602,8 @@ void ShaderFactory::SlangCompile(
 
     result = global_session->createSession(
         compile_session_desc, p_compile_session.writeRef());
+
+    assert(result == SLANG_OK);
 
     Slang::ComPtr<slang::IBlob> diagnostics;
 

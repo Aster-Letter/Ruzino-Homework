@@ -12,11 +12,11 @@ struct MaterialDataBlob {
 };
 
 #ifndef HOST_CODE
-StructuredBuffer<MaterialDataBlob> materialBuffer;
+StructuredBuffer<MaterialDataBlob> materialBuffer : register(t0);
 
 [[vk::binding(1, 1)]]
 Texture2D t_BindlessTextures[] : register(t0, space2);
 
-SamplerState sampler;
+SamplerState sampler : register(s0);
 
 #endif

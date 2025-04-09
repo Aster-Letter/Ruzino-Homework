@@ -46,11 +46,22 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
         auto& global_payload = node_system->get_node_tree_executor()
                                    ->get_global_payload<RenderGlobalPayload&>();
 
-        for (auto& material : *render_param->material_map) {
-            if (!material.second) {
-                continue;
+        {
+            std::vector<std::future<void>> futures;
+            for (auto& material : *render_param->material_map) {
+                if (!material.second) {
+                    continue;
+                }
+                futures.push_back(std::async(std::launch::async, [&]() {
+                    material.second->ensure_shader_ready(
+                        global_payload.shader_factory);
+                }));
             }
-            material.second->ensure_shader_ready(global_payload.shader_factory);
+
+            // Wait for all shader compilations to complete
+            for (auto& future : futures) {
+                future.wait();
+            }
         }
 
         global_payload.resource_allocator.gc();
