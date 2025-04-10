@@ -42,7 +42,11 @@ SlangResult SlangShaderCompiler::addHLSLPrelude(slang::IGlobalSession* session)
 
     auto root = find_root(includePath);
 
-    auto prelude_name = "/SDK/slang/include/slang-hlsl-prelude.h";
+    auto prelude_name =
+        "/" RELATIVE_TO_PROJROOT "/SDK/slang/include/slang-hlsl-prelude.h";
+
+    if (std::string(RELATIVE_TO_PROJROOT).empty())
+        prelude_name = "/SDK/slang/include/slang-hlsl-prelude.h";
     std::ostringstream prelude;
     prelude << "#include \"" << root.generic_string() + prelude_name
             << "\"\n\n";
