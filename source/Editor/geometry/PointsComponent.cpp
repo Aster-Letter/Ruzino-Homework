@@ -40,6 +40,7 @@ GeometryComponentHandle PointsComponent::copy(Geometry* operand) const
 #else
     ret->set_vertices(this->get_vertices());
     ret->set_display_color(this->get_display_color());
+    ret->set_normals(this->get_normals());
     ret->set_width(this->get_width());
 #endif
 

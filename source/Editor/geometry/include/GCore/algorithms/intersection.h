@@ -4,10 +4,14 @@
 
 #include "GCore/GOP.h"
 #include "GCore/api.h"
+#include "RHI/ResourceManager/resource_allocator.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
+struct MeshDesc;
 GEOMETRY_API void init_gpu_geometry_algorithms();
 GEOMETRY_API void deinit_gpu_geometry_algorithms();
+
+GEOMETRY_API ResourceAllocator& get_resource_allocator();
 
 struct GEOMETRY_API PointSample {
     pxr::GfVec3f position;
@@ -16,6 +20,23 @@ struct GEOMETRY_API PointSample {
     pxr::GfVec2f uv;
     bool valid;
 };
+
+// Remember to destroy the geometry explicitly with the resource allocator after
+// use.
+GEOMETRY_API nvrhi::rt::AccelStructHandle get_geomtry_tlas(
+    const Geometry& geometry,
+    MeshDesc* out_mesh_desc = nullptr,
+    nvrhi::BufferHandle* out_vertex_buffer = nullptr);
+
+GEOMETRY_API pxr::VtArray<PointSample> IntersectWithBuffer(
+    const nvrhi::BufferHandle& ray_buffer,
+    size_t ray_count,
+    const Geometry& BaseMesh);
+
+GEOMETRY_API nvrhi::BufferHandle IntersectToBuffer(
+    const nvrhi::BufferHandle& ray_buffer,
+    size_t ray_count,
+    const Geometry& BaseMesh);
 
 GEOMETRY_API pxr::VtArray<PointSample> Intersect(
     const pxr::VtArray<pxr::GfRay>& rays,

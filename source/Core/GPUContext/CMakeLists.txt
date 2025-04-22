@@ -7,3 +7,5 @@ USTC_CG_ADD_LIB(
 		NOMINMAX 
 		USTC_CG_BACKEND_NVRHI
 )
+
+target_compile_definitions(GPUContext INTERFACE USTC_CG_BACKEND_NVRHI)

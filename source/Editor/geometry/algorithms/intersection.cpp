@@ -10,6 +10,7 @@
 #include "RHI/rhi.hpp"
 #include "Scene/SceneTypes.slang"
 #include "nvrhi/nvrhi.h"
+#include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/matrix4f.h"
 USTC_CG_NAMESPACE_OPEN_SCOPE
 ResourceAllocator resource_allocator_;
@@ -17,6 +18,7 @@ std::shared_ptr<ShaderFactory> shader_factory;
 
 ResourceAllocator& get_resource_allocator()
 {
+    init_gpu_geometry_algorithms();
     return resource_allocator_;
 }
 
@@ -26,6 +28,7 @@ void init_gpu_geometry_algorithms()
         resource_allocator_.set_device(RHI::get_device());
         shader_factory = std::make_shared<ShaderFactory>();
         shader_factory->add_search_path(RENDERER_SHADER_DIR "shaders");
+        resource_allocator_.shader_factory = shader_factory.get();
     }
 }
 
@@ -37,14 +40,19 @@ void deinit_gpu_geometry_algorithms()
 
 nvrhi::rt::AccelStructHandle get_geomtry_tlas(
     const Geometry& geometry,
-    const pxr::GfMatrix4d& transform,
-    MeshDesc* out_mesh_desc = nullptr,
-    nvrhi::BufferHandle* out_vertex_buffer = nullptr)
+    MeshDesc* out_mesh_desc,
+    nvrhi::BufferHandle* out_vertex_buffer)
 {
     init_gpu_geometry_algorithms();
     auto mesh_component = geometry.get_component<MeshComponent>();
     if (!mesh_component) {
         return nullptr;
+    }
+
+    auto transform = pxr::GfMatrix4d(1.0);
+    auto xform_component = geometry.get_component<XformComponent>();
+    if (xform_component) {
+        transform = xform_component->get_transform();
     }
 
     // First build the BLAS for the mesh
@@ -203,21 +211,22 @@ nvrhi::rt::AccelStructHandle get_geomtry_tlas(
     return TLAS;
 }
 
-pxr::VtArray<PointSample> Intersect(
-    const pxr::VtArray<pxr::GfRay>& rays,
+nvrhi::BufferHandle IntersectToBuffer(
+    const nvrhi::BufferHandle& ray_buffer,
+    size_t ray_count,
     const Geometry& BaseMesh)
 {
     init_gpu_geometry_algorithms();
     auto mesh_component = BaseMesh.get_component<MeshComponent>();
 
     if (!mesh_component) {
-        return pxr::VtArray<PointSample>(rays.size());
+        return nullptr;
     }
 
     pxr::VtArray<pxr::GfVec3f> vertices = mesh_component->get_vertices();
 
     if (vertices.empty()) {
-        return pxr::VtArray<PointSample>(rays.size());
+        return nullptr;
     }
 
     pxr::VtArray<pxr::GfVec3f> normals = mesh_component->get_normals();
@@ -229,18 +238,9 @@ pxr::VtArray<PointSample> Intersect(
     auto& resource_allocator = get_resource_allocator();
     auto device = RHI::get_device();
 
-    auto transform = pxr::GfMatrix4d(1.0);
-    auto xform_component = BaseMesh.get_component<XformComponent>();
-    if (xform_component) {
-        transform = xform_component->get_transform();
-    }
-
     nvrhi::BufferHandle vertex_buffer;
-    auto accel = get_geomtry_tlas(
-        BaseMesh,
-        transform,
-        &mesh_desc,
-        std::addressof(vertex_buffer));
+    auto accel =
+        get_geomtry_tlas(BaseMesh, &mesh_desc, std::addressof(vertex_buffer));
 
     auto commandlist = resource_allocator.create(CommandListDesc{});
 
@@ -248,25 +248,11 @@ pxr::VtArray<PointSample> Intersect(
     desc.shaderType = nvrhi::ShaderType::AllRayTracing;
     desc.set_path(GEOM_COMPUTE_SHADER_DIR "intersection.slang");
     auto program = shader_factory->createProgram(desc);
-    // Create ray buffer with input rays
-    auto ray_buffer = resource_allocator.create(
-        nvrhi::BufferDesc{}
-            .setByteSize(rays.size() * sizeof(pxr::GfRay))
-            .setStructStride(sizeof(pxr::GfRay))
-            .setInitialState(nvrhi::ResourceStates::ShaderResource)
-            .setKeepInitialState(true)
-            .setCpuAccess(nvrhi::CpuAccessMode::Write)
-            .setDebugName("rayBuffer"));
-
-    // Copy rays to the ray buffer
-    void* data = device->mapBuffer(ray_buffer, nvrhi::CpuAccessMode::Write);
-    memcpy(data, rays.data(), rays.size() * sizeof(pxr::GfRay));
-    device->unmapBuffer(ray_buffer);
 
     // Create output buffer for intersection results
     auto result_buffer = resource_allocator.create(
         nvrhi::BufferDesc{}
-            .setByteSize(rays.size() * sizeof(PointSample))
+            .setByteSize(ray_count * sizeof(PointSample))
             .setStructStride(sizeof(PointSample))
             .setInitialState(nvrhi::ResourceStates::ShaderResource)
             .setKeepInitialState(true)
@@ -283,7 +269,7 @@ pxr::VtArray<PointSample> Intersect(
             .setIsConstantBuffer(true)
             .setDebugName("meshDescBuffer"));
 
-    data = device->mapBuffer(mesh_cb, nvrhi::CpuAccessMode::Write);
+    void* data = device->mapBuffer(mesh_cb, nvrhi::CpuAccessMode::Write);
     memcpy(data, &mesh_desc, sizeof(MeshDesc));
     device->unmapBuffer(mesh_cb);
 
@@ -307,17 +293,43 @@ pxr::VtArray<PointSample> Intersect(
 
     // Execute ray tracing
     raytracing_context.begin();
-    raytracing_context.trace_rays({}, program_vars, rays.size(), 1, 1);
+    raytracing_context.trace_rays({}, program_vars, ray_count, 1, 1);
     raytracing_context.finish();
 
-    // Read back results
+    // Clean up resources except for result_buffer
+    resource_allocator.destroy(accel);
+    resource_allocator.destroy(vertex_buffer);
+    resource_allocator.destroy(mesh_cb);
+    resource_allocator.destroy(program);
+    resource_allocator.destroy(commandlist);
+
+    // Return the GPU buffer with results
+    return result_buffer;
+}
+
+pxr::VtArray<PointSample> IntersectWithBuffer(
+    const nvrhi::BufferHandle& ray_buffer,
+    size_t ray_count,
+    const Geometry& BaseMesh)
+{
+    auto& resource_allocator = get_resource_allocator();
+    auto device = RHI::get_device();
+
+    // Get the GPU buffer with intersection results
+    auto result_buffer = IntersectToBuffer(ray_buffer, ray_count, BaseMesh);
+
+    // If we got a null buffer, return empty results
+    if (!result_buffer) {
+        return pxr::VtArray<PointSample>(ray_count);
+    }
+
     pxr::VtArray<PointSample> result;
-    result.resize(rays.size());
+    result.resize(ray_count);
 
     // Create readback buffer
     auto readback_buffer = resource_allocator.create(
         nvrhi::BufferDesc{}
-            .setByteSize(rays.size() * sizeof(PointSample))
+            .setByteSize(ray_count * sizeof(PointSample))
             .setCpuAccess(nvrhi::CpuAccessMode::Read)
             .setDebugName("resultReadbackBuffer"));
 
@@ -325,11 +337,7 @@ pxr::VtArray<PointSample> Intersect(
     auto copy_commandlist = device->createCommandList();
     copy_commandlist->open();
     copy_commandlist->copyBuffer(
-        readback_buffer,
-        0,
-        result_buffer,
-        0,
-        rays.size() * sizeof(PointSample));
+        readback_buffer, 0, result_buffer, 0, ray_count * sizeof(PointSample));
     copy_commandlist->close();
     device->executeCommandList(copy_commandlist);
     device->waitForIdle();
@@ -337,18 +345,45 @@ pxr::VtArray<PointSample> Intersect(
     // Map and read the results
     void* mapped_data =
         device->mapBuffer(readback_buffer, nvrhi::CpuAccessMode::Read);
-    memcpy(result.data(), mapped_data, rays.size() * sizeof(PointSample));
+    memcpy(result.data(), mapped_data, ray_count * sizeof(PointSample));
     device->unmapBuffer(readback_buffer);
 
-    resource_allocator.destroy(accel);
-    resource_allocator.destroy(vertex_buffer);
-    resource_allocator.destroy(ray_buffer);
+    // Clean up resources
     resource_allocator.destroy(result_buffer);
-    resource_allocator.destroy(mesh_cb);
     resource_allocator.destroy(readback_buffer);
-    resource_allocator.destroy(program);
-    resource_allocator.destroy(commandlist);
     resource_allocator.destroy(copy_commandlist);
+
+    return result;
+}
+
+pxr::VtArray<PointSample> Intersect(
+    const pxr::VtArray<pxr::GfRay>& rays,
+    const Geometry& BaseMesh)
+{
+    init_gpu_geometry_algorithms();
+    auto& resource_allocator = get_resource_allocator();
+    auto device = RHI::get_device();
+
+    // Create ray buffer with input rays
+    auto ray_buffer = resource_allocator.create(
+        nvrhi::BufferDesc{}
+            .setByteSize(rays.size() * sizeof(pxr::GfRay))
+            .setStructStride(sizeof(pxr::GfRay))
+            .setInitialState(nvrhi::ResourceStates::ShaderResource)
+            .setKeepInitialState(true)
+            .setCpuAccess(nvrhi::CpuAccessMode::Write)
+            .setDebugName("rayBuffer"));
+
+    // Copy rays to the ray buffer
+    void* data = device->mapBuffer(ray_buffer, nvrhi::CpuAccessMode::Write);
+    memcpy(data, rays.data(), rays.size() * sizeof(pxr::GfRay));
+    device->unmapBuffer(ray_buffer);
+
+    // Call the implementation with the buffer
+    auto result = IntersectWithBuffer(ray_buffer, rays.size(), BaseMesh);
+
+    // Clean up the buffer we created
+    resource_allocator.destroy(ray_buffer);
 
     return result;
 }
