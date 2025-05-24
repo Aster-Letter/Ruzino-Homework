@@ -12,7 +12,6 @@ NODE_DECLARATION_FUNCTION(curve_to_mesh)
 
     b.add_output<Geometry>("Mesh");
 }
-
 NODE_EXECUTION_FUNCTION(curve_to_mesh)
 {
     Geometry mesh_geom = Geometry::CreateMesh();
@@ -45,6 +44,7 @@ NODE_EXECUTION_FUNCTION(curve_to_mesh)
     VtArray<int> face_vertex_counts;
     VtArray<pxr::GfVec3f> verticies;
     VtArray<int> face_vertex_indices;
+    VtArray<pxr::GfVec3f> normals;
 
     for (int i = 0; i < guide_curve_verts.size(); ++i) {
         GfVec3f normal = curve_normals[i].GetNormalized();
@@ -95,6 +95,13 @@ NODE_EXECUTION_FUNCTION(curve_to_mesh)
         for (int j = 0; j < profile_curve_verts.size(); ++j) {
             auto new_pos = tbn * profile_curve_verts[j] + guide_curve_verts[i];
             verticies.push_back(new_pos);
+
+            // Add normal for this vertex (transform profile normal by tbn)
+            // Using profile position as approximation of normal direction
+            GfVec3f profile_normal = profile_curve_verts[j].GetNormalized();
+            GfVec3f transformed_normal = tbn * profile_normal;
+            transformed_normal.Normalize();
+            normals.push_back(transformed_normal);
         }
         // Removed per-iteration face count; faces will be built after vertex
         // generation.
@@ -117,10 +124,10 @@ NODE_EXECUTION_FUNCTION(curve_to_mesh)
     }
     mesh->set_vertices(verticies);
     mesh->set_face_vertex_counts(face_vertex_counts);
-
     mesh->set_face_vertex_indices(face_vertex_indices);
-
+    mesh->set_normals(normals);  // Set the calculated normals
     mesh->set_texcoords_array(texcoords_array);
+
     params.set_output("Mesh", mesh_geom);
     return true;
 }

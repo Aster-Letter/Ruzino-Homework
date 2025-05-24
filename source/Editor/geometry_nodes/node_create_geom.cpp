@@ -757,4 +757,68 @@ NODE_EXECUTION_FUNCTION(create_diamond)
     return true;
 }
 
+NODE_DECLARATION_FUNCTION(create_trefoil)
+{
+    b.add_input<int>("resolution").min(10).max(200).default_val(100);
+    b.add_input<float>("radius").min(0.1).max(10).default_val(1.0);
+    b.add_input<float>("tube_radius").min(0.1).max(5).default_val(0.2);
+    b.add_output<Geometry>("Curve");
+}
+NODE_EXECUTION_FUNCTION(create_trefoil)
+{
+    int resolution = params.get_input<int>("resolution");
+    float radius = params.get_input<float>("radius");
+    float tubeRadius = params.get_input<float>("tube_radius");
+
+    Geometry geometry;
+    std::shared_ptr<CurveComponent> curve =
+        std::make_shared<CurveComponent>(&geometry);
+    geometry.attach_component(curve);
+
+    pxr::VtArray<pxr::GfVec3f> points;
+    pxr::VtArray<pxr::GfVec3f> normals;
+
+    // Generate trefoil knot points
+    for (int i = 0; i <= resolution;
+         ++i) {  // <= to create an extra point that overlaps with the first
+        float t = 2.0f * M_PI * (i % resolution) /
+                  resolution;  // Use modulo to wrap around
+
+        // Trefoil knot parametric equation
+        float x = radius * (sin(t) + 2 * sin(2 * t));
+        float y = radius * (cos(t) - 2 * cos(2 * t));
+        float z = radius * (-sin(3 * t)) * 1.5f;
+
+        points.push_back(pxr::GfVec3f(x, y, z));
+
+        // Calculate derivative for normal approximation
+        float dx = radius * (cos(t) + 4 * cos(2 * t));
+        float dy = radius * (-sin(t) + 4 * sin(2 * t));
+        float dz = radius * (-3 * cos(3 * t)) * 1.5f;
+
+        // Use the derivative and an arbitrary vector to create a normal
+        pxr::GfVec3f tangent(dx, dy, dz);
+        tangent.Normalize();
+
+        // Create an arbitrary perpendicular vector for normal
+        pxr::GfVec3f normal(0, 0, 1);
+        if (std::abs(pxr::GfDot(tangent, normal)) > 0.9f) {
+            normal = pxr::GfVec3f(1, 0, 0);
+        }
+        normal = pxr::GfCross(tangent, normal).GetNormalized();
+
+        normals.push_back(normal);
+    }
+
+    // Use resolution+1 points to ensure the curve is closed
+    curve->set_vertices(points);
+    curve->set_curve_normals(normals);
+    curve->set_vert_count({ int(points.size()) });
+    curve->set_periodic(true);
+    curve->set_width({ tubeRadius });
+
+    params.set_output("Curve", std::move(geometry));
+    return true;
+}
+
 NODE_DEF_CLOSE_SCOPE
