@@ -109,8 +109,7 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
             TF_WARN("Failed to save generated shader: %s", e.what());
         }
 #endif
-        final_shader_source = eval_shader_source + sample_source_code_fallback +
-                              slang_source_code_main;
+        final_shader_source = eval_shader_source + slang_source_code_main;
     }
 
     // Combine shader parts into final source

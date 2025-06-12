@@ -104,10 +104,16 @@ void ClosestHit(
     float pdf = callData.pdf;
 
     float3 ray_dir = callData.sampledDir;
-    float3 world_ray_dir = sf.fromLocal(ray_dir);
+    float3 local_ray_dir = sf.toLocal(ray_dir);
+
+    //payload.color = pdf;
+
+    //payload.seed = callData.seed;
+
+    //return;
 
     // Update payload
-    payload.throughput *= ray_dir.z * callData.throughput / pdf;
+    payload.throughput *= local_ray_dir.z * callData.throughput / pdf;
 
     // payload.throughput *= 0.8f;
     payload.hitPosition = vertex.posW;
@@ -119,7 +125,7 @@ void ClosestHit(
     if (!payload.terminated) {
         RayDesc nextRay;
         nextRay.Origin = vertex.posW + vertex.normalW * 0.0001;
-        nextRay.Direction = world_ray_dir;
+        nextRay.Direction = ray_dir;
         nextRay.TMin = 0.0;
         nextRay.TMax = 1000.0;
 
@@ -164,7 +170,7 @@ void Miss(inout RayPayload payload)
     skyColor += sunsetColor * sunsetIntensity * (1.0 - skyBlend) * 0.4;
 
     // Add contribution to path
-    payload.color += payload.throughput * skyColor*1.0;
+    payload.color += payload.throughput * skyColor * 1.0;
     payload.terminated = true;
 }
 

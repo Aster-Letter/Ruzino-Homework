@@ -68,7 +68,9 @@ void BindlessContext::emitResourceBindings(
 
                     numComponents = 1;
                 }
-                else if (type == Type::INTEGER || type == Type::STRING) {
+                else if (
+                    type == Type::INTEGER || type == Type::STRING ||
+                    type == Type::BOOLEAN) {
                     if (type == Type::INTEGER) {
                         auto val = uniform->getValue()->asA<int>();
 
@@ -80,6 +82,20 @@ void BindlessContext::emitResourceBindings(
                         memcpy(
                             &material_data.data[data_location],
                             &val,
+                            sizeof(int));
+                    }
+                    else if (type == Type::BOOLEAN) {
+                        auto val = uniform->getValue()->asA<bool>();
+                        int intVal = val ? 1 : 0;
+
+                        log ::info(
+                            "setting %s to %d",
+                            uniform->getVariable().c_str(),
+                            intVal);
+
+                        memcpy(
+                            &material_data.data[data_location],
+                            &intVal,
                             sizeof(int));
                     }
                     dataFetch = "asint(data.data[" +

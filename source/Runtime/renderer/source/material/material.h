@@ -78,7 +78,6 @@ class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
     std::string slang_source_code_main;
     static std::string slang_source_code_template;
     static std::string eval_source_code_fallback;
-    static std::string sample_source_code_fallback;
     static std::mutex texture_mutex;
     static std::mutex material_data_handle_mutex;
 };

@@ -793,7 +793,7 @@ void SlangShaderGenerator::emitPixelStage(
 
     const VariableBlock& vertexData = stage.getInputBlock(HW::VERTEX_DATA);
 
-    emitLine("void eval(", stage, false);
+    emitLine("void eval_sample_pdf(", stage, false);
 
     const VariableBlock& outputs = stage.getOutputBlock(HW::PIXEL_OUTPUTS);
     emitVariableDeclarations(
@@ -807,6 +807,11 @@ void SlangShaderGenerator::emitPixelStage(
     auto& syntax = getSyntax();
 
     const string& type = syntax.getTypeName(Type::VECTOR3);
+    emitLine("out float3 sampled_direction, ", stage, false);
+    emitLine("out float3 sampled_weight, ", stage, false);
+    emitLine("out float pdf, ", stage, false);
+    emitLine("inout uint seed,", stage, false);
+
     emitLine(type + " " + HW::DIR_L + ", ", stage, false);
     emitLine(type + " " + HW::DIR_V + ", ", stage, false);
 
@@ -869,6 +874,10 @@ void SlangShaderGenerator::emitPixelStage(
                          upstream->hasClassification(
                              ShaderNode::Classification::SHADER))) {
                         emitFunctionCall(*upstream, context, stage);
+
+                        // cout upstream name
+                        std::cout << "Emitting function call for: "
+                                  << upstream->getName() << std::endl;
                     }
                 }
             }

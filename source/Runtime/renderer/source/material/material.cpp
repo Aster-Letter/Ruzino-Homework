@@ -101,48 +101,35 @@ void $getColor(inout CallableData data)
 {
     MaterialDataBlob blob_data = materialBlobBuffer[data.materialBlobID];
 
-    if (length(data.L) > 0.1)
-        eval(data.color, data.L, data.V, blob_data, data.vertexInfo);
-    data.sampledDir = sample(data.seed, data.pdf, blob_data);
-    bool valid;
-    ShadingFrame sf = ShadingFrame.createSafe(data.vertexInfo.normalW, float4(0, 0, 0, 1), valid);
-    float3 world_ray_dir = sf.fromLocal(data.sampledDir);
-
-    float4 throughput4;
-    eval(throughput4 , world_ray_dir, data.V, blob_data, data.vertexInfo);
-    data.throughput = throughput4.rgb;
+    eval_sample_pdf(data.color, data.sampledDir, data.throughput, data.pdf, data.seed, data.L, data.V, blob_data, data.vertexInfo);
+    if (length(data.L) < 0.1)
+        data.color = 0.0f;
 }
 
 )";
 
 // HLSL callable shader
 std::string Hd_USTC_CG_Material::eval_source_code_fallback = R"(
+import Utils.Math.MathHelpers;
+#include "utils/random.slangh"
 
-void eval(
+void eval_sample_pdf(
     out float4 color,
+    out float3 sampled_direction,
+    out float3 sampled_weight,
+    out float pdf,
+    inout uint seed,
     float3 L,
     float3 V,
     in MaterialDataBlob blob_data,
     VertexInfo vertexInfo)
 {
     color = float4(0.8, 0.8, 0.8, 1);
-}
-
-)";
-
-std::string Hd_USTC_CG_Material::sample_source_code_fallback = R"(
-import Utils.Math.MathHelpers;
-#include "utils/random.slangh"
-
-
-float3 sample(
-    inout uint seed,
-    out float pdf,
-    in MaterialDataBlob blob_data)
-{
-    // Sample the direction
-    float3 sampledDir = sample_cosine_hemisphere_concentric(random_float2(seed), pdf);
-    return sampledDir;
+    sampled_direction = sample_cosine_hemisphere_concentric(random_float2(seed), pdf);
+    bool valid;
+    ShadingFrame sf = ShadingFrame.createSafe(vertexInfo.normalW, float4(0, 0, 0, 1), valid);
+    sampled_direction = sf.fromLocal(sampled_direction);
+    sampled_weight = float3(0.8, 0.8, 0.8);
 }
 
 )";
@@ -166,8 +153,7 @@ void Hd_USTC_CG_Material::ensure_shader_ready(const ShaderFactory& factory)
             pos, strlen(FUNC_PLACEHOLDER), material_name);
     }
 
-    final_shader_source = eval_source_code_fallback +
-                          sample_source_code_fallback + slang_source_code_main;
+    final_shader_source = eval_source_code_fallback + slang_source_code_main;
 }
 
 std::string Hd_USTC_CG_Material::GetShader(const ShaderFactory& factory)

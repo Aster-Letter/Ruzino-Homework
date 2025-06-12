@@ -667,6 +667,21 @@ HdMaterialNode2 const* _GetTerminalNode(
 {
     // Get the Surface or Volume Terminal
     auto const& terminalConnIt = network.terminals.find(terminalName);
+    // Print all terminals
+    std::cout << "All terminals in network:" << std::endl;
+    for (const auto& terminal : network.terminals) {
+        std::cout << "  Terminal: " << terminal.first.GetText()
+                  << " -> Node: " << terminal.second.upstreamNode.GetText()
+                  << ", Output: "
+                  << terminal.second.upstreamOutputName.GetText() << std::endl;
+    }
+    
+    std::cout << "All nodes in network:" << std::endl;
+    for (const auto& node : network.nodes) {
+        std::cout << "  Node: " << node.first.GetText()
+                  << ", Type: " << node.second.nodeTypeId.GetText() << std::endl;
+    }
+
     if (terminalConnIt == network.terminals.end()) {
         return nullptr;
     }

@@ -78,7 +78,7 @@ float3 mx_integrate_burley_diffusion(float3 N, float3 L, float radius, float3 mf
 
 float3 mx_subsurface_scattering_approx(float3 N, float3 L, float3 P, float3 albedo, float3 mfp)
 {
-    float curvature = length(fwidth(N)) / length(fwidth(P));
-    float radius = 1.0 / max(curvature, 0.01);
+    // Use a fixed radius since fwidth is not available in callable shaders TODO: make it better
+    float radius = 1.0;
     return albedo * mx_integrate_burley_diffusion(N, L, radius, mfp) / float3(M_PI);
 }

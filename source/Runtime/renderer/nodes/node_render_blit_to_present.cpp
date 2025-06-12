@@ -52,7 +52,7 @@ NODE_EXECUTION_FUNCTION(blit_to_present)
         return false;
     }
     auto output_desc = sourceTexture->getDesc();
-    output_desc.format = nvrhi::Format::RGBA32_FLOAT;
+    output_desc.format = nvrhi::Format::SRGBA8_UNORM;
     output_desc.isRenderTarget = true;
     auto output = resource_allocator.create(output_desc);
     MARK_DESTROY_NVRHI_RESOURCE(output);
