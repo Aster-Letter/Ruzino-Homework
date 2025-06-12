@@ -104,19 +104,18 @@ void ClosestHit(
     callData.materialBlobID = material_header.material_blob_id;
     CallShader(material_header.material_type_id, callData);
 
-    payload.seed = callData.seed;
-    payload.color = callData.throughput;
-    return;
-
-    float pdf = callData.pdf;    float3 ray_dir = callData.sampledDir;
-    float3 local_ray_dir = sf.toLocal(ray_dir);
-
-    // For transmission, don't apply cosine weighting as it's already included in the BSDF
+    float pdf = callData.pdf;
+    float3 ray_dir = callData.sampledDir;
+    float3 local_ray_dir = sf.toLocal(ray_dir);    // Check if this is transmission or reflection
     bool isTransmission = dot(ray_dir, vertex.normalW) < 0.0;
+    
     if (isTransmission) {
-        // For transmission, use the throughput directly without cosine weighting
-        payload.throughput *= callData.throughput / pdf;
-    } else {
+        // For transmission, apply cosine weighting on the exit side
+        // Use the absolute value to handle both sides correctly
+        float cosine_factor = abs(dot(ray_dir, vertex.normalW));
+        payload.throughput *= cosine_factor * callData.throughput / pdf;
+    }
+    else {
         // For reflection, apply cosine weighting
         float cosine_factor = abs(local_ray_dir.z);
         payload.throughput *= cosine_factor * callData.throughput / pdf;
@@ -125,15 +124,15 @@ void ClosestHit(
     payload.hitPosition = vertex.posW;
     payload.hitNormal = vertex.normalW;
     payload.depth++;
-    payload.seed = callData.seed;
-
-    // Trace next ray (light comes from environment/miss shader)
+    payload.seed = callData.seed;    // Trace next ray (light comes from environment/miss shader)
     if (!payload.terminated) {
         RayDesc nextRay;
-        nextRay.Origin = vertex.posW + (dot(ray_dir, vertex.normalW) < 0.0
-                                            ? -vertex.normalW
-                                            : vertex.normalW) *
-                                           0.001;
+        
+        // Better ray offset handling for transmission vs reflection
+        bool isTransmission = dot(ray_dir, vertex.normalW) < 0.0;
+        float3 offset_normal = isTransmission ? -vertex.normalW : vertex.normalW;
+        
+        nextRay.Origin = vertex.posW + offset_normal * 0.001;
         nextRay.Direction = ray_dir;
         nextRay.TMin = 0.0;
         nextRay.TMax = 1000.0;

@@ -33,9 +33,10 @@ float3 mx_surface_transmission(
 
     float VdotH = clamp(dot(V, H), M_FLOAT_EPS, 1.0);
     float LdotH = clamp(abs(dot(L, H)), M_FLOAT_EPS, 1.0);
-    float3 Ht = float3(dot(H, X), dot(H, Y), dot(H, N));
-
-    // Compute transmission fresnel coefficient
+    float3 Ht = float3(
+        dot(H, X),
+        dot(H, Y),
+        dot(H, N));  // Compute transmission fresnel coefficient
     float3 F = mx_compute_fresnel(VdotH, fd);
     float3 T_fresnel = float3(1.0) - F;
 
@@ -48,11 +49,10 @@ float3 mx_surface_transmission(
 
     // Compute Jacobian for the transformation from half-angle to light
     // direction
-    float denom = VdotH + LdotH / eta;
+    float denom = abs(VdotH) + abs(LdotH) / eta;
     float jacobian = (eta * eta * abs(LdotH)) / (denom * denom);
 
-    // Final transmission BSDF - remove the extra eta^2 factor as it's already
-    // in the Jacobian
+    // Final transmission BSDF with proper energy conservation
     float3 transmission = T_fresnel * D * G * jacobian * tint;
 
     return transmission / (4.0 * NdotV);

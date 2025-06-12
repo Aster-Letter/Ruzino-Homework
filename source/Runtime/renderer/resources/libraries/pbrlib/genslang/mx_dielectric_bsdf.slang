@@ -99,11 +99,15 @@ void mx_dielectric_bsdf_transmission(
     float3 comp = mx_ggx_energy_compensation(NdotV, avgAlpha, F);
     float3 dirAlbedo = mx_ggx_dir_albedo(NdotV, avgAlpha, F0, 1.0) * comp;
     bsdf.throughput = 1.0 - dirAlbedo * weight;
-
     if (scatter_mode != 0) {
         bsdf.response = mx_surface_transmission(
                             N, V, L, X, safeAlpha, distribution, fd, safeTint) *
                         occlusion * weight;
+
+        // Add energy compensation for transmission
+        float3 comp_transmission =
+            mx_ggx_energy_compensation(NdotV, avgAlpha, F);
+        bsdf.response *= comp_transmission;
     }
 }
 
