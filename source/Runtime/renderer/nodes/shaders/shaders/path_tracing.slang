@@ -157,9 +157,10 @@ void ClosestHit(
     // else {
     // }
     payload.throughput *= cosine_factor * callData.throughput / pdf;
-    // if (payload.depth == 1)
+    // if (payload.depth == 0)
     // {
     //     payload.color = cosine_factor * callData.throughput / pdf / 2;
+    //     // payload.color = callData.sampledDir * 0.5 + 0.5;  // For debugging,
     //     payload.seed = callData.seed;
     //     return;
     // }

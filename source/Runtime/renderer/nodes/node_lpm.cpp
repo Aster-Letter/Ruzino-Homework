@@ -593,6 +593,8 @@ NODE_EXECUTION_FUNCTION(lpm)
     context.finish();
 
     params.set_output("Output Color", outputColor);
+
+    return true;
 }
 
 NODE_DECLARATION_UI(lpm);

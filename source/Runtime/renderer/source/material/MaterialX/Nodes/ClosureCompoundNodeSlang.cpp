@@ -53,6 +53,7 @@ import pbrlib.genslang.mx_roughness_anisotropy;
 import pbrlib.genslang.lib.mx_microfacet;
 import pbrlib.genslang.lib.mx_microfacet_specular;
 import pbrlib.genslang.lib.mx_microfacet_diffuse;
+import utils.Math.MathHelpers;
 #include "utils/Math/MathConstants.slangh"
 #include "utils/random.slangh"
 

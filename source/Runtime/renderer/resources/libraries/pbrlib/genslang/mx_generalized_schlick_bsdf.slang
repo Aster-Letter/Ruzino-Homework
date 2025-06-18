@@ -24,6 +24,12 @@ void mx_generalized_schlick_bsdf_reflection(
 
     N = mx_forward_facing_normal(N, V);
 
+    if (dot(N, L) < 0.0) {
+        bsdf.throughput = 0.0;
+        bsdf.response = float3(0.0);
+        return;
+    }
+
     X = normalize(X - dot(X, N) * N);
     float3 Y = cross(N, X);
     float3 H = normalize(L + V);
@@ -83,6 +89,12 @@ void mx_generalized_schlick_bsdf_transmission(
 
     N = mx_forward_facing_normal(N, V);
     float NdotV = clamp(dot(N, V), M_FLOAT_EPS, 1.0);
+
+    if (dot(N, L) > 0.0) {
+        bsdf.throughput = 0.0;
+        bsdf.response = float3(0.0);
+        return;
+    }
 
     FresnelData fd;
     float3 safeColor0 = max(color0, 0.0);

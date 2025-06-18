@@ -23,6 +23,12 @@ void mx_conductor_bsdf_reflection(
 
     N = mx_forward_facing_normal(N, V);
 
+    if (dot(N, L) < 0.0) {
+        bsdf.throughput = 0.0;
+        bsdf.response = float3(0.0);
+        return;
+    }
+
     X = normalize(X - dot(X, N) * N);
     float3 Y = cross(N, X);
     float3 H = normalize(L + V);

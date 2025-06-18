@@ -59,6 +59,7 @@ NODE_EXECUTION_FUNCTION(gamma_correction)
     context.finish();
 
     params.set_output("Corrected", corrected_texture);
+    return true;
 }
 
 NODE_DECLARATION_UI(gamma_correction);

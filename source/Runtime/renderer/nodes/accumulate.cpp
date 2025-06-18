@@ -88,6 +88,7 @@ NODE_EXECUTION_FUNCTION(accumulate)
     storage.current_spp++;
 
     params.set_output("Accumulated", storage.accumulated);
+    return true;
 }
 
 NODE_DECLARATION_UI(accumulate);
