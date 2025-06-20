@@ -405,7 +405,7 @@ float3 sample_diffuse_lobe(float2 u, out float pdf)
 // Sample specular reflection using GGX distribution
 float3 sample_specular_reflection(float2 u, float3 V, float roughness, out float pdf)
 {
-    float2 alpha = float2(roughness, roughness);
+    float2 alpha = float2(roughness * roughness, roughness * roughness);
     
     // Sample microfacet normal using GGX VNDF distribution
     float3 H = mx_ggx_importance_sample_VNDF(u, V, alpha);
@@ -461,11 +461,6 @@ float3 sample_preview_surface(
     // Create shading frame
     bool valid;
     ShadingFrame sf = ShadingFrame.createSafe(vd.normalWorld, float4(1, 0, 0, 1), valid);
-
-    ////debug
-
-    //float3 cosineSample = sample_cosine_hemisphere_concentric(random_float2(seed), pdf);
-    //return sf.fromLocal(cosineSample);
 
     // Transform view direction to local space
     float3 V_local = sf.toLocal(V);
@@ -554,7 +549,7 @@ float3 sample_preview_surface(
         float NdotH = max(H.z, M_FLOAT_EPS);
         float VdotH = max(dot(V_local, H), M_FLOAT_EPS);
         
-        float2 alpha = float2(roughness, roughness);
+        float2 alpha = float2(roughness * roughness, roughness * roughness);
         float D = mx_ggx_NDF(H, alpha);
         float G1 = mx_ggx_smith_G1(NdotV, mx_average_alpha(alpha));
         float vndf_pdf = D * G1 * VdotH / NdotV;
@@ -571,7 +566,7 @@ float3 sample_preview_surface(
         float NdotH = max(H.z, M_FLOAT_EPS);
         float VdotH = max(dot(V_local, H), M_FLOAT_EPS);
         
-        float2 alpha = float2(roughness, roughness);
+        float2 alpha = float2(roughness * roughness, roughness * roughness);
         float D = mx_ggx_NDF(H, alpha);
         float G1 = mx_ggx_smith_G1(NdotV, mx_average_alpha(alpha));
         float vndf_pdf = D * G1 * VdotH / NdotV;
