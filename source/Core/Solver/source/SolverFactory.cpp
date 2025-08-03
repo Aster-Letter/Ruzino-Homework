@@ -72,10 +72,12 @@ std::vector<SolverType> SolverFactory::getAvailableTypes()
                                           SolverType::CUDA_BICGSTAB,  // 新增
                                           SolverType::CUDA_GMRES,     // 新增
                                           SolverType::EIGEN_ITERATIVE_CG,
-                                          SolverType::EIGEN_ITERATIVE_BICGSTAB,
+                                          SolverType::EIGEN_ITERATIVE_BICGSTAB/*,
                                           SolverType::EIGEN_DIRECT_LU,
                                           SolverType::EIGEN_DIRECT_CHOLESKY,
-                                          SolverType::EIGEN_DIRECT_QR };
+                                          SolverType::EIGEN_DIRECT_QR*/
+
+    };
 
     for (auto type : all_types) {
         try {
