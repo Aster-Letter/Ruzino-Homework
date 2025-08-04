@@ -26,7 +26,7 @@
 
 #include <iostream>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "camera.h"
 #include "config.h"
 #include "geometries/mesh.h"
@@ -130,10 +130,10 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
 
             namespace fs = std::filesystem;
             std::regex submission_suffix(R"(.*_nodes_hw_submissions_render\.json)");
-            log::info("LOADING SUBMISSIONS [Render]");
+            spdlog::info("LOADING SUBMISSIONS [Render]");
             for (auto &itr: fs::directory_iterator(".")){
                 if (std::regex_match(itr.path().string(), submission_suffix)){
-                    log::info("Found: %s", itr.path().string().c_str());
+                    spdlog::info("Found: %s", itr.path().string().c_str());
                     node_system->load_configuration(itr.path());
                 }
             }
@@ -257,7 +257,7 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
 
 void Hd_USTC_CG_RenderDelegate::DestroyRprim(HdRprim* rPrim)
 {
-    log::info("Destroy Tiny Rprim id=" + rPrim->GetId().GetString());
+    spdlog::info("Destroy Tiny Rprim id=" + rPrim->GetId().GetString());
     meshes.erase(
         std::remove(meshes.begin(), meshes.end(), rPrim), meshes.end());
     delete rPrim;
@@ -337,7 +337,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
 
 void Hd_USTC_CG_RenderDelegate::DestroySprim(HdSprim* sPrim)
 {
-    log::info(sPrim->GetId().GetAsString() + " destroyed");
+    spdlog::info(sPrim->GetId().GetAsString() + " destroyed");
     lights.erase(
         std::remove(lights.begin(), lights.end(), sPrim), lights.end());
     cameras.erase(
@@ -351,7 +351,7 @@ HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
     const SdfPath& bprimId)
 {
     if (typeId == HdPrimTypeTokens->renderBuffer) {
-        log::info(
+        spdlog::info(
             "Create bprim: type id=" + typeId.GetString() +
             ",prim id = " + bprimId.GetString());
 
@@ -377,7 +377,7 @@ void Hd_USTC_CG_RenderDelegate::DestroyBprim(HdBprim* bPrim)
     if (!bprim_name.empty()) {
         sentence += " id=" + bprim_name;
     }
-    log::info(sentence);
+    spdlog::info(sentence);
     delete bPrim;
 }
 

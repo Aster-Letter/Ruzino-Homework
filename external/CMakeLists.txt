@@ -68,7 +68,6 @@ set_target_properties(OpenMeshTools PROPERTIES FOLDER "external")
 
 target_compile_definitions(OpenMeshCore PUBLIC -D_USE_MATH_DEFINES=1)
 
-add_subdirectory(entt)
 add_subdirectory(glm)
 
 set_target_properties(glm PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)

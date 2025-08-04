@@ -4,7 +4,7 @@ USTC_CG_ADD_LIB(
 	stage
 	SHARED
 	PRIVATE_LIBS 
-		Logger
+		spdlog::spdlog
 		usd
 		usdImaging
 		usdShade

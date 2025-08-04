@@ -145,7 +145,7 @@ NODE_EXECUTION_FUNCTION(shadow_mapping)
 
     params.set_output("Shadow Maps", shadow_map_texture);
     if (!shader_error.empty()) {
-        log::error(shader_error.c_str())
+        spdlog::error(shader_error.c_str())
     }
 #endif
 

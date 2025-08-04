@@ -293,7 +293,7 @@ class DeviceManager_VK : public DeviceManager {
                 return VK_FALSE;
         }
 
-        log::warning(
+        spdlog::warn(
             "[Vulkan: location=0x%zx code=%d, layerPrefix='%s'] %s",
             location,
             code,
@@ -330,7 +330,7 @@ bool DeviceManager_VK::createInstance()
 {
     if (!m_DeviceParams.headlessDevice) {
         if (!glfwVulkanSupported()) {
-            log::error(
+            spdlog::error(
                 "GLFW reports that Vulkan is not supported. Perhaps missing a "
                 "call to glfwInit()?");
             return false;
@@ -385,14 +385,14 @@ bool DeviceManager_VK::createInstance()
         for (const auto& ext : requiredExtensions)
             ss << std::endl << "  - " << ext;
 
-        log::error("%s", ss.str().c_str());
+        spdlog::error("%s", ss.str().c_str());
         return false;
     }
 
-    log::message(
+    spdlog::log(
         m_DeviceParams.infoLogSeverity, "Enabled Vulkan instance extensions:");
     for (const auto& ext : enabledExtensions.instance) {
-        log::message(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
+        spdlog::log(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
     }
 
     std::unordered_set<std::string> requiredLayers = enabledExtensions.layers;
@@ -414,13 +414,13 @@ bool DeviceManager_VK::createInstance()
         for (const auto& ext : requiredLayers)
             ss << std::endl << "  - " << ext;
 
-        log::error("%s", ss.str().c_str());
+        spdlog::error("%s", ss.str().c_str());
         return false;
     }
 
-    log::message(m_DeviceParams.infoLogSeverity, "Enabled Vulkan layers:");
+    spdlog::log(m_DeviceParams.infoLogSeverity, "Enabled Vulkan layers:");
     for (const auto& layer : enabledExtensions.layers) {
-        log::message(m_DeviceParams.infoLogSeverity, "    %s", layer.c_str());
+        spdlog::log(m_DeviceParams.infoLogSeverity, "    %s", layer.c_str());
     }
 
     auto instanceExtVec = stringSetToVector(enabledExtensions.instance);
@@ -433,7 +433,7 @@ bool DeviceManager_VK::createInstance()
     vk::Result res = vk::enumerateInstanceVersion(&applicationInfo.apiVersion);
 
     if (res != vk::Result::eSuccess) {
-        log::error(
+        spdlog::error(
             "Call to vkEnumerateInstanceVersion failed, error code = %s",
             nvrhi::vulkan::resultToString(VkResult(res)));
         return false;
@@ -443,7 +443,7 @@ bool DeviceManager_VK::createInstance()
 
     // Check if the Vulkan API version is sufficient.
     if (applicationInfo.apiVersion < minimumVulkanVersion) {
-        log::error(
+        spdlog::error(
             "The Vulkan API version supported on the system (%d.%d.%d) is too "
             "low, at least %d.%d.%d is required.",
             VK_API_VERSION_MAJOR(applicationInfo.apiVersion),
@@ -459,7 +459,7 @@ bool DeviceManager_VK::createInstance()
     // Vulkan API and applications will typically need to be modified to run
     // against it.
     if (VK_API_VERSION_VARIANT(applicationInfo.apiVersion) != 0) {
-        log::error(
+        spdlog::error(
             "The Vulkan API supported on the system uses an unexpected "
             "variant: %d.",
             VK_API_VERSION_VARIANT(applicationInfo.apiVersion));
@@ -477,7 +477,7 @@ bool DeviceManager_VK::createInstance()
 
     res = vk::createInstance(&info, nullptr, &m_VulkanInstance);
     if (res != vk::Result::eSuccess) {
-        log::error(
+        spdlog::error(
             "Failed to create a Vulkan instance, error code = %s",
             nvrhi::vulkan::resultToString(VkResult(res)));
         return false;
@@ -517,7 +517,7 @@ bool DeviceManager_VK::pickPhysicalDevice()
     int lastDevice = int(devices.size()) - 1;
     if (m_DeviceParams.adapterIndex >= 0) {
         if (m_DeviceParams.adapterIndex > lastDevice) {
-            log::error(
+            spdlog::error(
                 "The specified Vulkan physical device %d does not exist.",
                 m_DeviceParams.adapterIndex);
             return false;
@@ -677,7 +677,7 @@ bool DeviceManager_VK::pickPhysicalDevice()
         return true;
     }
 
-    log::error("%s", errorStream.str().c_str());
+    spdlog::error("%s", errorStream.str().c_str());
 
     return false;
 }
@@ -772,10 +772,10 @@ bool DeviceManager_VK::createDevice()
     bool aftermathSupported = false;
     bool shaderAtomicSupported = false;
 
-    log::message(
+    spdlog::log(
         m_DeviceParams.infoLogSeverity, "Enabled Vulkan device extensions:");
     for (const auto& ext : enabledExtensions.device) {
-        log::message(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
+        spdlog::log(m_DeviceParams.infoLogSeverity, "    %s", ext.c_str());
 
         if (ext == VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             accelStructSupported = true;
@@ -937,7 +937,7 @@ bool DeviceManager_VK::createDevice()
     const vk::Result res = m_VulkanPhysicalDevice.createDevice(
         &deviceDesc, nullptr, &m_VulkanDevice);
     if (res != vk::Result::eSuccess) {
-        log::error(
+        spdlog::error(
             "Failed to create a Vulkan physical device, error code = %s",
             nvrhi::vulkan::resultToString(VkResult(res)));
         return false;
@@ -956,7 +956,7 @@ bool DeviceManager_VK::createDevice()
     // remember the bufferDeviceAddress feature enablement
     m_BufferDeviceAddressSupported = vulkan12features.bufferDeviceAddress;
 
-    log::message(
+    spdlog::log(
         m_DeviceParams.infoLogSeverity,
         "Created Vulkan device: %s",
         m_RendererString.c_str());
@@ -969,7 +969,7 @@ bool DeviceManager_VK::createWindowSurface()
     const VkResult res = glfwCreateWindowSurface(
         m_VulkanInstance, m_Window, nullptr, (VkSurfaceKHR*)&m_WindowSurface);
     if (res != VK_SUCCESS) {
-        log::error(
+        spdlog::error(
             "Failed to create a GLFW window surface, error code = %s",
             nvrhi::vulkan::resultToString(res));
         return false;
@@ -1068,7 +1068,7 @@ bool DeviceManager_VK::createSwapChain()
     const vk::Result res =
         m_VulkanDevice.createSwapchainKHR(&desc, nullptr, &m_SwapChain);
     if (res != vk::Result::eSuccess) {
-        log::error(
+        spdlog::error(
             "Failed to create a Vulkan swap chain, error code = %s",
             nvrhi::vulkan::resultToString(VkResult(res)));
         return false;

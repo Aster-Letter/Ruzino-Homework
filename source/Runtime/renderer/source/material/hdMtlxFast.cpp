@@ -12,7 +12,7 @@
 #include <MaterialXFormat/Util.h>
 #include <MaterialXFormat/XmlIo.h>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "pxr/base/arch/fileSystem.h"
 #include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -211,7 +211,7 @@ static mx::NodePtr _AddMaterialXNode(
     for (TfToken const& paramName : hdNodeParamNames) {
         // Get the MaterialX Parameter info
         const std::string& mxInputName = paramName.GetString();
-        log::info("Adding input %s", mxInputName.c_str());
+        spdlog::info("Adding input %s", mxInputName.c_str());
 
         const HdMaterialNetworkInterface::NodeParamData paramData =
             netInterface->GetNodeParameterData(hdNodeName, paramName);

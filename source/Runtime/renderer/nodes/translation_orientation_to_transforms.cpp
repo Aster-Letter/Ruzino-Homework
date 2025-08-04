@@ -58,7 +58,7 @@ NODE_EXECUTION_FUNCTION(translation_orientation_to_transforms)
     context.finish();
 
     int buffer_size = counter_read_out(params, counter);
-    log::info("Buffer size: %d", buffer_size);
+    spdlog::info("Buffer size: %d", buffer_size);
 
     params.set_output("Transforms", output_buffer);
     params.set_output("Buffer Size", buffer_size);

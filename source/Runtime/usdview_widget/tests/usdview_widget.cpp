@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "GUI/window.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/rhi.hpp"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/sphere.h"
@@ -12,8 +12,8 @@
 using namespace USTC_CG;
 int main()
 {
-    log::SetMinSeverity(Severity::Debug);
-    log::EnableOutputToConsole(true);
+    spdlog::set_level(spdlog::level::debug);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
 
     auto stage = create_global_stage();
     // Add a sphere

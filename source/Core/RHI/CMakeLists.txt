@@ -4,7 +4,7 @@ if(SLANG_FOUND)
         SHARED
         WITH_CUDA
         PUBLIC_LIBS nvrhi SLANG::slang
-        PRIVATE_LIBS Vulkan::Headers Logger glfw glm::glm nodes_core
+        PRIVATE_LIBS Vulkan::Headers spdlog::spdlog glfw glm::glm nodes_core
         PYTHON_WRAP_DIR python
         COMPILE_DEFS
         NOMINMAX

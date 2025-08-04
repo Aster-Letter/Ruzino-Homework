@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/internal/nvrhi_patch.hpp"
 #include "nodes/core/def/node_def.hpp"
 #include "nvrhi/nvrhi.h"
@@ -124,7 +124,7 @@ NODE_EXECUTION_FUNCTION(scatter_contribution)
         }
     }
     else {
-        log::warning("Buffer size is 0");
+        spdlog::warn("Buffer size is 0");
     }
     params.set_output("Result Texture", source_texture);
     return true;

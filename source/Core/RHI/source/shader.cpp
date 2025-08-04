@@ -564,7 +564,7 @@ void ShaderFactory::populate_vk_options(
         return;                                                          \
     }                                                                    \
     else if (diagnostics) {                                              \
-        log::warning((const char*)diagnostics->getBufferPointer());      \
+        spdlog::warn((const char*)diagnostics->getBufferPointer());      \
     }
 
 void ShaderFactory::SlangCompile(

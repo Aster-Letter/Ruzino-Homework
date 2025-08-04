@@ -1,5 +1,5 @@
-add_subdirectory(Logger)
-add_subdirectory(nodes)
+set(NODE_IMGUI_ENABLED ON)
+add_subdirectory(rznode)
 add_subdirectory(RHI)
 add_subdirectory(Solver)
 add_subdirectory(GPUContext)

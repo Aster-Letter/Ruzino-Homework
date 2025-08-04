@@ -6,7 +6,7 @@
 
 #include "GUI/ImGuiFileDialog.h"
 #include "GUI/window.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "nodes/core/node_tree.hpp"
 #include "nodes/system/node_system.hpp"
 #include "nodes/ui/imgui.hpp"
@@ -143,7 +143,7 @@ class NodeEditorWidget : public IWidget {
         widget_desc.json_path = "";
         node_widget_ = create_node_imgui_widget(widget_desc);
 
-        log::info("Created new node graph");
+        spdlog::info("Created new node graph");
     }
 
     void OpenFile()
@@ -216,7 +216,7 @@ class NodeEditorWidget : public IWidget {
             widget_desc.json_path = file_path;
             node_widget_ = create_node_imgui_widget(widget_desc);
 
-            log::info("Loaded node graph from: %s", file_path.c_str());
+            spdlog::info("Loaded node graph from: %s", file_path.c_str());
         }
         else {
             // Create new empty widget
@@ -227,7 +227,7 @@ class NodeEditorWidget : public IWidget {
 
             current_file_path_ = file_path;
             file_changed_ = false;
-            log::info("Created new node graph: %s", file_path.c_str());
+            spdlog::info("Created new node graph: %s", file_path.c_str());
         }
     }
 
@@ -241,11 +241,11 @@ class NodeEditorWidget : public IWidget {
                 // implement actual saving
                 current_file_path_ = file_path;
                 file_changed_ = false;
-                log::info("Saved node graph to: %s", file_path.c_str());
+                spdlog::info("Saved node graph to: %s", file_path.c_str());
             }
         }
         catch (const std::exception& e) {
-            log::error("Failed to save node graph: %s", e.what());
+            spdlog::error("Failed to save node graph: %s", e.what());
         }
     }
 };
@@ -254,11 +254,11 @@ int main(int argc, char** argv)
 {
     // Setup logging
 #ifdef _DEBUG
-    log::SetMinSeverity(Severity::Debug);
+    spdlog::set_level(spdlog::level::debug);
 #else
-    log::SetMinSeverity(Severity::Info);
+    spdlog::set_level(spdlog::level::info);
 #endif
-    log::EnableOutputToConsole(true);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
 
     // Default configuration
     std::string json_path = "node_editor_config.json";
@@ -332,25 +332,25 @@ int main(int argc, char** argv)
     // Load configuration files
     for (const auto& config_file : config_files) {
         if (std::filesystem::exists(config_file)) {
-            log::info("Loading configuration: %s", config_file.c_str());
+            spdlog::info("Loading configuration: %s", config_file.c_str());
             system->load_configuration(config_file);
         } else {
-            log::warning("Configuration file not found: %s", config_file.c_str());
+            spdlog::warn("Configuration file not found: %s", config_file.c_str());
         }
     }
 
     // Load plugin configurations
     auto plugin_path = std::filesystem::path(plugin_path_str);
     if (std::filesystem::exists(plugin_path)) {
-        log::info("Loading plugins from: %s", plugin_path_str.c_str());
+        spdlog::info("Loading plugins from: %s", plugin_path_str.c_str());
         for (auto& p : std::filesystem::directory_iterator(plugin_path)) {
             if (p.path().extension() == ".json") {
-                log::info("Loading plugin: %s", p.path().filename().string().c_str());
+                spdlog::info("Loading plugin: %s", p.path().filename().string().c_str());
                 system->load_configuration(p.path().string());
             }
         }
     } else {
-        log::warning("Plugin directory not found: %s", plugin_path_str.c_str());
+        spdlog::warn("Plugin directory not found: %s", plugin_path_str.c_str());
     }
 
     // Initialize node system

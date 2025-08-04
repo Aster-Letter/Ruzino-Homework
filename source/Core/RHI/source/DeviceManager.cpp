@@ -47,15 +47,16 @@ freely, subject to the following restrictions:
    distribution.
 */
 
-#include <Logger/Logger.h>
 #include <RHI/DeviceManager/DeviceManager.h>
 #include <nvrhi/utils.h>
+#include <spdlog/spdlog.h>
 
 #include <cstdio>
 #include <glm/glm.hpp>
 #include <iomanip>
 #include <sstream>
 #include <thread>
+
 
 #if USTC_CG_WITH_DX11
 #include <d3d11.h>
@@ -1083,8 +1084,8 @@ DeviceManager *DeviceManager::Create(nvrhi::GraphicsAPI api)
 #endif
         case nvrhi::GraphicsAPI::VULKAN: return CreateVK();
         default:
-            log::error(
-                "DeviceManager::Create: Unsupported Graphics API (%d)", api);
+            spdlog::error(
+                "DeviceManager::Create: Unsupported Graphics API");
             return nullptr;
     }
 }
@@ -1099,23 +1100,26 @@ void DefaultMessageCallback::message(
     nvrhi::MessageSeverity severity,
     const char *messageText)
 {
-    Severity donutSeverity = Severity::Info;
+    spdlog::level::level_enum spd_severity = spdlog::level::info;
     switch (severity) {
         case nvrhi::MessageSeverity::Info:
-            donutSeverity = Severity::Info;
+            spd_severity = spdlog::level::info;
             break;
         case nvrhi::MessageSeverity::Warning:
-            donutSeverity = Severity::Warning;
+            spd_severity = spdlog::level::warn;
             break;
         case nvrhi::MessageSeverity::Error:
-            donutSeverity = Severity::Error;
+            spd_severity = spdlog::level::err;
             break;
         case nvrhi::MessageSeverity::Fatal:
-            donutSeverity = Severity::Fatal;
+            spd_severity = spdlog::level::critical;
             break;
     }
 
-    log::message(donutSeverity, "%s", messageText);
+    spdlog::log(
+        spd_severity,
+        "nvrhi: {}",
+        messageText);  // Use nvrhi::utils::FormatMessage() if available
 }
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

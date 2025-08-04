@@ -90,7 +90,7 @@ NODE_EXECUTION_FUNCTION(read_usd)
         abs_path = std::filesystem::path(file_name);
     }
     else {
-        log::error("Path is empty.");
+        spdlog::error("Path is empty.");
         return false;
     }
     if (!abs_path.is_absolute()) {
@@ -210,14 +210,14 @@ NODE_EXECUTION_FUNCTION(read_usd)
                     skel_component->jointIndices = jointIndices;
                 }
                 else {
-                    log::warning("Unable to read the skeleton.");
+                    spdlog::warn("Unable to read the skeleton.");
                     return false;
                 }
             }
         }
 
         else {
-            log::warning("Unable to read the prim.");
+            spdlog::warn("Unable to read the prim.");
             return false;
         }
 

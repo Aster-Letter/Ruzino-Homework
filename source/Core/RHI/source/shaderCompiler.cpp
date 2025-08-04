@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "slang.h"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
@@ -27,7 +27,7 @@ std::filesystem::path SlangShaderCompiler::find_root(
             current = current.parent_path();
         }
         else {
-            log::error("CUDA Prelude not found.");
+            spdlog::error("CUDA Prelude not found.");
             return "";
         }
     }

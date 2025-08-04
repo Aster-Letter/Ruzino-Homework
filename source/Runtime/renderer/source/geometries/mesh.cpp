@@ -26,7 +26,7 @@
 
 #include "../instancer.h"
 #include "../renderParam.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "Scene/SceneTypes.slang"
 #include "material/material.h"
 #include "nvrhi/utils.h"
@@ -141,11 +141,11 @@ void Hd_USTC_CG_Mesh::_UpdatePrimvarSources(
         auto interp = static_cast<HdInterpolation>(i);
         primvars = GetPrimvarDescriptors(sceneDelegate, interp);
         for (const HdPrimvarDescriptor& pv : primvars) {
-            log::info("Checking primvar %s", pv.name.GetText());
+            spdlog::info("Checking primvar %s", pv.name.GetText());
 
             if (HdChangeTracker::IsPrimvarDirty(dirtyBits, id, pv.name) &&
                 pv.name != HdTokens->points) {
-                log::info("primvar %s is dirty", pv.name.GetText());
+                spdlog::info("primvar %s is dirty", pv.name.GetText());
                 _primvarSourceMap[pv.name] = {
                     GetPrimvar(sceneDelegate, pv.name), interp
                 };
@@ -349,7 +349,7 @@ void Hd_USTC_CG_Mesh::updateTLAS(
 
     auto material_id = GetMaterialId();
 
-    log::info("Material id: %s", material_id.GetText());
+    spdlog::info("Material id: %s", material_id.GetText());
 
     Hd_USTC_CG_Material* material = (*render_param->material_map)[material_id];
 
@@ -486,7 +486,7 @@ void Hd_USTC_CG_Mesh::Sync(
                         if (value.IsHolding<VtVec3fArray>()) {
                             if (value.Get<VtVec3fArray>().size() !=
                                 topology.GetFaceVertexIndices().size()) {
-                                log::error(
+                                spdlog::error(
                                     "FaceVarying primvar size mismatch: %s, "
                                     "expected %d, have %d",
                                     primvar.first.GetText(),
@@ -513,7 +513,7 @@ void Hd_USTC_CG_Mesh::Sync(
                             assert(
                                 value.Get<VtVec4fArray>().size() ==
                                 topology.GetFaceVertexIndices().size());
-                            log::info(
+                            spdlog::info(
                                 "Get a VtVec4fArray, named %s",
                                 primvar.first.GetText());
                             meshUtil.ComputeTriangulatedFaceVaryingPrimvar(
@@ -526,7 +526,7 @@ void Hd_USTC_CG_Mesh::Sync(
 
                     if (primvar.second.data.GetArraySize() !=
                         triangulatedIndices.size() * 3) {
-                        log::error(
+                        spdlog::error(
                             "FaceVarying primvar size mismatch: %s, expected "
                             "%d, have %d",
                             primvar.first.GetText(),
@@ -592,7 +592,7 @@ void Hd_USTC_CG_Mesh::Sync(
                     auto p = material_map->find(subset.materialId);
 
                     if (p == material_map->end()) {
-                        log::error(
+                        spdlog::error(
                             "Material not found for subset %s",
                             subset.materialId.GetText());
                         continue;
@@ -647,7 +647,7 @@ void Hd_USTC_CG_Mesh::Sync(
             }
             else {
                 normal_primvar = GetNormals(sceneDelegate);
-                log::info(GetId().GetAsString().c_str());
+                spdlog::info(GetId().GetAsString().c_str());
             }
 
             if (normal_primvar.IsEmpty() ||

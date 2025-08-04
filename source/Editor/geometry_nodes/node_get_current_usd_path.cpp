@@ -34,7 +34,7 @@ NODE_EXECUTION_FUNCTION(get_current_usd_path)
     auto& global_payload = params.get_global_payload<GeomPayload&>();
 //    bool log = params.get_input<bool>("Print log");
 //    if (log) {
-//            log::warning("Path in the payload is %s", global_payload.stage_filepath_.c_str());
+//            spdlog::warn("Path in the payload is %s", global_payload.stage_filepath_.c_str());
 //    }
     params.set_output("USD file path", global_payload.stage_filepath_);
     return true;

@@ -66,7 +66,7 @@ NODE_EXECUTION_FUNCTION(write_usd)
     auto sub_path = params.get_input<std::string>("Sub Path");
     if (!std::string(sub_path.c_str()).empty()) {
         if (!legal(sub_path)) {
-            log::error("Illegal sub path");
+            spdlog::error("Illegal sub path");
             return false;
         }
         sdf_path = sdf_path.AppendPath(pxr::SdfPath(sub_path.c_str()));

@@ -53,7 +53,7 @@ void BindlessContext::emitResourceBindings(
                 if (type == Type::FLOAT) {
                     auto val = uniform->getValue()->asA<float>();
 
-                    log ::info(
+                    spdlog::info(
                         "setting %s to %f",
                         uniform->getVariable().c_str(),
                         val);
@@ -74,7 +74,7 @@ void BindlessContext::emitResourceBindings(
                     if (type == Type::INTEGER) {
                         auto val = uniform->getValue()->asA<int>();
 
-                        log ::info(
+                        spdlog::info(
                             "setting %s to %d",
                             uniform->getVariable().c_str(),
                             val);
@@ -88,7 +88,7 @@ void BindlessContext::emitResourceBindings(
                         auto val = uniform->getValue()->asA<bool>();
                         int intVal = val ? 1 : 0;
 
-                        log ::info(
+                        spdlog::info(
                             "setting %s to %d",
                             uniform->getVariable().c_str(),
                             intVal);
@@ -109,7 +109,7 @@ void BindlessContext::emitResourceBindings(
                         &val,
                         sizeof(Vector2));
 
-                    log::info(
+                    spdlog::info(
                         "setting %s to %f, %f",
                         uniform->getVariable().c_str(),
                         val[0],
@@ -127,7 +127,7 @@ void BindlessContext::emitResourceBindings(
                     if (type == Type::COLOR3) {
                         auto val = uniform->getValue()->asA<Color3>();
 
-                        log::info(
+                        spdlog::info(
                             "setting %s to %f, %f, %f",
                             uniform->getVariable().c_str(),
                             val[0],
@@ -141,7 +141,7 @@ void BindlessContext::emitResourceBindings(
                     else {
                         auto val = uniform->getValue()->asA<Vector3>();
 
-                        log ::info(
+                        spdlog::info(
                             "setting %s to %f, %f, %f",
                             uniform->getVariable().c_str(),
                             val[0],
@@ -167,7 +167,7 @@ void BindlessContext::emitResourceBindings(
                     if (uniform->getValue()->isA<Color4>()) {
                         auto val = uniform->getValue()->asA<Color4>();
 
-                        log ::info(
+                        spdlog::info(
                             "setting %s to %f, %f, %f, %f",
                             uniform->getVariable().c_str(),
                             val[0],
@@ -183,7 +183,7 @@ void BindlessContext::emitResourceBindings(
                     else if (uniform->getValue()->isA<Vector4>()) {
                         auto val = uniform->getValue()->asA<Vector4>();
 
-                        log ::info(
+                        spdlog::info(
                             "setting %s to %f, %f, %f, %f",
                             uniform->getVariable().c_str(),
                             val[0],
@@ -197,7 +197,7 @@ void BindlessContext::emitResourceBindings(
                             sizeof(Vector4));
                     }
                     else {
-                        log::warning(
+                        spdlog::warn(
                             ("Unsupported uniform type: " + type.getName())
                                 .c_str());
                         assert(false);
@@ -248,12 +248,12 @@ void BindlessContext::emitResourceBindings(
                     numComponents = 4;
                 }
                 else {
-                    log::warning(("Unsupported uniform type: " + type.getName())
+                    spdlog::warn(("Unsupported uniform type: " + type.getName())
                                      .c_str());
                 }
 
                 if (uniform->getVariable() == "Surface_opacityThreshold") {
-                    log::info(
+                    spdlog::info(
                         "Surface_opacityThreshold: %s, value: %f",
                         dataFetch.c_str(),
                         uniform->getValue()->asA<float>());

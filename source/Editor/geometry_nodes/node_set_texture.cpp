@@ -36,26 +36,26 @@ NODE_EXECUTION_FUNCTION(set_texture)
 
 
     if (texture.empty()) {
-        log::warning("Path cannot be empty!");
+        spdlog::warn("Path cannot be empty!");
         return false;
     } // no path input
     // expand the texture name to abs path
     std::filesystem::path texture_path(texture);
     if (!texture_path.is_absolute()) texture_path = executable_path / texture_path;
-    log::info("Exec path %s", executable_path.u8string().c_str());
+    spdlog::info("Exec path {}", executable_path.string());
     texture_path = texture_path.lexically_normal();
-    log::info("Normalized texture path: %s", texture_path.u8string().c_str());
+    spdlog::info("Normalized texture path: {}", texture_path.string());
     if (!std::filesystem::exists(texture_path)) {
-        log::warning("File not exists!");
+        spdlog::warn("File not exists!");
         return false;
     }
     if (std::filesystem::is_directory(texture_path)) {
-        log::warning("This is a directory!");
+        spdlog::warn("This is a directory!");
         return false;
     }
 
     texture = texture_path.string();
-    log::info("Texture file: %s", texture.c_str());
+    spdlog::info("Texture file: {}", texture.c_str());
 
     if (!material) {
         material = std::make_shared<MaterialComponent>(&geometry);

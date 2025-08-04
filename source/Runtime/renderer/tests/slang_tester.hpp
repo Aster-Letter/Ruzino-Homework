@@ -17,7 +17,7 @@
 
 #include <random>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/ShaderFactory/shader.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
@@ -816,7 +816,7 @@ inline bool ShaderGeneratorTester::generateCode(
     }
     catch (mx::Exception& e) {
         log << ">> Code generation failure: " << e.what() << "\n";
-        log::warning((std::string(e.what()) + " in " + shaderName).c_str());
+        spdlog::warn((std::string(e.what()) + " in " + shaderName).c_str());
         shader = nullptr;
     }
     CHECK(shader);
@@ -1048,7 +1048,7 @@ inline void ShaderGeneratorTester::validate_shader_compile(
         }
 
         if (successed_files.count(doc->getSourceUri())) {
-            log::info("Skip file: %s", doc->getSourceUri().c_str());
+            spdlog::info("Skip file: %s", doc->getSourceUri().c_str());
             continue;
         }
 
@@ -1114,7 +1114,7 @@ inline void ShaderGeneratorTester::validate_shader_compile(
             std::string msg =
                 "Document is invalid: [" + doc->getSourceUri() + "] " + message;
             _logFile << msg;
-            log::warning(msg.c_str());
+            spdlog::warn(msg.c_str());
         }
         ASSERT_TRUE(docValid);
 
@@ -1240,7 +1240,7 @@ inline void ShaderGeneratorTester::validate_shader_compile(
                             file.close();
                         }
 
-                        log::info("Compiled shader: %s", elementName.c_str());
+                        spdlog::info("Compiled shader: %s", elementName.c_str());
 
                         // Run compile test
                         if (compileSource(sourceCodePaths)) {

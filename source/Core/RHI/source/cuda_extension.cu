@@ -1,9 +1,9 @@
+#define FMT_UNICODE 0
+#include <spdlog/spdlog.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
 #include <RHI/internal/cuda_extension.hpp>
-
-#include "Logger/Logger.h"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 namespace cuda {
@@ -34,15 +34,15 @@ class CUDALinearBuffer : public nvrhi::RefCounter<cuda::ICUDALinearBuffer> {
 CUDALinearBuffer::CUDALinearBuffer(const cuda::CUDALinearBufferDesc& in_desc)
     : desc(in_desc)
 {
-    log::info(
-        "Allocating vMem of size(MB) : %d\n",
+    spdlog::info(
+        "Allocating vMem of size(MB) : {}",
         desc.element_size * desc.element_count / 1024 / 1024);
     d_vec.resize(desc.element_size * desc.element_count);
 }
 
 CUDALinearBuffer::~CUDALinearBuffer()
 {
-    log::info("Freeing vMem of size(MB) : %d\n", d_vec.size() / 1024 / 1024);
+    spdlog::info("Freeing vMem of size(MB) : {}", d_vec.size() / 1024 / 1024);
     d_vec.clear();
 }
 
@@ -70,10 +70,11 @@ CUDALinearBufferHandle create_cuda_linear_buffer(
     auto buffer = new CUDALinearBuffer(d);
 
     if (init_data)
-        buffer->assign_host_data(thrust::host_vector<uint8_t>(
-            static_cast<uint8_t*>(init_data),
-            static_cast<uint8_t*>(init_data) +
-                d.element_size * d.element_count));
+        buffer->assign_host_data(
+            thrust::host_vector<uint8_t>(
+                static_cast<uint8_t*>(init_data),
+                static_cast<uint8_t*>(init_data) +
+                    d.element_size * d.element_count));
 
     return CUDALinearBufferHandle::Create(buffer);
 }

@@ -1,4 +1,4 @@
-#include <Logger/Logger.h>
+#include <spdlog/spdlog.h>
 #include <MaterialXCore/Document.h>
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
@@ -188,8 +188,8 @@ TEST(GenShader, Bind_Light_Shaders)
 
 static void generateSlangCode()
 {
-    USTC_CG::log::SetMinSeverity(USTC_CG::Severity::Info);
-    USTC_CG::log::EnableOutputToConsole(true);
+    spdlog::set_level(spdlog::level::info);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
 
     mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
 

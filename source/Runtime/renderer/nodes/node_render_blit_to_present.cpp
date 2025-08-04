@@ -48,7 +48,7 @@ NODE_EXECUTION_FUNCTION(blit_to_present)
 {
     auto sourceTexture = params.get_input<TextureHandle>("Tex");
     if (!sourceTexture) {
-        log::warning("No texture to blit");
+        spdlog::warn("No texture to blit");
         return false;
     }
     auto output_desc = sourceTexture->getDesc();
@@ -123,7 +123,7 @@ NODE_EXECUTION_FUNCTION(blit_to_present)
     MARK_DESTROY_NVRHI_RESOURCE(pixel_shader);
 
     if (!error_string.empty()) {
-        log::warning(error_string.c_str());
+        spdlog::warn(error_string.c_str());
         return false;
     }
 

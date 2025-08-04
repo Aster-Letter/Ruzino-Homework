@@ -52,7 +52,7 @@ NODE_EXECUTION_FUNCTION(taa)
 
     if (!error_string.empty()) {
         resource_allocator.destroy(output);
-        log::warning(error_string.c_str());
+        spdlog::warn(error_string.c_str());
         return false;
     }
 

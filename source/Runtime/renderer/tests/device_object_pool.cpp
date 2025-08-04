@@ -5,7 +5,7 @@
 #include <random>
 
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 
 using namespace USTC_CG;
 
@@ -16,8 +16,8 @@ class MemoryPoolTest : public ::testing::Test {
         // Code here will be called immediately after the constructor (right
         // before each test).
         RHI::init();
-        log::SetMinSeverity(Severity::Warning);
-        log::EnableOutputToConsole(true);
+        spdlog::set_level(spdlog::level::warn);
+        spdlog::set_pattern("%^[%T] %n: %v%$");
     }
 
     void TearDown() override

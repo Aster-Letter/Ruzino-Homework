@@ -6,7 +6,7 @@
 // #include "GCore/GOP.h"
 // #include "GCore/geom_payload.hpp"
 // #include "GUI/window.h"
-// #include "Logger/Logger.h"
+// #include <spdlog/spdlog.h>
 // #include "cmdparser.hpp"
 // #include "nodes/system/node_system.hpp"
 // #include "nodes/ui/imgui.hpp"
@@ -44,11 +44,11 @@
 //    // load the stage file
 //    if (stage_filename.empty()) {
 //        stage = create_global_stage();
-//        log::info("Use the default stage file!");
+//        spdlog::info("Use the default stage file!");
 //    }
 //    else {
 //        stage = create_custom_global_stage(stage_filename);
-//        log::info("Use the custom stage file! %s", stage_filename.c_str());
+//        spdlog::info("Use the custom stage file! %s", stage_filename.c_str());
 //    }
 //    init(stage.get());
 //
@@ -94,11 +94,11 @@
 //            // loading the submission from students
 //            namespace fs = std::filesystem;
 //            std::regex submission_suffix(R"(.*_nodes_hw_submissions\.json)");
-//            log::info("LOADING SUBMISSIONS");
+//            spdlog::info("LOADING SUBMISSIONS");
 //            for (auto& itr : fs::directory_iterator(".")) {
 //                if (std::regex_match(itr.path().string(), submission_suffix))
 //                {
-//                    log::info("Found: %s", itr.path().string().c_str());
+//                    spdlog::info("Found: %s", itr.path().string().c_str());
 //                    loaded =
 //                        system->load_configuration(itr.path().generic_string());
 //                }
@@ -112,7 +112,7 @@
 //            geom_global_params.stage = stage->get_usd_stage();
 //            geom_global_params.prim_path = json_path;
 //            geom_global_params.stage_filepath_ = stage->GetStagePath();
-//            //            log::warning("Path in the payload is %s",
+//            //            spdlog::warn("Path in the payload is %s",
 //            //            geom_global_params.stage_filepath_.c_str());
 //
 //            // add the stage path to the payload

@@ -1,6 +1,6 @@
 #include "light.h"
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "pxr/imaging/glf/simpleLight.h"
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/rprimCollection.h"

@@ -46,7 +46,7 @@ NODE_EXECUTION_FUNCTION(motion_vec)
 
     if (!error_string.empty()) {
         resource_allocator.destroy(output);
-        log::warning(error_string.c_str());
+        spdlog::warn(error_string.c_str());
         return false;
     }
 

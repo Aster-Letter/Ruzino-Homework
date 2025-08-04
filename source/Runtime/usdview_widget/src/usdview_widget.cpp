@@ -6,7 +6,7 @@
 #include <pxr/imaging/hd/driver.h>
 
 #include "GCore/geom_payload.hpp"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/Hgi/desc_conversion.hpp"
 #include "RHI/rhi.hpp"
 #include "free_camera.hpp"
@@ -84,7 +84,7 @@ void UsdviewEngine::ChooseRenderer(
     unsigned i)
 {
     renderer_->SetRendererPlugin(available_renderers[i]);
-    log::info(
+    spdlog::info(
         "Switching to renderer %s", available_renderers[i].GetString().c_str());
     if (available_renderers[i].GetString() == "Hd_USTC_CG_RendererPlugin") {
         renderer_ui_control =
@@ -290,7 +290,7 @@ void UsdviewEngine::OnFrame(float delta_time)
             ImVec2(1.0f, 0.0f));
     }
     else {
-        log ::warning("No image!");
+        spdlog::warn("No image!");
     }
     is_active = ImGui::IsWindowFocused();
     is_hovered = ImGui::IsItemHovered();
@@ -298,7 +298,7 @@ void UsdviewEngine::OnFrame(float delta_time)
     if (right_mouse_pressed) {
         auto mouse_pos_rel = ImGui::GetMousePos() - ImGui::GetItemRectMin();
 
-        log::info(
+        spdlog::info(
             "Mouse Position Relative: (%.2f, %.2f)",
             mouse_pos_rel.x,
             mouse_pos_rel.y);
@@ -311,7 +311,7 @@ void UsdviewEngine::OnFrame(float delta_time)
         ImVec2 mousePosNDC =
             ImVec2(mousePosNorm.x * 2.0f - 1.0f, 1.0f - mousePosNorm.y * 2.0f);
 
-        log::info(
+        spdlog::info(
             "Mouse Position NDC: (%.2f, %.2f)", mousePosNDC.x, mousePosNDC.y);
 
         using namespace pxr;
@@ -342,8 +342,8 @@ void UsdviewEngine::OnFrame(float delta_time)
             current_pick_event_ =
                 std::make_shared<PickEvent>(point, normal, path, instancer);
 
-            log::info("Picked prim " + path.GetAsString());
-            log::info(
+            spdlog::info("Picked prim " + path.GetAsString());
+            spdlog::info(
                 "Picked point: (%.2f, %.2f, %.2f)",
                 point[0],
                 point[1],

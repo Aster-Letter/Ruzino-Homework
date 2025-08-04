@@ -33,7 +33,7 @@
 #include <fstream>
 
 #include "../renderParam.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/rhi.hpp"
 #include "pxr/imaging/hd/tokens.h"
 
@@ -47,7 +47,7 @@ Hd_USTC_CG_Volume::Hd_USTC_CG_Volume(const SdfPath& id)
       _fieldsLoaded(false),
       _boundingBoxValid(false)
 {
-    log::info("Creating volume: %s", id.GetText());
+    spdlog::info("Creating volume: %s", id.GetText());
 }
 
 Hd_USTC_CG_Volume::~Hd_USTC_CG_Volume()
@@ -72,7 +72,7 @@ void Hd_USTC_CG_Volume::Sync(
 
     const SdfPath& id = GetId();
 
-    log::info("Syncing volume: %s", id.GetText());
+    spdlog::info("Syncing volume: %s", id.GetText());
 
     if (HdChangeTracker::IsVisibilityDirty(*dirtyBits, id)) {
         _sharedData.visible = sceneDelegate->GetVisible(id);
@@ -115,7 +115,7 @@ void Hd_USTC_CG_Volume::Sync(
         if (*dirtyBits & HdChangeTracker::AllDirty)
             dirtyBitNames += "AllDirty ";
 
-        log::info(
+        spdlog::info(
             "Volume %s dirty bits: 0x%x [%s]",
             id.GetText(),
             static_cast<unsigned int>(*dirtyBits),
@@ -145,7 +145,7 @@ void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
     // Get volume field descriptors from USD
     auto fieldDescriptors = sceneDelegate->GetVolumeFieldDescriptors(id);
 
-    log::info(
+    spdlog::info(
         "Loading %zu volume fields for %s",
         fieldDescriptors.size(),
         id.GetText());
@@ -156,7 +156,7 @@ void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
         fieldData.name = fieldDesc.fieldName.GetString();
         fieldData.fieldPrimType = fieldDesc.fieldPrimType;
 
-        log::info(
+        spdlog::info(
             "Processing field: %s (type: %s)",
             fieldData.name.c_str(),
             fieldData.fieldPrimType.GetText());
@@ -174,7 +174,7 @@ void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
                     fieldData.filePath = assetPath.GetAssetPath();
                 }
 
-                log::info("Field file path: %s", fieldData.filePath.c_str());
+                spdlog::info("Field file path: %s", fieldData.filePath.c_str());
 
                 // For OpenVDB, get the grid name
                 VtValue gridNameValue =
@@ -235,14 +235,14 @@ void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
                                 fieldData);
                             break;
                         default:
-                            log::error(
+                            spdlog::error(
                                 "Unsupported volume format for file: %s",
                                 fieldData.filePath.c_str());
                             break;
                     }
 
                     if (loaded) {
-                        log::info(
+                        spdlog::info(
                             "Successfully loaded field %s: %dx%dx%d voxels",
                             fieldData.name.c_str(),
                             fieldData.dimensions[0],
@@ -287,7 +287,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
     const std::string& gridName,
     VolumeFieldData& fieldData)
 {
-    log::info(
+    spdlog::info(
         "Loading OpenVDB file: %s, grid: %s",
         filePath.c_str(),
         gridName.c_str());
@@ -297,7 +297,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
         file.open();
 
         // First, let's see what grids are available in the file
-        log::info("Examining OpenVDB file: %s", filePath.c_str());
+        spdlog::info("Examining OpenVDB file: %s", filePath.c_str());
 
         openvdb::GridBase::Ptr baseGrid;
 
@@ -305,31 +305,31 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
         try {
             baseGrid = file.readGrid(gridName);
             if (baseGrid) {
-                log::info(
+                spdlog::info(
                     "Successfully found grid '%s' in file", gridName.c_str());
             }
         }
         catch (const std::exception& e) {
-            log::info(
+            spdlog::info(
                 "Failed to read grid '%s': %s", gridName.c_str(), e.what());
         }
         // If we couldn't find the specific grid, try to get all grids
         if (!baseGrid) {
-            log::info(
+            spdlog::info(
                 "Grid '%s' not found, looking for available grids",
                 gridName.c_str());
 
             try {
                 auto gridPtrs = file.getGrids();
                 if (gridPtrs && !gridPtrs->empty()) {
-                    log::info("Found %zu grids in file:", gridPtrs->size());
+                    spdlog::info("Found %zu grids in file:", gridPtrs->size());
 
                     // List all available grids
                     for (size_t i = 0; i < gridPtrs->size(); ++i) {
                         auto grid = (*gridPtrs)[i];
                         if (grid) {
                             std::string name = grid->getName();
-                            log::info(
+                            spdlog::info(
                                 "  Grid %zu: name='%s', type=%s",
                                 i,
                                 name.c_str(),
@@ -339,22 +339,22 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
 
                     // Use the first grid
                     baseGrid = (*gridPtrs)[0];
-                    log::info(
+                    spdlog::info(
                         "Using first grid: %s", baseGrid->getName().c_str());
                 }
                 else {
-                    log::error("No grids found in file '%s'", filePath.c_str());
+                    spdlog::error("No grids found in file '%s'", filePath.c_str());
                 }
             }
             catch (const std::exception& e) {
-                log::error(
+                spdlog::error(
                     "Failed to enumerate grids in file '%s': %s",
                     filePath.c_str(),
                     e.what());
             }
 
             if (!baseGrid) {
-                log::error(
+                spdlog::error(
                     "No valid grids found in file '%s'", filePath.c_str());
                 return false;
             }
@@ -362,7 +362,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
         openvdb::FloatGrid::Ptr grid =
             openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
         if (!grid) {
-            log::error(
+            spdlog::error(
                 "Failed to cast grid to FloatGrid. Grid type: %s",
                 baseGrid ? baseGrid->type().c_str() : "null");
             return false;
@@ -386,7 +386,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
             GfBBox3d(GfRange3d(minPt, maxPt));  // Convert OpenVDB to NanoVDB
         auto handle = nanovdb::openToNanoVDB(*grid);
         if (!handle) {
-            log::error("Failed to convert OpenVDB grid to NanoVDB");
+            spdlog::error("Failed to convert OpenVDB grid to NanoVDB");
             return false;
         }
 
@@ -399,7 +399,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
 
         fieldData.isLoaded = true;
 
-        log::info(
+        spdlog::info(
             "OpenVDB placeholder loaded (replace with actual implementation): "
             "%zu bytes",
             fieldData.dataSize);
@@ -407,7 +407,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
         return true;
     }
     catch (const std::exception& e) {
-        log::error(
+        spdlog::error(
             "Error loading OpenVDB file '%s': %s", filePath.c_str(), e.what());
         return false;
     }
@@ -418,7 +418,7 @@ bool Hd_USTC_CG_Volume::_LoadField3D(
     const std::string& fieldName,
     VolumeFieldData& fieldData)
 {
-    log::info(
+    spdlog::info(
         "Loading Field3D file: %s, field: %s",
         filePath.c_str(),
         fieldName.c_str());
@@ -433,7 +433,7 @@ bool Hd_USTC_CG_Volume::_LoadField3D(
     fieldData.isLoaded = true;
     fieldData.dataSize = 32 * 32 * 32 * sizeof(float);
 
-    log::info("Field3D placeholder loaded (implement actual Field3D support)");
+    spdlog::info("Field3D placeholder loaded (implement actual Field3D support)");
     return true;
 }
 
@@ -442,7 +442,7 @@ bool Hd_USTC_CG_Volume::_LoadRawVolume(
     const GfVec3i& dimensions,
     VolumeFieldData& fieldData)
 {
-    log::info(
+    spdlog::info(
         "Loading raw volume: %s (%dx%dx%d)",
         filePath.c_str(),
         dimensions[0],
@@ -451,7 +451,7 @@ bool Hd_USTC_CG_Volume::_LoadRawVolume(
 
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
-        log::error("Failed to open raw volume file: %s", filePath.c_str());
+        spdlog::error("Failed to open raw volume file: %s", filePath.c_str());
         return false;
     }
 
@@ -501,7 +501,7 @@ void Hd_USTC_CG_Volume::_UpdateBoundingBox()
 
     _boundingBoxValid = true;
 
-    log::info(
+    spdlog::info(
         "Volume bounding box: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f)",
         _boundingBox.GetRange().GetMin()[0],
         _boundingBox.GetRange().GetMin()[1],
@@ -533,7 +533,7 @@ void Hd_USTC_CG_Volume::_PrepareGPUData()
             _gpuData.dimensions = field.dimensions;
             _gpuData.voxelSize = field.voxelSize;
             primaryFieldType = "density";
-            log::info("Found density field at index %d", fieldIndex);
+            spdlog::info("Found density field at index %d", fieldIndex);
         }
         else if (field.name.find("sdf") != std::string::npos) {
             // SDF can also be used as a density-like field for rendering
@@ -542,18 +542,18 @@ void Hd_USTC_CG_Volume::_PrepareGPUData()
                 _gpuData.dimensions = field.dimensions;
                 _gpuData.voxelSize = field.voxelSize;
                 primaryFieldType = "sdf";
-                log::info(
+                spdlog::info(
                     "Found SDF field at index %d, using as density field",
                     fieldIndex);
             }
         }
         else if (field.name.find("temperature") != std::string::npos) {
             _gpuData.temperatureFieldIndex = fieldIndex;
-            log::info("Found temperature field at index %d", fieldIndex);
+            spdlog::info("Found temperature field at index %d", fieldIndex);
         }
         else if (field.name.find("velocity") != std::string::npos) {
             _gpuData.velocityFieldIndex = fieldIndex;
-            log::info("Found velocity field at index %d", fieldIndex);
+            spdlog::info("Found velocity field at index %d", fieldIndex);
         }
 
         fieldIndex++;
@@ -566,11 +566,11 @@ void Hd_USTC_CG_Volume::_PrepareGPUData()
         _gpuData.dimensions = firstField.dimensions;
         _gpuData.voxelSize = firstField.voxelSize;
         primaryFieldType = "generic";
-        log::info(
+        spdlog::info(
             "No density or sdf field found, using first field as density");
     }
 
-    log::info(
+    spdlog::info(
         "GPU data prepared - %d fields, primary field type: %s at index %d",
         _gpuData.fieldCount,
         primaryFieldType.c_str(),
@@ -579,7 +579,7 @@ void Hd_USTC_CG_Volume::_PrepareGPUData()
 
 void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
 {
-    log::info("Finalizing volume: %s", GetId().GetText());
+    spdlog::info("Finalizing volume: %s", GetId().GetText());
 
     // Clean up GPU resources properly
     auto* ustcRenderParam = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
@@ -594,14 +594,14 @@ void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
 
             // Release GPU buffer if it exists
             if (field.gpuBuffer) {
-                log::info(
+                spdlog::info(
                     "Releasing GPU buffer for field: %s", field.name.c_str());
                 field.gpuBuffer = nullptr;
             }
 
             // Release 3D texture if it exists
             if (field.texture3D) {
-                log::info(
+                spdlog::info(
                     "Releasing 3D texture for field: %s", field.name.c_str());
                 field.texture3D = nullptr;
             }
@@ -614,7 +614,7 @@ void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
         }
     }
     else {
-        log::warning("Device not available during volume finalization");
+        spdlog::warn("Device not available during volume finalization");
         // Still clean up what we can
         for (auto& fieldPair : _fields) {
             VolumeFieldData& field = fieldPair.second;
@@ -636,7 +636,7 @@ void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
     // Reset GPU data
     _gpuData = VolumeGPUData{};
 
-    log::info("Volume finalization complete: %s", GetId().GetText());
+    spdlog::info("Volume finalization complete: %s", GetId().GetText());
 }
 
 void Hd_USTC_CG_Volume::_InitRepr(
@@ -655,7 +655,7 @@ void Hd_USTC_CG_Volume::CreateGPUResources(Hd_USTC_CG_RenderParam* renderParam)
 {
     auto device = RHI::get_device();
 
-    log::info("Creating GPU resources for volume");
+    spdlog::info("Creating GPU resources for volume");
 
     for (auto& fieldPair : _fields) {
         VolumeFieldData& field = fieldPair.second;
@@ -689,13 +689,13 @@ void Hd_USTC_CG_Volume::CreateGPUResources(Hd_USTC_CG_RenderParam* renderParam)
         commandList->close();
         device->executeCommandList(commandList);
 
-        log::info(
+        spdlog::info(
             "Created GPU buffer for field %s: %zu bytes",
             field.name.c_str(),
             field.dataSize);
     }
 
-    log::info(
+    spdlog::info(
         "GPU resources created for volume with %zu fields", _fields.size());
 }
 

@@ -26,7 +26,7 @@
 
 #include <iostream>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "config.h"
 #include "geometries/mesh.h"
 #include "instancer.h"
@@ -227,7 +227,7 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
 
 void Hd_USTC_CG_RenderDelegate::DestroyRprim(HdRprim* rPrim)
 {
-    log::info("Destroy Rprim id=" + rPrim->GetId().GetString());
+    spdlog::info("Destroy Rprim id=" + rPrim->GetId().GetString());
     delete rPrim;
 }
 
@@ -314,7 +314,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
 
 void Hd_USTC_CG_RenderDelegate::DestroySprim(HdSprim* sPrim)
 {
-    log::info(sPrim->GetId().GetAsString() + " destroyed");
+    spdlog::info(sPrim->GetId().GetAsString() + " destroyed");
     lights.erase(
         std::remove(lights.begin(), lights.end(), sPrim), lights.end());
     materials.erase(sPrim->GetId());
@@ -326,7 +326,7 @@ HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
     const SdfPath& bprimId)
 {
     if (typeId == HdPrimTypeTokens->renderBuffer) {
-        log::info(
+        spdlog::info(
             "Create bprim: type id=" + typeId.GetString() +
             ",prim id = " + bprimId.GetString());
 
@@ -352,7 +352,7 @@ void Hd_USTC_CG_RenderDelegate::DestroyBprim(HdBprim* bPrim)
     if (!bprim_name.empty()) {
         sentence += " id=" + bprim_name;
     }
-    log::info(sentence);
+    spdlog::info(sentence);
     delete bPrim;
 }
 

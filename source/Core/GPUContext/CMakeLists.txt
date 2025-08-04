@@ -2,7 +2,7 @@ USTC_CG_ADD_LIB(
 	GPUContext
 	SHARED
 	PUBLIC_LIBS RHI
-	PRIVATE_LIBS Logger nodes_core
+	PRIVATE_LIBS spdlog::spdlog nodes_core
 	COMPILE_DEFS
 		NOMINMAX 
 		USTC_CG_BACKEND_NVRHI

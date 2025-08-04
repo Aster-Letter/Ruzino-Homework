@@ -1,7 +1,7 @@
 #include "GCore/GOP.h"
 #include "GCore/geom_payload.hpp"
 #include "GUI/window.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 // #include "diff_optics/diff_optics.hpp"
 // #include "diff_optics/lens_system.hpp"
 #include "GCore/algorithms/intersection.h"
@@ -19,9 +19,9 @@ using namespace USTC_CG;
 int main(int argc, char* argv[])
 {
 #ifdef _DEBUG
-    log::SetMinSeverity(Severity::Debug);
+    spdlog::set_level(spdlog::level::debug);
 #endif
-    log::EnableOutputToConsole(true);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
     auto window = std::make_unique<Window>();
 
     // Check for command line arguments to specify USD file

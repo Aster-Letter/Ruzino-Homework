@@ -135,7 +135,7 @@ NODE_EXECUTION_FUNCTION(transparent_refraction)
     params.set_output("Color", color_texture);
 
     if (!shader_error.empty()) {
-        log::error(shader_error.c_str())
+        spdlog::error(shader_error.c_str())
     }
 #endif
     return true;

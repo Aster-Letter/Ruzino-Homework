@@ -257,7 +257,7 @@ NODE_EXECUTION_FUNCTION(scene_ray_launch)
     assert(hit_counter + miss_counter == length);
     params.set_output("Buffer Size", static_cast<int>(hit_counter));
     if (error.size()) {
-        log::warning(error.c_str());
+        spdlog::warn(error.c_str());
         return false;
     }
     return true;

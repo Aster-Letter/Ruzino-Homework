@@ -50,7 +50,7 @@ SOFTWARE.
 #include <nvrhi/nvrhi.h>
 #include <stddef.h>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/ShaderFactory/shader.hpp"
 
 const char* vertex_shader_source = R"(
@@ -203,7 +203,7 @@ bool ImGui_NVRHI::init(
         std::string(pixel_shader_source));
 
     if (!vertexShader || !pixelShader) {
-        log::error("Failed to create an ImGUI shader");
+        spdlog::error("Failed to create an ImGUI shader");
         return false;
     }
 

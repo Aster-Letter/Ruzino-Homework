@@ -27,7 +27,7 @@
 #include <iostream>
 
 #include "../api.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/imaging/hd/extComputationUtils.h"
 #include "pxr/imaging/hd/instancer.h"
@@ -129,7 +129,7 @@ void Hd_USTC_CG_Mesh::_UpdatePrimvarSources(
         for (const HdPrimvarDescriptor& pv : primvars) {
             if (HdChangeTracker::IsPrimvarDirty(dirtyBits, id, pv.name) &&
                 pv.name != HdTokens->points) {
-                log::info("Primvar source " + pv.name.GetString());
+                spdlog::info("Primvar source " + pv.name.GetString());
                 _primvarSourceMap[pv.name] = {
                     GetPrimvar(sceneDelegate, pv.name), interp
                 };
@@ -212,7 +212,7 @@ void Hd_USTC_CG_Mesh::Sync(
             &_adjacency, points.size(), points.cdata());
     }
     _UpdateComputedPrimvarSources(sceneDelegate, *dirtyBits);
-    log::info("Syncing mesh " + GetId().GetString());
+    spdlog::info("Syncing mesh " + GetId().GetString());
     *dirtyBits &= ~HdChangeTracker::AllSceneDirtyBits;
 }
 
@@ -297,7 +297,7 @@ void Hd_USTC_CG_Mesh::RefreshTexcoordGLBuffer(std::string texcoord_name)
 
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, texcoords);
 
-                log::info(
+                spdlog::info(
                     GetId().GetString() +
                     " Attempts to attach texcoord: " + texcoord_name);
                 assert(this->_primvarSourceMap[texcoord_name]

@@ -6,7 +6,7 @@
 #include "GCore/GOP.h"
 #include "GCore/algorithms/intersection.h"
 #include "GCore/geom_payload.hpp"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "nodes/core/api.hpp"
 #include "nodes/system/node_system.hpp"
 #include "stage/stage.hpp"

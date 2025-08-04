@@ -2,7 +2,7 @@
 
 #include "material.h"
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/internal/map.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hio/image.h"
@@ -77,7 +77,7 @@ void Hd_USTC_CG_Material::TryLoadTexture(
 {
     for (auto&& input_connection : usd_preview_surface.inputConnections) {
         if (input_connection.first == TfToken(name)) {
-            log::info("Loading texture: " + input_connection.first.GetString());
+            spdlog::info("Loading texture: " + input_connection.first.GetString());
             auto texture_node =
                 get_input_connection(surfaceNetwork, input_connection);
             assert(texture_node.nodeTypeId == UsdImagingTokens->UsdUVTexture);
@@ -128,7 +128,7 @@ void Hd_USTC_CG_Material::TryLoadParameter(
     for (auto&& parameter : usd_preview_surface.parameters) {
         if (parameter.first == name) {
             descriptor.value = parameter.second;
-            log::info("Loading parameter: " + parameter.first.GetString());
+            spdlog::info("Loading parameter: " + parameter.first.GetString());
         }
     }
 }
@@ -146,7 +146,7 @@ void Hd_USTC_CG_Material::TryLoadParameter(
 
 Hd_USTC_CG_Material::Hd_USTC_CG_Material(const SdfPath& id) : HdMaterial(id)
 {
-    log::info("Creating material " + id.GetString());
+    spdlog::info("Creating material " + id.GetString());
     diffuseColor.value = VtValue(GfVec3f(0.8f));
     roughness.value = VtValue(0.8f);
 
@@ -169,7 +169,7 @@ void Hd_USTC_CG_Material::Sync(
         const HdMaterialNetworkMap& hdNetworkMap =
             vtMat.UncheckedGet<HdMaterialNetworkMap>();
         if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
-            log::info("Loaded a material");
+            spdlog::info("Loaded a material");
 
             surfaceNetwork = HdConvertToHdMaterialNetwork2(hdNetworkMap);
 
@@ -189,7 +189,7 @@ void Hd_USTC_CG_Material::Sync(
         }
     }
     else {
-        log::info("Not loaded a material");
+        spdlog::info("Not loaded a material");
     }
     *dirtyBits = Clean;
 }

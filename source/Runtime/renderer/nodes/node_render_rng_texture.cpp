@@ -49,7 +49,7 @@ NODE_EXECUTION_FUNCTION(rng_texture)
         nvrhi::BindingLayoutDescVector binding_layout_descs =
             reflection.get_binding_layout_descs();
         if (!compute_shader) {
-            log::warning(error_string.c_str());
+            spdlog::warn(error_string.c_str());
             return false;
         }
 

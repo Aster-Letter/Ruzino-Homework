@@ -12,6 +12,8 @@
 #include "pxr/imaging/garch/glApi.h"
 #endif
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <iostream>
+
 #include "vulkan/vulkan.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
@@ -23,7 +25,7 @@ std::map<std::string, nvrhi_image> rhi_images{};
 int init(bool with_window, bool use_dx12)
 {
     if (device_manager) {
-        log::warning("Trying to initialize the RHI again");
+        spdlog::warn("Trying to initialize the RHI again");
         return 0;
     }
 

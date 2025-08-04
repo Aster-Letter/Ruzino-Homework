@@ -1,6 +1,6 @@
 #include "texture.h"
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 Texture2D::Texture2D()
@@ -13,7 +13,7 @@ Texture2D::Texture2D(SdfAssetPath path, HioImage::SourceColorSpace colorSpace)
 {
     texture = HioImage::OpenForReading(path.GetAssetPath(), 0, 0, colorSpace);
     if (texture) {
-        log::info(
+        spdlog::info(
             (textureFileName.GetAssetPath() + " successfully loaded").c_str());
         // Step 1: Get image information
         int width = texture->GetWidth();
@@ -36,7 +36,7 @@ Texture2D::Texture2D(SdfAssetPath path, HioImage::SourceColorSpace colorSpace)
         }
     }
     else {
-        log::info((textureFileName.GetAssetPath() + " not loaded").c_str());
+        spdlog::info((textureFileName.GetAssetPath() + " not loaded").c_str());
     }
 }
 

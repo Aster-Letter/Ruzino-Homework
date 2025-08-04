@@ -4,7 +4,7 @@
 #include "GCore/Components/MeshOperand.h"
 #include "GCore/Components/VolumeComponent.h"
 #include "GCore/Components/XformComponent.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "global_stage.hpp"
 #include "GCore/Components/PointsComponent.h"
 #include "pxr/usd/usdGeom/xform.h"
@@ -101,7 +101,7 @@ std::string Geometry::to_string() const
 void Geometry::attach_component(const GeometryComponentHandle& component)
 {
     if (component->get_attached_operand() != this) {
-        log::warning(
+        spdlog::warn(
             "A component should never be attached to two operands, unless you "
             "know what you are doing");
     }

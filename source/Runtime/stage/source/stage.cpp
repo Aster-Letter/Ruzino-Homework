@@ -49,7 +49,7 @@ Stage::Stage()
         abs_path = std::filesystem::path(stage_path);
     }
     else {
-        log::error("Path is empty.");
+        spdlog::error("Path is empty.");
         return;
     }
     if (!abs_path.is_absolute()) {
@@ -76,7 +76,7 @@ Stage::Stage(const std::string& stage_path)
         abs_path = std::filesystem::path(stage_path);
     }
     else {
-        log::error("Path is empty.");
+        spdlog::error("Path is empty.");
         return;
     }
     abs_path = abs_path.lexically_normal();

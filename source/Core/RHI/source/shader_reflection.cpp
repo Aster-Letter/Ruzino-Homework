@@ -1,6 +1,6 @@
 #include "RHI/ShaderFactory/shader_reflection.hpp"
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/ShaderFactory/shader.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
@@ -30,7 +30,7 @@ unsigned ShaderReflectionInfo::get_binding_space(const std::string& path)
         }
     }
     
-    log::warning("Binding space not found: %s (base: %s)", path.c_str(), base_name.c_str());
+    spdlog::warn("Binding space not found: %s (base: %s)", path.c_str(), base_name.c_str());
     return -1;
 }
 
@@ -53,7 +53,7 @@ unsigned ShaderReflectionInfo::get_binding_location(const std::string& path)
         }
     }
     
-    log::error("Binding location not found: %s (base: %s)", path.c_str(), base_name.c_str());
+    spdlog::error("Binding location not found: %s (base: %s)", path.c_str(), base_name.c_str());
     return -1;
 }
 
@@ -80,7 +80,7 @@ nvrhi::ResourceType ShaderReflectionInfo::get_binding_type(const std::string& pa
         }
     }
     
-    log::error("Binding type not found: %s (base: %s)", path.c_str(), base_name.c_str());
+    spdlog::error("Binding type not found: %s (base: %s)", path.c_str(), base_name.c_str());
     return nvrhi::ResourceType::None;
 }
 

@@ -1,6 +1,6 @@
 
 #include "GUI/window.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "MCore/MaterialXNodeTree.hpp"
 #include "MCore/MaterialXNodeTreeWidget.h"
 #include "gtest/gtest.h"
@@ -45,8 +45,8 @@ class MaterialXNodeSystem : public NodeSystem {
 int main()
 {
     std::shared_ptr<NodeSystem> system_;
-    log::SetMinSeverity(Severity::Info);
-    log::EnableOutputToConsole(true);
+    spdlog::set_level(spdlog::level::info);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
 
     system_ = std::make_shared<MaterialXNodeSystem>();
     std::unique_ptr<NodeTree> tree = std::make_unique<MaterialXNodeTree>(

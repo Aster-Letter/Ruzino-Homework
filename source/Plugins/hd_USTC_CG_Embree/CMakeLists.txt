@@ -9,7 +9,7 @@ if (ENABLE_EMBREE_BASED_RENDERER)
 	USTC_CG_ADD_LIB(
 		hd_USTC_CG_Embree
 		SHARED
-		PUBLIC_LIBS Logger
+		PUBLIC_LIBS spdlog::spdlog
 		PRIVATE_LIBS usd RHI hdx nodes_system usdMtlx  usdImaging embree
 		COMPILE_DEFS
 			NOMINMAX

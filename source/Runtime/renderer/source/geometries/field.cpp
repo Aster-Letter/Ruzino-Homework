@@ -25,7 +25,7 @@
 #include "field.h"
 
 #include "../renderParam.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "pxr/imaging/hd/tokens.h"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
@@ -35,7 +35,7 @@ Hd_USTC_CG_Field::Hd_USTC_CG_Field(const SdfPath& id)
     : HdField(id),
       _isLoaded(false)
 {
-    log::info("Creating field: %s", id.GetText());
+    spdlog::info("Creating field: %s", id.GetText());
 }
 
 Hd_USTC_CG_Field::~Hd_USTC_CG_Field()
@@ -57,7 +57,7 @@ void Hd_USTC_CG_Field::Sync(
 
     const SdfPath& id = GetId();
 
-    log::info("Syncing field: %s", id.GetText());
+    spdlog::info("Syncing field: %s", id.GetText());
 
     // Get field file path
     if (*dirtyBits & HdField::DirtyParams) {
@@ -69,7 +69,7 @@ void Hd_USTC_CG_Field::Sync(
             if (_filePath.empty()) {
                 _filePath = assetPath.GetAssetPath();
             }
-            log::info("Field file path: %s", _filePath.c_str());
+            spdlog::info("Field file path: %s", _filePath.c_str());
         }
 
         // Get field name
@@ -88,7 +88,7 @@ void Hd_USTC_CG_Field::Sync(
             _fieldName = "density";  // Default field name
         }
 
-        log::info("Field name: %s", _fieldName.c_str());
+        spdlog::info("Field name: %s", _fieldName.c_str());
 
         // Mark as loaded (placeholder - actual loading would happen here)
         _isLoaded = true;
@@ -99,14 +99,14 @@ void Hd_USTC_CG_Field::Sync(
 
 void Hd_USTC_CG_Field::Finalize(HdRenderParam* renderParam)
 {
-    log::info("Finalizing field: %s", GetId().GetText());
+    spdlog::info("Finalizing field: %s", GetId().GetText());
 
     // Reset state
     _filePath.clear();
     _fieldName.clear();
     _isLoaded = false;
 
-    log::info("Field finalization complete: %s", GetId().GetText());
+    spdlog::info("Field finalization complete: %s", GetId().GetText());
 }
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

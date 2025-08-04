@@ -19,7 +19,7 @@ NODE_EXECUTION_FUNCTION(print_debug_info)
     if (storage.allow_cast<type>()) { \
         std::ostringstream out;       \
         out << storage.cast<type>();  \
-        log::info(out.str().c_str()); \
+        spdlog::info(out.str().c_str()); \
     }
 
     MACRO_MAP(PrintType, TypesToPrint);

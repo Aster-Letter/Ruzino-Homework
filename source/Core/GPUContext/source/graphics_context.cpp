@@ -223,7 +223,7 @@ GraphicsContext& GraphicsContext::finish_setting_pso()
     pipeline_desc.renderState = renderState;
 
     if (!framebuffer_) {
-        log::error("framebuffer must be set before pso");
+        spdlog::error("framebuffer must be set before pso");
     }
     graphics_pipeline =
         resource_allocator_.create(pipeline_desc, framebuffer_.Get());

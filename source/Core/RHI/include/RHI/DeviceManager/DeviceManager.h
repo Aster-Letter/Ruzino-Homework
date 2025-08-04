@@ -74,8 +74,8 @@ freely, subject to the following restrictions:
 #define GLFW_EXPOSE_NATIVE_WIN32
 #endif  // _WIN32
 #include <GLFW/glfw3native.h>
-#include <Logger/Logger.h>
 #include <nvrhi/nvrhi.h>
+#include <spdlog/spdlog.h>
 
 #include <functional>
 #include <list>
@@ -125,7 +125,7 @@ struct DeviceCreationParameters : public InstanceParameters {
 
     // Severity of the information log messages from the device manager, like
     // the device name or enabled extensions.
-    Severity infoLogSeverity = Severity::Info;
+    spdlog::level::level_enum infoLogSeverity = spdlog::level::info;
 
     // Index of the adapter (DX11, DX12) or physical device (Vk) on which to
     // initialize the device. Negative values mean automatic detection. The

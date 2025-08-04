@@ -7,7 +7,7 @@ target_compile_definitions(shaders_interface INTERFACE RENDERER_SHADER_DIR="${CM
 USTC_CG_ADD_LIB(
 	hd_USTC_CG
 	SHARED
-	PUBLIC_LIBS Logger GPUContext
+	PUBLIC_LIBS spdlog::spdlog GPUContext
 	PRIVATE_LIBS usd usdVol RHI hdx nodes_system usdMtlx shaders_interface usdImaging usdVol usdVolImaging hioOpenVDB
 	COMPILE_DEFS
 		NOMINMAX USTC_CG_DIRECT_VK_DISPLAY

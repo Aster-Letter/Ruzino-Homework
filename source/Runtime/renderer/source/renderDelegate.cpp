@@ -31,7 +31,7 @@
 
 #include <iostream>
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/Hgi/desc_conversion.hpp"
 #include "RHI/rhi.hpp"
 #include "config.h"
@@ -185,7 +185,7 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
 HdAovDescriptor Hd_USTC_CG_RenderDelegate::GetDefaultAovDescriptor(
     const TfToken& name) const
 {
-    log::info(("Attempting to acquire aov " + name.GetString()).c_str());
+    spdlog::info(("Attempting to acquire aov " + name.GetString()).c_str());
 
     if (name == HdAovTokens->color) {
         return HdAovDescriptor(
@@ -267,14 +267,14 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
 {
     if (typeId == HdPrimTypeTokens->mesh) {
         auto mesh = new Hd_USTC_CG_Mesh(rprimId);
-        // log::info(("Create Rprim id=" + rprimId.GetString()).c_str());
+        // spdlog::info(("Create Rprim id=" + rprimId.GetString()).c_str());
 
         meshes.push_back(mesh);
         return mesh;
     }
     else if (typeId == HdPrimTypeTokens->volume) {
         auto volume = new Hd_USTC_CG_Volume(rprimId);
-        log::info("Created volume: %s", rprimId.GetText());
+        spdlog::info("Created volume: %s", rprimId.GetText());
         return volume;
     }
     TF_CODING_ERROR(
@@ -284,7 +284,7 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
 
 void Hd_USTC_CG_RenderDelegate::DestroyRprim(HdRprim* rPrim)
 {
-    // log::info(("Destroy Rprim id=" + rPrim->GetId().GetString()).c_str());
+    // spdlog::info(("Destroy Rprim id=" + rPrim->GetId().GetString()).c_str());
     meshes.erase(
         std::remove(meshes.begin(), meshes.end(), rPrim), meshes.end());
     delete rPrim;
@@ -417,7 +417,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
 
 void Hd_USTC_CG_RenderDelegate::DestroySprim(HdSprim* sPrim)
 {
-    // log::info((sPrim->GetId().GetAsString() + " destroyed").c_str());
+    // spdlog::info((sPrim->GetId().GetAsString() + " destroyed").c_str());
     lights.erase(
         std::remove(lights.begin(), lights.end(), sPrim), lights.end());
     cameras.erase(
@@ -435,14 +435,14 @@ HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
     const SdfPath& bprimId)
 {
     if (typeId == HdPrimTypeTokens->renderBuffer) {
-        // log::info(("Create bprim: type id=" + typeId.GetString() +
+        // spdlog::info(("Create bprim: type id=" + typeId.GetString() +
         //            ",prim id = " + bprimId.GetString())
         //               .c_str());
 
         return new Hd_USTC_CG_RenderBuffer(bprimId);
     }
     if (typeId == UsdVolImagingTokens->openvdbAsset) {
-        // log::info(("Create bprim: type id=" + typeId.GetString() +
+        // spdlog::info(("Create bprim: type id=" + typeId.GetString() +
         //            ",prim id = " + bprimId.GetString())
         //               .c_str());
         return new Hd_USTC_CG_Field(bprimId);
@@ -455,12 +455,12 @@ HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
 HdBprim* Hd_USTC_CG_RenderDelegate::CreateFallbackBprim(const TfToken& typeId)
 {
     if (typeId == HdPrimTypeTokens->renderBuffer) {
-        log::info(
+        spdlog::info(
             ("Create fallback bprim: type id=" + typeId.GetString()).c_str());
         return new Hd_USTC_CG_RenderBuffer(SdfPath::EmptyPath());
     }
     if (typeId == UsdVolImagingTokens->openvdbAsset) {
-        log::info(
+        spdlog::info(
             ("Create fallback bprim: type id=" + typeId.GetString()).c_str());
         return new Hd_USTC_CG_Field(SdfPath::EmptyPath());
     }
@@ -475,7 +475,7 @@ void Hd_USTC_CG_RenderDelegate::DestroyBprim(HdBprim* bPrim)
     if (!bprim_name.empty()) {
         sentence += " id=" + bprim_name;
     }
-    // log::info(sentence.c_str());
+    // spdlog::info(sentence.c_str());
     delete bPrim;
 }
 
@@ -490,7 +490,7 @@ void Hd_USTC_CG_RenderDelegate::DestroyInstancer(HdInstancer* instancer)
 {
     // TF_CODING_ERROR("Destroy instancer not supported");
 
-    // log::info(
+    // spdlog::info(
     //     ("Destroy Instancer id=" + instancer->GetId().GetString()).c_str());
 }
 

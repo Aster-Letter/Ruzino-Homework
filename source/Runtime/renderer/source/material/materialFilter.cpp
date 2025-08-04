@@ -497,8 +497,8 @@ void _FixNodeValues(HdMaterialNetwork2Interface* netInterface)
                 TfToken wrapSValue = wrapS.Get<TfToken>();
                 TfToken wrapTValue = wrapT.Get<TfToken>();
 
-                log::info("wrapSValue: %s", wrapSValue.GetText());
-                log::info("wrapTValue: %s", wrapTValue.GetText());
+                spdlog::info("wrapSValue: %s", wrapSValue.GetText());
+                spdlog::info("wrapTValue: %s", wrapTValue.GetText());
 
                 if (wrapSValue == _tokens->repeat) {
                     netInterface->SetNodeParameterValue(
@@ -545,7 +545,7 @@ void _FixNodeValues(HdMaterialNetwork2Interface* netInterface)
                 auto v = opacityThresholdInput.Get<float>();
 
                 if (v > 0.00001)
-                    log::info("opacityThreshold: %f", v);
+                    spdlog::info("opacityThreshold: %f", v);
             }
         }
     }
@@ -575,7 +575,7 @@ void _FixOmittedConnections(
                 auto input_in_def = rough_node_def->getInput(input->getName());
 
                 if (input_in_def->getType() != input->getType()) {
-                    log::info("Fixing skipped link.");
+                    spdlog::info("Fixing skipped link.");
 
                     // Get required information
                     auto upstream = input->getConnectedOutput();

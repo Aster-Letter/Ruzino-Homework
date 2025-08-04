@@ -8,7 +8,7 @@
 // Framework includes
 #include "GCore/GOP.h"
 #include "GCore/algorithms/intersection.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "RHI/rhi.hpp"
 #include "nodes/system/node_system.hpp"
 #include "stage/stage.hpp"
@@ -103,7 +103,7 @@ UsdGeomCamera FindFirstCamera(const UsdStageRefPtr& stage)
 {
     for (const UsdPrim& prim : stage->Traverse()) {
         if (prim.IsA<UsdGeomCamera>()) {
-            log::info("Found camera: %s", prim.GetPath().GetString().c_str());
+            spdlog::info("Found camera: %s", prim.GetPath().GetString().c_str());
             return UsdGeomCamera(prim);
         }
     }
@@ -174,7 +174,7 @@ bool ReadTextureDirectly(
         return false;
     }
 
-    log::info("Using direct texture copy method...");
+    spdlog::info("Using direct texture copy method...");
 
     auto bare_pointer = hacked_handle.Get<const void*>();
     auto texture =
@@ -232,7 +232,7 @@ bool ReadTextureDirectly(
     }
 
     RHI::get_device()->unmapStagingTexture(staging_texture);
-    log::info("Direct texture copy completed successfully");
+    spdlog::info("Direct texture copy completed successfully");
     return true;
 }
 
@@ -243,7 +243,7 @@ bool ReadTextureCPU(
     int height,
     std::vector<uint8_t>& texture_data)
 {
-    log::info("Using CPU readback method...");
+    spdlog::info("Using CPU readback method...");
 
     auto hgi_texture = renderer->GetAovTexture(HdAovTokens->color);
     if (!hgi_texture) {
@@ -290,15 +290,15 @@ int main(int argc, char* argv[])
     }
 
     // Initialize logging
-    log::SetMinSeverity(Severity::Info);
-    log::EnableOutputToConsole(true);
+    spdlog::set_level(spdlog::level::info);
+    spdlog::set_pattern("%^[%T] %n: %v%$");
 
-    log::info("Starting headless render...");
-    log::info("USD file: %s", settings.usd_file.c_str());
-    log::info("JSON script: %s", settings.json_script.c_str());
-    log::info("Output image: %s", settings.output_image.c_str());
-    log::info("Resolution: %dx%d", settings.width, settings.height);
-    log::info("SPP: %d", settings.spp);
+    spdlog::info("Starting headless render...");
+    spdlog::info("USD file: {}", settings.usd_file.c_str());
+    spdlog::info("JSON script: {}", settings.json_script.c_str());
+    spdlog::info("Output image: {}", settings.output_image.c_str());
+    spdlog::info("Resolution: {}x{}", settings.width, settings.height);
+    spdlog::info("SPP: {}", settings.spp);
 
     try {
         // Initialize OpenGL context
@@ -366,15 +366,15 @@ int main(int argc, char* argv[])
 
         // Render the scene with multiple samples
         UsdPrim root = stage->get_usd_stage()->GetPseudoRoot();
-        log::info("Starting render with %d samples...", settings.spp);
+        spdlog::info("Starting render with %d samples...", settings.spp);
 
         for (int sample = 0; sample < settings.spp; ++sample) {
-            log::info("Rendering sample %d/%d", sample + 1, settings.spp);
+            spdlog::info("Rendering sample %d/%d", sample + 1, settings.spp);
             renderer->Render(root, render_params);
             renderer->StopRenderer();
         }
 
-        log::info("Render complete.");
+        spdlog::info("Render complete.");
 
         // Read back texture data
         std::vector<uint8_t> texture_data;
@@ -395,7 +395,7 @@ int main(int argc, char* argv[])
         }
 
         // Save the image
-        log::info("Saving image to: %s", settings.output_image.c_str());
+        spdlog::info("Saving image to: %s", settings.output_image.c_str());
         if (!SaveImageToFile(
                 settings.output_image,
                 settings.width,
@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
                 "Failed to save image to " + settings.output_image);
         }
 
-        log::info("Headless render completed successfully!");
+        spdlog::info("Headless render completed successfully!");
 
         // Cleanup
         renderer.reset();

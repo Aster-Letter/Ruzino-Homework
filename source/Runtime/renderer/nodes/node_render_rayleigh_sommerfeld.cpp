@@ -33,7 +33,7 @@ NODE_EXECUTION_FUNCTION(rayleigh_sommerfeld)
     //}
     //catch (const bp::error_already_set&) {
     //    PyErr_Print();
-    //    log::error("Python error.")
+    //    spdlog::error("Python error.")
     //}
     return true;
 }

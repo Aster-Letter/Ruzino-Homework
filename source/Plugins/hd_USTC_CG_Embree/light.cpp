@@ -1,6 +1,6 @@
 #include "light.h"
 
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "pxr/base/gf/plane.h"
 #include "pxr/base/gf/ray.h"
 #include "pxr/base/gf/rotation.h"
@@ -226,7 +226,7 @@ void Hd_USTC_CG_Dome_Light::_PrepareDomeLight(
                 texture = nullptr;
             }
 
-            log::info(
+            spdlog::info(
                 ("Attempting to load file " + textureFileName.GetAssetPath())
                     .c_str());
         }

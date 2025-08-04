@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "GUI/ImGuiFileDialog.h"
-#include "Logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "imgui.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/vt/typeHeaders.h"
@@ -196,7 +196,7 @@ void UsdFileViewer::EditValue()
         auto xformable =
             UsdGeomXformable::Get(stage->get_usd_stage(), selected);
         if (xformable) {
-            //            log::warning("XFORMABLE_GET! -> %s",
+            //            spdlog::warn("XFORMABLE_GET! -> %s",
             //            prim.GetName().GetText());
             bool rst_stack;
             auto xform_op = xformable.GetOrderedXformOps(&rst_stack);
@@ -237,7 +237,7 @@ void UsdFileViewer::EditValue()
                 attr.GetName().GetString() + "##" + attr.GetName().GetString();
 
             /// print the label for dbg
-            //            log::warning("%s -> %s
+            //            spdlog::warn("%s -> %s
             //            [%s]",prim.GetName().GetText(),label.c_str(),
             //            attr.GetTypeName().GetCPPTypeName().c_str());
 
@@ -380,7 +380,7 @@ void UsdFileViewer::EditValue()
                 //
                 //            if (label=="xformOpOrder##xformOpOrder") {
                 //                std::cout << v.IsEmpty() << "\n";
-                //                log::warning("[%s]", label.c_str());
+                //                spdlog::warn("[%s]", label.c_str());
                 //
                 //            }
             }
@@ -393,7 +393,7 @@ void UsdFileViewer::select_file()
     auto instance = IGFD::FileDialog::Instance();
     if (instance->Display("SelectFile")) {
         auto selected = instance->GetFilePathName();
-        log::info(selected.c_str());
+        spdlog::info(selected.c_str());
 
         is_selecting_file = false;
 
