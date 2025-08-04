@@ -5,7 +5,7 @@ if(SLANG_FOUND)
         WITH_CUDA
         PUBLIC_LIBS nvrhi SLANG::slang
         PRIVATE_LIBS Vulkan::Headers spdlog::spdlog glfw glm::glm nodes_core
-        PYTHON_WRAP_DIR python
+        # PYTHON_WRAP_DIR python
         COMPILE_DEFS
         NOMINMAX
         VULKAN_HPP_STORAGE_SHARED
