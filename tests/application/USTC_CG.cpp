@@ -1,10 +1,9 @@
+#include <spdlog/spdlog.h>
+
 #include "GCore/GOP.h"
+#include "GCore/algorithms/intersection.h"
 #include "GCore/geom_payload.hpp"
 #include "GUI/window.h"
-#include <spdlog/spdlog.h>
-// #include "diff_optics/diff_optics.hpp"
-// #include "diff_optics/lens_system.hpp"
-#include "GCore/algorithms/intersection.h"
 #include "nodes/system/node_system.hpp"
 #include "nodes/ui/imgui.hpp"
 #include "pxr/usd/usd/stage.h"
@@ -13,7 +12,7 @@
 #include "usd_nodejson.hpp"
 #include "widgets/usdtree/usd_fileviewer.h"
 #include "widgets/usdview/usdview_widget.hpp"
-
+#include "cmdparser.hpp"
 using namespace USTC_CG;
 
 int main(int argc, char* argv[])
@@ -42,6 +41,7 @@ int main(int argc, char* argv[])
     window->register_function_before_frame(
         [&stage](Window* window) { stage->tick(window->get_elapsed_time()); });
 #else
+
     window->register_function_before_frame(
         [&stage](Window* window) { stage->tick(1.0f / 30.f); });
 #endif
@@ -124,23 +124,6 @@ int main(int argc, char* argv[])
             window->register_widget(std::move(node_widget));
         }
     });
-
-    // std::unique_ptr<LensSystem> lens_system = std::make_unique<LensSystem>();
-
-    //// Check existence of lens.json
-    // if (std::filesystem::exists("lens.json")) {
-    //     lens_system->deserialize(std::filesystem::path("lens.json"));
-    // }
-    // else {
-    //     lens_system->set_default();
-    // }
-
-    // window->register_openable_widget(
-    //     createDiffOpticsGUIFactory(), { "Plugins", "Physical Lens System" });
-
-    // render_bare->set_renderer_setting(
-    //     pxr::TfToken("lens_system_ptr"),
-    //     pxr::VtValue(static_cast<void*>(lens_system.get())));
 
     window->register_function_after_frame(
         [render_bare](Window* window) { render_bare->finish_render(); });

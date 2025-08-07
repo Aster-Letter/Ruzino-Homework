@@ -13,6 +13,7 @@ NODE_DECLARATION_FUNCTION({nodename})
 NODE_EXECUTION_FUNCTION({nodename})
 {{
     // Function content omitted
+    return true;  // Ensure the function returns a boolean value
 }}
 
 NODE_DECLARATION_UI({nodename});

@@ -1,7 +1,7 @@
 USTC_CG_ADD_LIB(
 	geometry 
 	SHARED
-	PUBLIC_LIBS usd usdVol OpenMeshCore usdGeom usdSkel stage hioOpenVDB spdlog::spdlog usdShade RHI shaders_interface GPUContext nodes_core
+	PUBLIC_LIBS usd usdVol OpenMeshCore usdGeom usdSkel stage hioOpenVDB spdlog::spdlog usdShade RHI shaders_interface GPUContext nodes_core exprtk
 	COMPILE_DEFS
 		NOMINMAX 
 		USTC_CG_BACKEND_NVRHI
