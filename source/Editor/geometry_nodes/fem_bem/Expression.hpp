@@ -28,7 +28,8 @@ namespace fem_bem {
         // Constructors
         Expression() = default;
         explicit Expression(const std::string& expr_str)
-            : expression_string_(expr_str)
+            : expression_string_(expr_str),
+              is_compound_(false)
         {
         }
 
@@ -36,15 +37,57 @@ namespace fem_bem {
             const std::string& expr_str,
             const std::vector<std::string>& variable_names)
             : expression_string_(expr_str),
-              variable_names_(variable_names)
+              variable_names_(variable_names),
+              is_compound_(false)
         {
+        }
+
+        // Compound expression constructor
+        Expression(
+            const Expression& outer_expr,
+            const std::unordered_map<std::string, Expression>&
+                variable_substitutions)
+            : outer_expression_(std::make_unique<Expression>(outer_expr)),
+              substitution_map_(variable_substitutions),
+              is_compound_(true)
+        {
+            // Build compound expression string for display
+            expression_string_ = outer_expr.get_string();
+            for (const auto& [var, sub_expr] : variable_substitutions) {
+                expression_string_ +=
+                    " with " + var + "=(" + sub_expr.get_string() + ")";
+            }
+        }
+
+        // Compound expression constructor with initializer list for convenience
+        Expression(
+            const Expression& outer_expr,
+            std::initializer_list<std::pair<const std::string, Expression>>
+                substitutions)
+            : outer_expression_(std::make_unique<Expression>(outer_expr)),
+              substitution_map_(substitutions.begin(), substitutions.end()),
+              is_compound_(true)
+        {
+            // Build compound expression string for display
+            expression_string_ = outer_expr.get_string();
+            for (const auto& [var, sub_expr] : substitution_map_) {
+                expression_string_ +=
+                    " with " + var + "=(" + sub_expr.get_string() + ")";
+            }
         }
 
         // Copy constructor and assignment
         Expression(const Expression& other)
             : expression_string_(other.expression_string_),
               variable_names_(other.variable_names_),
-              is_parsed_(false)  // Force re-parsing with new symbol table
+              is_parsed_(false),  // Force re-parsing with new symbol table
+              is_compound_(other.is_compound_),
+              outer_expression_(
+                  other.outer_expression_
+                      ? std::make_unique<Expression>(*other.outer_expression_)
+                      : nullptr),
+              substitution_map_(other.substitution_map_),
+              derivative_evaluator_(other.derivative_evaluator_)
         {
         }
 
@@ -56,6 +99,13 @@ namespace fem_bem {
                 is_parsed_ = false;  // Force re-parsing
                 compiled_expression_.reset();
                 symbol_table_.reset();
+                is_compound_ = other.is_compound_;
+                outer_expression_ =
+                    other.outer_expression_
+                        ? std::make_unique<Expression>(*other.outer_expression_)
+                        : nullptr;
+                substitution_map_ = other.substitution_map_;
+                derivative_evaluator_ = other.derivative_evaluator_;
             }
             return *this;
         }
@@ -63,6 +113,9 @@ namespace fem_bem {
         // Move constructor and assignment
         Expression(Expression&& other) noexcept = default;
         Expression& operator=(Expression&& other) noexcept = default;
+
+        // Virtual destructor for inheritance
+        virtual ~Expression() = default;
 
         // Factory methods
         static Expression from_string(const std::string& expr_str)
@@ -92,7 +145,7 @@ namespace fem_bem {
         }
 
         // Method to check if this is a string-based expression
-        bool is_string_based() const
+        virtual bool is_string_based() const
         {
             return true;  // Regular expressions are always string-based
         }
@@ -111,7 +164,26 @@ namespace fem_bem {
         T evaluate_at(
             const std::unordered_map<std::string, T>& variable_values) const
         {
-            // Lazy parsing with variable discovery
+            // Handle expressions created from DerivativeExpression
+            if (derivative_evaluator_) {
+                return derivative_evaluator_(variable_values);
+            }
+
+            // Handle compound expressions
+            if (is_compound_ && outer_expression_) {
+                // Evaluate substitutions first
+                std::unordered_map<std::string, T> outer_values =
+                    variable_values;
+
+                for (const auto& [var_name, sub_expr] : substitution_map_) {
+                    T sub_result = sub_expr.evaluate_at(variable_values);
+                    outer_values[var_name] = sub_result;
+                }
+
+                return outer_expression_->evaluate_at(outer_values);
+            }
+
+            // Standard evaluation for non-compound expressions
             if (!is_parsed_ || !compiled_expression_) {
                 // If no variables specified, discover them from the values
                 // provided
@@ -201,14 +273,23 @@ namespace fem_bem {
             MappingFunc mapping = nullptr,
             std::size_t intervals = 100) const
         {
+            // Handle compound expressions using numerical integration
+            if (derivative_evaluator_ || (is_compound_ && outer_expression_)) {
+                auto evaluator =
+                    [this](const std::unordered_map<std::string, T>& values) {
+                        return this->evaluate_at(values);
+                    };
+                return integrate_numerical_with_mapping(
+                    evaluator, mapping, barycentric_names, intervals);
+            }
+
+            // For simple expressions, use existing integration methods
             ensure_parsed();
             if constexpr (std::is_same_v<MappingFunc, std::nullptr_t>) {
                 return integrate_simplex(
                     *compiled_expression_, barycentric_names, intervals);
             }
             else {
-                // For mapping integration, we need to handle coordinate
-                // variables
                 return integrate_simplex_with_mapping(
                     *compiled_expression_,
                     mapping,
@@ -224,6 +305,23 @@ namespace fem_bem {
             MappingFunc mapping = nullptr,
             std::size_t intervals = 100) const
         {
+            // If either expression is compound or derivative-based, use
+            // numerical integration
+            if ((derivative_evaluator_ ||
+                 (is_compound_ && outer_expression_)) ||
+                (other.derivative_evaluator_ ||
+                 (other.is_compound_ && other.outer_expression_))) {
+                auto product_evaluator =
+                    [this,
+                     &other](const std::unordered_map<std::string, T>& values) {
+                        return this->evaluate_at(values) *
+                               other.evaluate_at(values);
+                    };
+                return integrate_numerical_with_mapping(
+                    product_evaluator, mapping, barycentric_names, intervals);
+            }
+
+            // For simple expressions, use existing integration methods
             ensure_parsed();
             other.ensure_parsed();
 
@@ -244,13 +342,26 @@ namespace fem_bem {
             }
         }
 
-        // Derivative methods - now properly implemented
+        // Derivative methods
         DerivativeExpression<T> derivative(
             const std::string& variable_name) const
         {
-            auto derivative_func = create_derivative_function<T>(
-                expression_string_, variable_name);
-            return DerivativeExpression<T>(derivative_func, variable_name);
+            // For compound expressions, use numerical chain rule
+            if (is_compound_ && outer_expression_) {
+                auto compound_evaluator =
+                    [this](const std::unordered_map<std::string, T>& values) {
+                        return this->evaluate_at(values);
+                    };
+                auto derivative_func = create_compound_derivative_function<T>(
+                    compound_evaluator, variable_name);
+                return DerivativeExpression<T>(derivative_func, variable_name);
+            }
+            else {
+                // For simple expressions, use string-based derivative
+                auto derivative_func = create_derivative_function<T>(
+                    expression_string_, variable_name);
+                return DerivativeExpression<T>(derivative_func, variable_name);
+            }
         }
 
         std::vector<DerivativeExpression<T>> gradient(
@@ -277,7 +388,8 @@ namespace fem_bem {
             return symbol_table_.get();
         }
 
-       private:
+       protected:
+        // Protected members for derived classes to access
         std::string expression_string_;
         mutable std::vector<std::string> variable_names_;
 
@@ -289,6 +401,75 @@ namespace fem_bem {
         // Storage for variables
         mutable std::unordered_map<std::string, T> temp_variables_;
 
+        // Compound expression support
+        bool is_compound_ = false;
+        std::unique_ptr<Expression> outer_expression_;
+        std::unordered_map<std::string, Expression> substitution_map_;
+
+        // Support for DerivativeExpression conversion
+        std::function<T(const std::unordered_map<std::string, T>&)>
+            derivative_evaluator_;
+
+        // Numerical integration for compound expressions
+        template<typename EvaluatorFunc, typename MappingFunc = std::nullptr_t>
+        T integrate_numerical_with_mapping(
+            EvaluatorFunc evaluator,
+            MappingFunc mapping,
+            const std::vector<std::string>& barycentric_names,
+            std::size_t intervals) const
+        {
+            // Create a unified evaluator that handles both coordinate types
+            auto unified_evaluator = [&](const std::vector<T>& coords) -> T {
+                // Convert vector coords to map format
+                std::unordered_map<std::string, T> values;
+
+                // Set barycentric coordinates
+                for (std::size_t i = 0;
+                     i < coords.size() && i < barycentric_names.size();
+                     ++i) {
+                    values[barycentric_names[i]] = coords[i];
+                }
+
+                // Apply mapping if provided
+                if constexpr (!std::is_same_v<MappingFunc, std::nullptr_t>) {
+                    if (coords.size() == 1) {
+                        auto mapped_coords = mapping(coords[0]);
+                        if (mapped_coords.size() > 0)
+                            values["x"] = mapped_coords[0];
+                        if (mapped_coords.size() > 1)
+                            values["y"] = mapped_coords[1];
+                        if (mapped_coords.size() > 2)
+                            values["z"] = mapped_coords[2];
+                    }
+                    else if (coords.size() == 2) {
+                        auto mapped_coords = mapping(coords[0], coords[1]);
+                        if (mapped_coords.size() > 0)
+                            values["x"] = mapped_coords[0];
+                        if (mapped_coords.size() > 1)
+                            values["y"] = mapped_coords[1];
+                        if (mapped_coords.size() > 2)
+                            values["z"] = mapped_coords[2];
+                    }
+                    else if (coords.size() == 3) {
+                        auto mapped_coords =
+                            mapping(coords[0], coords[1], coords[2]);
+                        if (mapped_coords.size() > 0)
+                            values["x"] = mapped_coords[0];
+                        if (mapped_coords.size() > 1)
+                            values["y"] = mapped_coords[1];
+                        if (mapped_coords.size() > 2)
+                            values["z"] = mapped_coords[2];
+                    }
+                }
+
+                return evaluator(values);
+            };
+
+            // Use the generic integration framework
+            return integrate_simplex_generic<T>(
+                unified_evaluator, barycentric_names, intervals);
+        }
+
         void ensure_parsed() const
         {
             if (!is_parsed_ || !compiled_expression_) {
@@ -296,6 +477,7 @@ namespace fem_bem {
             }
         }
 
+       private:
         void parse_expression() const
         {
             symbol_table_ = std::make_unique<symbol_table_type>();
@@ -332,15 +514,23 @@ namespace fem_bem {
             const std::vector<std::string>& barycentric_names,
             std::size_t intervals) const
         {
-            // This is a simpler version that just integrates a single
-            // expression with coordinate mapping We need to create a dummy
-            // constant expression to use the product integration
-            Expression<T> constant_one("1");
+            // For compound expressions, use numerical integration
+            if (is_compound_ && outer_expression_) {
+                auto compound_evaluator =
+                    [this](const std::unordered_map<std::string, T>& values) {
+                        return this->evaluate_at(values);
+                    };
+                return integrate_numerical_with_mapping(
+                    compound_evaluator, mapping, barycentric_names, intervals);
+            }
 
-            constant_one.ensure_parsed();
+            // For simple expressions, use the mapping-aware integration from
+            // integrate.hpp
+            Expression<T> unit_expr("1", barycentric_names);
+            unit_expr.ensure_parsed();
 
             return integrate_product_simplex_with_mapping(
-                *constant_one.compiled_expression_,
+                *unit_expr.compiled_expression_,
                 expr,
                 mapping,
                 barycentric_names,

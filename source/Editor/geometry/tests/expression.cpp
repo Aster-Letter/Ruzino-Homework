@@ -210,7 +210,9 @@ TEST(ExpressionFocusedTest, ErrorHandling)
 {
     // Test expression with syntax error - will fail during evaluate_at
     ExpressionD invalid_expr("x + * y");
-    EXPECT_THROW(invalid_expr.evaluate_at({{"x", 1.0}, {"y", 2.0}}), std::runtime_error);
+    EXPECT_THROW(
+        invalid_expr.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }),
+        std::runtime_error);
 
     // Test empty expression
     ExpressionD empty_expr;
@@ -248,4 +250,37 @@ TEST(ExpressionFocusedTest, DerivativeInterface)
         dy2.evaluate_at({ { "x", 1.0 }, { "y", 2.0 }, { "z", 3.0 } }),
         4.0,
         1e-6);
+}
+
+// Test Expression class specific functionality - Derivative interface
+TEST(ExpressionFocusedTest, CompoundExpression)
+{
+    ExpressionD expr2("x + y");
+    ExpressionD element1("u+v");
+    ExpressionD element2("(u-v)^2");
+    ExpressionD compound(expr2, { { "x", element1 }, { "y", element2 } });
+
+    auto eval = compound.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } });
+    EXPECT_DOUBLE_EQ(
+        eval, 1.0 + 2.0 + (1.0 - 2.0) * (1.0 - 2.0));  // u + v + (u - v)^2
+
+    auto derivative = compound.derivative("u");
+
+    // Test that derivative can be used in compound expressions
+    auto compound2 =
+        ExpressionD(expr2, { { "x", element1 }, { "y", derivative } });
+    auto eval2 = compound2.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } });
+    EXPECT_DOUBLE_EQ(
+        eval2,
+        1.0 + 2.0 + 2.0 * (1.0 - 2.0));  // u + v + 2 * (u - v) = 3 * u - v
+
+    auto rst = compound2.integrate_over_simplex({ "u", "v" }, nullptr, 10);
+
+    EXPECT_NEAR(rst, 2.0 / 3.0, 1e-6);  // Integral over simplex should be 1/3
+
+    auto dc2_du = compound2.derivative("u");
+    EXPECT_EQ(dc2_du.get_string(), "");
+    EXPECT_EQ(dc2_du.is_string_based(), false);
+    EXPECT_NEAR(dc2_du.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }), 3.0, 1e-6);
+    EXPECT_NEAR(dc2_du.evaluate_at({ { "u", 0.0 }, { "v", 0.0 } }), 3.0, 1e-6);
 }

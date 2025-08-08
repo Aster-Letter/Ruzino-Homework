@@ -1,10 +1,8 @@
 #pragma once
 #include <exprtk/exprtk.hpp>
 #include <functional>
-#include <memory>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 namespace USTC_CG {
 namespace fem_bem {
@@ -13,35 +11,39 @@ namespace fem_bem {
     template<typename T>
     class Expression;
 
-    // Numerical derivative class that stores the derivative computation
+    // Numerical derivative class that inherits from Expression
     template<typename T>
-    class DerivativeExpression {
+    class DerivativeExpression : public Expression<T> {
        private:
-        std::function<T(const std::unordered_map<std::string, T>&)> derivative_func_;
         std::string variable_name_;
 
        public:
         DerivativeExpression(
             std::function<T(const std::unordered_map<std::string, T>&)> func,
             const std::string& var_name)
-            : derivative_func_(std::move(func)), variable_name_(var_name)
+            : Expression<T>(),
+              variable_name_(var_name)
         {
+            // Set up the base class with the derivative evaluator
+            this->derivative_evaluator_ = std::move(func);
+            this->expression_string_ =
+                "";  // Derivatives don't have string representation
+            this->is_compound_ = false;
         }
 
-        T evaluate_at(const std::unordered_map<std::string, T>& values) const
+        // Get the variable name for this derivative
+        const std::string& get_variable_name() const
         {
-            return derivative_func_(values);
+            return variable_name_;
         }
 
-        std::string get_string() const
-        {
-            return "";  // Derivative expressions don't have string representation
-        }
-
-        bool is_string_based() const
+        // Override is_string_based to return false for derivatives
+        bool is_string_based() const override
         {
             return false;
         }
+
+        // Note: Integration methods are inherited from Expression base class
     };
 
     // Numerical derivative using finite differences (5-point stencil)
@@ -84,7 +86,7 @@ namespace fem_bem {
 
             // Add all variables to symbol table
             std::unordered_map<std::string, T> temp_values = values;
-            
+
             for (auto& [name, value] : temp_values) {
                 symbol_table.add_variable(name, value);
             }
@@ -103,6 +105,46 @@ namespace fem_bem {
             }
 
             return numerical_derivative(expr, var_node, h);
+        };
+    }
+
+    // Create a derivative function for compound expressions using chain rule
+    template<typename T>
+    std::function<T(const std::unordered_map<std::string, T>&)>
+    create_compound_derivative_function(
+        const std::function<T(const std::unordered_map<std::string, T>&)>&
+            compound_evaluator,
+        const std::string& variable_name,
+        const T& h = T(0.00000001))
+    {
+        return [compound_evaluator, variable_name, h](
+                   const std::unordered_map<std::string, T>& values) -> T {
+            auto values_iter = values.find(variable_name);
+            if (values_iter == values.end()) {
+                return T(0);  // Variable not found
+            }
+
+            const T x_init = values_iter->second;
+            const T _2h = T(2) * h;
+
+            // Create modified value maps for derivative computation
+            std::unordered_map<std::string, T> values_plus_2h = values;
+            std::unordered_map<std::string, T> values_plus_h = values;
+            std::unordered_map<std::string, T> values_minus_h = values;
+            std::unordered_map<std::string, T> values_minus_2h = values;
+
+            values_plus_2h[variable_name] = x_init + _2h;
+            values_plus_h[variable_name] = x_init + h;
+            values_minus_h[variable_name] = x_init - h;
+            values_minus_2h[variable_name] = x_init - _2h;
+
+            // 5-point stencil numerical derivative
+            const T y0 = compound_evaluator(values_plus_2h);
+            const T y1 = compound_evaluator(values_plus_h);
+            const T y2 = compound_evaluator(values_minus_h);
+            const T y3 = compound_evaluator(values_minus_2h);
+
+            return (-y0 + T(8) * (y1 - y2) + y3) / (T(12) * h);
         };
     }
 
