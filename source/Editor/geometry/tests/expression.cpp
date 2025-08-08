@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 using namespace USTC_CG::fem_bem;
@@ -30,14 +29,14 @@ TEST(ExpressionFocusedTest, VariableManagementAPI)
     ExpressionD expr("a + b * c");
 
     // Test evaluate_at method since add_variable is removed
-    std::unordered_map<std::string, double> values = { { "a", 1.0 },
-                                                       { "b", 2.0 },
-                                                       { "c", 3.0 } };
+    ParameterMap<double> values = { { "a", 1.0 },
+                                   { "b", 2.0 },
+                                   { "c", 3.0 } };
 
     EXPECT_DOUBLE_EQ(expr.evaluate_at(values), 7.0);
 
     // Test with different values
-    values["a"] = 5.0;
+    values.insert_or_assign("a", 5.0);
     EXPECT_DOUBLE_EQ(expr.evaluate_at(values), 11.0);
 }
 
@@ -47,8 +46,7 @@ TEST(ExpressionFocusedTest, EvaluateAtMethod)
     ExpressionD expr("x^2 + y^2");
 
     // Test evaluate_at with variable values
-    std::unordered_map<std::string, double> temp_values = { { "x", 3.0 },
-                                                            { "y", 4.0 } };
+    ParameterMap<double> temp_values = { { "x", 3.0 }, { "y", 4.0 } };
 
     double result = expr.evaluate_at(temp_values);
     EXPECT_DOUBLE_EQ(result, 25.0);  // 3^2 + 4^2 = 25
@@ -134,8 +132,8 @@ TEST(ExpressionFocusedTest, CopySemantics)
     EXPECT_EQ(expr2.get_string(), "x * y + 5");
 
     // Both expressions should evaluate to the same result with same inputs
-    std::unordered_map<std::string, double> values = { { "x", 2.0 },
-                                                       { "y", 3.0 } };
+    ParameterMap<double> values = { { "x", 2.0 },
+                                   { "y", 3.0 } };
     EXPECT_DOUBLE_EQ(expr1.evaluate_at(values), 11.0);  // 2*3+5
     EXPECT_DOUBLE_EQ(expr2.evaluate_at(values), 11.0);  // 2*3+5
 }
@@ -217,7 +215,7 @@ TEST(ExpressionFocusedTest, ErrorHandling)
     // Test empty expression
     ExpressionD empty_expr;
     EXPECT_EQ(empty_expr.get_string(), "");
-    EXPECT_THROW(empty_expr.evaluate_at({}), std::runtime_error);
+    EXPECT_THROW(empty_expr.evaluate_at(ParameterMap<double>{}), std::runtime_error);
 }
 
 // Test Expression class specific functionality - Derivative interface
@@ -238,8 +236,8 @@ TEST(ExpressionFocusedTest, DerivativeInterface)
     auto grad = expr2.gradient({ "x", "y" });
     EXPECT_EQ(grad.size(), 2);
 
-    auto dx2 = grad[0];
-    auto dy2 = grad[1];
+    auto& dx2 = grad[0];
+    auto& dy2 = grad[1];
     EXPECT_EQ(dx2.get_string(), "");
     EXPECT_EQ(dy2.get_string(), "");
     EXPECT_NEAR(

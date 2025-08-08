@@ -2,11 +2,11 @@
 #include <exprtk/exprtk.hpp>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "derivative.hpp"
 #include "integrate.hpp"
+#include "parameter_map.hpp"
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec3d.h"
 
@@ -45,7 +45,7 @@ namespace fem_bem {
         // Compound expression constructor
         Expression(
             const Expression& outer_expr,
-            const std::unordered_map<std::string, Expression>&
+            const std::vector<std::pair<std::string, Expression>>&
                 variable_substitutions)
             : outer_expression_(std::make_unique<Expression>(outer_expr)),
               substitution_map_(variable_substitutions),
@@ -53,16 +53,16 @@ namespace fem_bem {
         {
             // Build compound expression string for display
             expression_string_ = outer_expr.get_string();
-            for (const auto& [var, sub_expr] : variable_substitutions) {
-                expression_string_ +=
-                    " with " + var + "=(" + sub_expr.get_string() + ")";
+            for (const auto& pair : variable_substitutions) {
+                expression_string_ += " with " + pair.first + "=(" +
+                                      pair.second.get_string() + ")";
             }
         }
 
         // Compound expression constructor with initializer list for convenience
         Expression(
             const Expression& outer_expr,
-            std::initializer_list<std::pair<const std::string, Expression>>
+            std::initializer_list<std::pair<const char*, Expression>>
                 substitutions)
             : outer_expression_(std::make_unique<Expression>(outer_expr)),
               substitution_map_(substitutions.begin(), substitutions.end()),
@@ -70,9 +70,9 @@ namespace fem_bem {
         {
             // Build compound expression string for display
             expression_string_ = outer_expr.get_string();
-            for (const auto& [var, sub_expr] : substitution_map_) {
-                expression_string_ +=
-                    " with " + var + "=(" + sub_expr.get_string() + ")";
+            for (const auto& pair : substitution_map_) {
+                expression_string_ += " with " + std::string(pair.first) +
+                                      "=(" + pair.second.get_string() + ")";
             }
         }
 
@@ -161,8 +161,7 @@ namespace fem_bem {
             return compiled_expression_->value();
         }
 
-        T evaluate_at(
-            const std::unordered_map<std::string, T>& variable_values) const
+        T evaluate_at(const ParameterMap<T>& variable_values) const
         {
             // Handle expressions created from DerivativeExpression
             if (derivative_evaluator_) {
@@ -172,11 +171,11 @@ namespace fem_bem {
             // Handle compound expressions
             if (is_compound_ && outer_expression_) {
                 // Evaluate substitutions first
-                std::unordered_map<std::string, T> outer_values;
+                ParameterMap<T> outer_values;
 
-                for (const auto& [var_name, sub_expr] : substitution_map_) {
-                    T sub_result = sub_expr.evaluate_at(variable_values);
-                    outer_values[var_name] = sub_result;
+                for (const auto& pair : substitution_map_) {
+                    T sub_result = pair.second.evaluate_at(variable_values);
+                    outer_values.insert_or_assign(pair.first, sub_result);
                 }
 
                 return outer_expression_->evaluate_at(outer_values);
@@ -187,8 +186,8 @@ namespace fem_bem {
                 // If no variables specified, discover them from the values
                 // provided
                 if (variable_names_.empty()) {
-                    for (const auto& [name, value] : variable_values) {
-                        variable_names_.push_back(name);
+                    for (const auto& pair : variable_values) {
+                        variable_names_.push_back(pair.first);
                     }
                 }
                 parse_expression();
@@ -200,25 +199,26 @@ namespace fem_bem {
             }
 
             // Store original values
-            std::unordered_map<std::string, T> original_values;
+            ParameterMap<T> original_values;
             const exprtk::symbol_table<T>& sym_table =
                 compiled_expression_->get_symbol_table();
 
-            for (const auto& [name, value] : variable_values) {
-                auto* var_node = sym_table.get_variable(name);
+            for (const auto& pair : variable_values) {
+                auto* var_node = sym_table.get_variable(pair.first);
                 if (var_node) {
-                    original_values[name] = var_node->ref();
-                    var_node->ref() = value;
+                    original_values.insert_or_assign(
+                        pair.first, var_node->ref());
+                    var_node->ref() = pair.second;
                 }
             }
 
             T result = compiled_expression_->value();
 
             // Restore original values
-            for (const auto& [name, value] : original_values) {
-                auto* var_node = sym_table.get_variable(name);
+            for (const auto& pair : original_values) {
+                auto* var_node = sym_table.get_variable(pair.first);
                 if (var_node) {
-                    var_node->ref() = value;
+                    var_node->ref() = pair.second;
                 }
             }
 
@@ -274,10 +274,9 @@ namespace fem_bem {
         {
             // Handle compound expressions using numerical integration
             if (derivative_evaluator_ || (is_compound_ && outer_expression_)) {
-                auto evaluator =
-                    [this](const std::unordered_map<std::string, T>& values) {
-                        return this->evaluate_at(values);
-                    };
+                auto evaluator = [this](const ParameterMap<T>& values) {
+                    return this->evaluate_at(values);
+                };
                 return integrate_numerical_with_mapping(
                     evaluator, mapping, barycentric_names, intervals);
             }
@@ -311,8 +310,7 @@ namespace fem_bem {
                 (other.derivative_evaluator_ ||
                  (other.is_compound_ && other.outer_expression_))) {
                 auto product_evaluator =
-                    [this,
-                     &other](const std::unordered_map<std::string, T>& values) {
+                    [this, &other](const ParameterMap<T>& values) {
                         return this->evaluate_at(values) *
                                other.evaluate_at(values);
                     };
@@ -348,7 +346,7 @@ namespace fem_bem {
             // For compound expressions, use numerical chain rule
             if (is_compound_ && outer_expression_) {
                 auto compound_evaluator =
-                    [this](const std::unordered_map<std::string, T>& values) {
+                    [this](const ParameterMap<T>& values) {
                         return this->evaluate_at(values);
                     };
                 auto derivative_func = create_compound_derivative_function<T>(
@@ -404,16 +402,15 @@ namespace fem_bem {
         mutable bool is_parsed_ = false;
 
         // Storage for variables
-        mutable std::unordered_map<std::string, T> temp_variables_;
+        mutable ParameterMap<T> temp_variables_;
 
         // Compound expression support
         bool is_compound_ = false;
         std::unique_ptr<Expression> outer_expression_;
-        std::unordered_map<std::string, Expression> substitution_map_;
+        std::vector<std::pair<const char*, Expression>> substitution_map_;
 
         // Support for DerivativeExpression conversion
-        std::function<T(const std::unordered_map<std::string, T>&)>
-            derivative_evaluator_;
+        std::function<T(const ParameterMap<T>&)> derivative_evaluator_;
 
         // Numerical integration for compound expressions
         template<typename EvaluatorFunc, typename MappingFunc = std::nullptr_t>
@@ -426,13 +423,13 @@ namespace fem_bem {
             // Create a unified evaluator that handles both coordinate types
             auto unified_evaluator = [&](const std::vector<T>& coords) -> T {
                 // Convert vector coords to map format
-                std::unordered_map<std::string, T> values;
+                ParameterMap<T> values;
 
                 // Set barycentric coordinates
                 for (std::size_t i = 0;
                      i < coords.size() && i < barycentric_names.size();
                      ++i) {
-                    values[barycentric_names[i]] = coords[i];
+                    values.insert_or_assign(barycentric_names[i].c_str(), coords[i]);
                 }
 
                 // Apply mapping if provided
@@ -440,30 +437,30 @@ namespace fem_bem {
                     if (coords.size() == 1) {
                         auto mapped_coords = mapping(coords[0]);
                         if (mapped_coords.size() > 0)
-                            values["x"] = mapped_coords[0];
+                            values.insert_or_assign("x", mapped_coords[0]);
                         if (mapped_coords.size() > 1)
-                            values["y"] = mapped_coords[1];
+                            values.insert_or_assign("y", mapped_coords[1]);
                         if (mapped_coords.size() > 2)
-                            values["z"] = mapped_coords[2];
+                            values.insert_or_assign("z", mapped_coords[2]);
                     }
                     else if (coords.size() == 2) {
                         auto mapped_coords = mapping(coords[0], coords[1]);
                         if (mapped_coords.size() > 0)
-                            values["x"] = mapped_coords[0];
+                            values.insert_or_assign("x", mapped_coords[0]);
                         if (mapped_coords.size() > 1)
-                            values["y"] = mapped_coords[1];
+                            values.insert_or_assign("y", mapped_coords[1]);
                         if (mapped_coords.size() > 2)
-                            values["z"] = mapped_coords[2];
+                            values.insert_or_assign("z", mapped_coords[2]);
                     }
                     else if (coords.size() == 3) {
                         auto mapped_coords =
                             mapping(coords[0], coords[1], coords[2]);
                         if (mapped_coords.size() > 0)
-                            values["x"] = mapped_coords[0];
+                            values.insert_or_assign("x", mapped_coords[0]);
                         if (mapped_coords.size() > 1)
-                            values["y"] = mapped_coords[1];
+                            values.insert_or_assign("y", mapped_coords[1]);
                         if (mapped_coords.size() > 2)
-                            values["z"] = mapped_coords[2];
+                            values.insert_or_assign("z", mapped_coords[2]);
                     }
                 }
 
@@ -494,9 +491,14 @@ namespace fem_bem {
             // Register specified variables only
             if (!variable_names_.empty()) {
                 for (const auto& var_name : variable_names_) {
-                    auto& temp_var = temp_variables_[var_name];
-                    temp_var = T(0);
-                    symbol_table_->add_variable(var_name, temp_var);
+                    auto* temp_var_ptr = temp_variables_.find(var_name.c_str());
+                    if (!temp_var_ptr) {
+                        temp_variables_.insert_or_assign(
+                            var_name.c_str(), T(0));
+                        temp_var_ptr = temp_variables_.find(var_name.c_str());
+                    }
+                    symbol_table_->add_variable(
+                        var_name, const_cast<T&>(*temp_var_ptr));
                 }
             }
 
@@ -522,7 +524,7 @@ namespace fem_bem {
             // For compound expressions, use numerical integration
             if (is_compound_ && outer_expression_) {
                 auto compound_evaluator =
-                    [this](const std::unordered_map<std::string, T>& values) {
+                    [this](const ParameterMap<T>& values) {
                         return this->evaluate_at(values);
                     };
                 return integrate_numerical_with_mapping(

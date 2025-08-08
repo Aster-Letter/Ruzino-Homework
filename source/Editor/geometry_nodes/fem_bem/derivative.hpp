@@ -2,7 +2,8 @@
 #include <exprtk/exprtk.hpp>
 #include <functional>
 #include <string>
-#include <unordered_map>
+
+#include "parameter_map.hpp"
 
 namespace USTC_CG {
 namespace fem_bem {
@@ -19,7 +20,7 @@ namespace fem_bem {
 
        public:
         DerivativeExpression(
-            std::function<T(const std::unordered_map<std::string, T>&)> func,
+            std::function<T(const ParameterMap<T>&)> func,
             const std::string& var_name)
             : Expression<T>(),
               variable_name_(var_name)
@@ -71,24 +72,24 @@ namespace fem_bem {
 
     // Create a derivative function for an expression
     template<typename T>
-    std::function<T(const std::unordered_map<std::string, T>&)>
-    create_derivative_function(
+    std::function<T(const ParameterMap<T>&)> create_derivative_function(
         const std::string& expression_string,
         const std::string& variable_name,
         const T& h = T(1e-8))
     {
         return [expression_string, variable_name, h](
-                   const std::unordered_map<std::string, T>& values) -> T {
+                   const ParameterMap<T>& values) -> T {
             // Create a temporary expression for derivative computation
             exprtk::symbol_table<T> symbol_table;
             exprtk::expression<T> expr;
             exprtk::parser<T> parser;
 
             // Add all variables to symbol table
-            std::unordered_map<std::string, T> temp_values = values;
+            ParameterMap<T> temp_values = values;
 
-            for (auto& [name, value] : temp_values) {
-                symbol_table.add_variable(name, value);
+            for (const auto& pair : temp_values) {
+                symbol_table.add_variable(
+                    pair.first, const_cast<T&>(pair.second));
             }
 
             symbol_table.add_constants();
@@ -110,30 +111,30 @@ namespace fem_bem {
 
     // Create a derivative function for compound expressions using chain rule
     template<typename T>
-    std::function<T(const std::unordered_map<std::string, T>&)>
+    std::function<T(const ParameterMap<T>&)>
     create_compound_derivative_function(
-        const std::function<T(const std::unordered_map<std::string, T>&)>&
-            compound_evaluator,
+        const std::function<T(const ParameterMap<T>&)>& compound_evaluator,
         const std::string& variable_name,
         const T& h = T(1e-6))
     {
         return [compound_evaluator, variable_name, h](
-                   const std::unordered_map<std::string, T>& values) -> T {
-            auto values_iter = values.find(variable_name);
-            if (values_iter == values.end()) {
+                   const ParameterMap<T>& values) -> T {
+            const T* var_value = values.find(variable_name.c_str());
+            if (!var_value) {
                 return T(0);  // Variable not found
             }
 
-            const T x_init = values_iter->second;
+            const T x_init = *var_value;
 
             // Create modified value maps for derivative computation
-            std::unordered_map<std::string, T> values_plus_h = values;
-            std::unordered_map<std::string, T> values_minus_h = values;
+            ParameterMap<T> values_plus_h = values;
+            ParameterMap<T> values_minus_h = values;
 
-            values_plus_h[variable_name] = x_init + h;
-            values_minus_h[variable_name] = x_init - h;
+            values_plus_h.insert_or_assign(variable_name.c_str(), x_init + h);
+            values_minus_h.insert_or_assign(variable_name.c_str(), x_init - h);
 
-            // Use simple 2-point central difference for better numerical stability
+            // Use simple 2-point central difference for better numerical
+            // stability
             const T y_plus = compound_evaluator(values_plus_h);
             const T y_minus = compound_evaluator(values_minus_h);
 
