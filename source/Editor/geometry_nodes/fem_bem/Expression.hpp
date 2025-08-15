@@ -204,10 +204,11 @@ namespace fem_bem {
                 compiled_expression_->get_symbol_table();
 
             for (const auto& pair : variable_values) {
-                auto* var_node = sym_table.get_variable_unchecked(pair.first);
-                if (var_node) {
-                    var_node->ref() = pair.second;
-                }
+                *temp_variables_.find(pair.first) = pair.second;
+                //auto* var_node = sym_table.get_variable_unchecked(pair.first);
+                //if (var_node) {
+                //    var_node->ref() = pair.second;
+                //}
             }
 
             T result = compiled_expression_->value();

@@ -26,7 +26,15 @@ int main()
     // baseline: 0.002f, 0.002f, 3917 ms.
 
     long long operations = 0;
-    for (float u = 0.0f; u <= 1.0f; u += 0.002f) {
+
+#ifdef DEBUG
+    auto step = 0.001f;
+#else
+    auto step = 0.0001f;  // Use smaller step for performance testing
+#endif
+
+
+    for (float u = 0.0f; u <= 1.0f; u += step) {
         for (float v = 0.0f; v <= 1.0f; v += 0.002f) {
             auto eval_at_uv = compound2.evaluate_at({ { "u", u }, { "v", v } });
             operations += 1;
@@ -40,9 +48,11 @@ int main()
     std::cout << "Evaluation took " << duration << " ms." << std::endl;
     std::cout << "Total operations: " << operations << std::endl;
 
-    std::cout << "flops: " << (operations / (duration / 1000.0)) << " flops/s."
+    std::cout << "flops: " << (operations / (duration / 1000.0))/ 1000.0 << " kflops/s."
               << std::endl;
 
-    // Baseline: 46924.8 flops/s.
-    // Unchecked get_variable(): 71367.9 flops/s 
+    // Baseline: 46.32 kflops/s.
+    // Unchecked get_variable(): 71.36 kflops/s
+    // Use local buffer: 200 kflops/s
+    // Release version: 3174.06 kflops/s
  }
