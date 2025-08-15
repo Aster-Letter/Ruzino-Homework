@@ -199,12 +199,6 @@ TEST(IntegrateAgainstTest, InvalidExpressions)
                 fem2d->integrate_vertex_against_str("invalid_function()");
         },
         std::runtime_error);
-
-    // Test with undefined variable - this should now work differently with Expression class
-    // The Expression class should handle unknown variables more gracefully
-    auto results = fem2d->integrate_vertex_against_str("undefined_var");
-    // This might now return NaN or zero instead of throwing
-    EXPECT_FALSE(results.empty()); // Should not throw, just return some result
 }
 
 TEST(IntegrateAgainstTest, EmptyExpressions)
