@@ -4,12 +4,12 @@
 #include <fem_bem/fem_bem.hpp>
 
 #include "GCore/Components/MeshComponent.h"
+#include "GCore/create_geom.h"
 
 using namespace USTC_CG::fem_bem;
 using namespace USTC_CG;
 
 TEST(FEMBEMProblem, Laplacian)
 {
-    Geometry circle = Geometry::CreateMesh();
-    auto mesh = circle.get_component<MeshComponent>();
+    Geometry circle = create_circle(64, 1);
 }
