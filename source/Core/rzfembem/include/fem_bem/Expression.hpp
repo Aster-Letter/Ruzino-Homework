@@ -150,17 +150,6 @@ namespace fem_bem {
             return true;  // Regular expressions are always string-based
         }
 
-        // Evaluation
-        T evaluate() const
-        {
-            ensure_parsed();
-            if (!compiled_expression_) {
-                throw std::runtime_error(
-                    "Expression not properly parsed: " + expression_string_);
-            }
-            return compiled_expression_->value();
-        }
-
         T evaluate_at(const ParameterMap<T>& variable_values) const
         {
             // Handle expressions created from DerivativeExpression
@@ -215,45 +204,43 @@ namespace fem_bem {
 
             return result;
         }
-
         // Arithmetic operations
         Expression operator+(const Expression& other) const
         {
-            return Expression(
-                "(" + expression_string_ + ") + (" + other.expression_string_ +
-                ")");
+            Expression add_expr("x + y", { "x", "y" });
+            return Expression(add_expr, { { "x", *this }, { "y", other } });
         }
 
         Expression operator-(const Expression& other) const
         {
-            return Expression(
-                "(" + expression_string_ + ") - (" + other.expression_string_ +
-                ")");
+            Expression sub_expr("x - y", { "x", "y" });
+            return Expression(sub_expr, { { "x", *this }, { "y", other } });
         }
 
         Expression operator*(const Expression& other) const
         {
-            return Expression(
-                "(" + expression_string_ + ") * (" + other.expression_string_ +
-                ")");
+            Expression mul_expr("x * y", { "x", "y" });
+            return Expression(mul_expr, { { "x", *this }, { "y", other } });
         }
 
         Expression operator/(const Expression& other) const
         {
-            return Expression(
-                "(" + expression_string_ + ") / (" + other.expression_string_ +
-                ")");
+            Expression div_expr("x / y", { "x", "y" });
+            return Expression(div_expr, { { "x", *this }, { "y", other } });
         }
 
         Expression operator*(T scalar) const
         {
+            Expression scalar_expr(std::to_string(scalar));
+            Expression mul_expr("x * y", { "x", "y" });
             return Expression(
-                std::to_string(scalar) + " * (" + expression_string_ + ")");
+                mul_expr, { { "x", scalar_expr }, { "y", *this } });
         }
 
         Expression operator-() const
         {
-            return Expression("-(" + expression_string_ + ")");
+            Expression neg_expr("-x", { "x" });
+            return Expression(neg_expr, { { "x", *this } });
         }
 
         // Integration methods

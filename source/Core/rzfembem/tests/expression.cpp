@@ -55,41 +55,6 @@ TEST(ExpressionFocusedTest, EvaluateAtMethod)
     EXPECT_DOUBLE_EQ(expr.evaluate_at(temp_values), 2.0);  // 1^2 + 1^2 = 2
 }
 
-// Test Expression class specific functionality - Arithmetic operators
-TEST(ExpressionFocusedTest, ArithmeticOperatorOverloads)
-{
-    ExpressionD expr1("x + 2");
-    ExpressionD expr2("y * 3");
-
-    // Test Expression + Expression
-    auto sum = expr1 + expr2;
-    EXPECT_EQ(sum.get_string(), "(x + 2) + (y * 3)");
-
-    // Test Expression - Expression
-    auto diff = expr1 - expr2;
-    EXPECT_EQ(diff.get_string(), "(x + 2) - (y * 3)");
-
-    // Test Expression * Expression
-    auto prod = expr1 * expr2;
-    EXPECT_EQ(prod.get_string(), "(x + 2) * (y * 3)");
-
-    // Test Expression / Expression
-    auto quot = expr1 / expr2;
-    EXPECT_EQ(quot.get_string(), "(x + 2) / (y * 3)");
-
-    // Test Expression * scalar
-    auto scaled = expr1 * 5.0;
-    EXPECT_EQ(scaled.get_string(), "5.000000 * (x + 2)");
-
-    // Test scalar * Expression (free function)
-    auto scaled2 = 3.0 * expr1;
-    EXPECT_EQ(scaled2.get_string(), "3.000000 * (x + 2)");
-
-    // Test unary minus
-    auto neg = -expr1;
-    EXPECT_EQ(neg.get_string(), "-(x + 2)");
-}
-
 // Test Expression class specific functionality - String modification API
 TEST(ExpressionFocusedTest, StringModificationAPI)
 {
@@ -296,4 +261,38 @@ TEST(ExpressionFocusedTest, CompoundExpression)
     EXPECT_EQ(dc2_du.is_string_based(), false);
     EXPECT_NEAR(dc2_du.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }), 3.0, 1e-4);
     EXPECT_NEAR(dc2_du.evaluate_at({ { "u", 0.0 }, { "v", 0.0 } }), 3.0, 1e-4);
+}
+
+// Add, sub, basic ops
+TEST(ExpressionFocusedTest, BasicArithmeticOperations)
+{
+    ExpressionD expr1("x + 2");
+    ExpressionD expr2("y * 3");
+
+    // Test addition
+    auto sum = expr1 + expr2;
+    EXPECT_EQ(sum.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }), 1.0 + 2 + 2 * 3);
+
+    // Test subtraction
+    auto diff = expr1 - expr2;
+    EXPECT_EQ(
+        diff.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }), 1.0 + 2 - 2 * 3);
+
+    // Test multiplication
+    auto prod = expr1 * expr2;
+    EXPECT_EQ(
+        prod.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }), (1.0 + 2) * (2 * 3));
+
+    // Test division
+    auto quot = expr1 / expr2;
+    EXPECT_EQ(
+        quot.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }), (1.0 + 2) / (2 * 3));
+
+    // More compound
+
+    auto rss = sum + diff * prod / quot;
+    EXPECT_EQ(
+        rss.evaluate_at({ { "x", 1.0 }, { "y", 2.0 } }),
+        (1.0 + 2 + 2 * 3) + ((1.0 + 2 - 2 * 3) * ((1.0 + 2) * (2 * 3))) /
+                                ((1.0 + 2) / (2 * 3)));
 }
