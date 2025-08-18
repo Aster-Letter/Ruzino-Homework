@@ -105,6 +105,22 @@ namespace fem_bem {
         std::vector<DerivativeExpression> gradient(
             const std::vector<std::string>& variable_names) const;
 
+        // Closure methods - bind specific variables to values
+        Expression bind_variables(const ParameterMap<real>& bound_values) const;
+
+        Expression bind_variable(const std::string& var_name, real value) const;
+
+        // Check if expression has bound variables (is a closure)
+        bool has_bound_variables() const
+        {
+            return !bound_variables_.empty();
+        }
+
+        const ParameterMap<real>& get_bound_variables() const
+        {
+            return bound_variables_;
+        }
+
         // Access to underlying exprtk objects (for advanced use)
         const expression_type* get_compiled_expression() const
         {
@@ -139,6 +155,9 @@ namespace fem_bem {
         // Support for DerivativeExpression conversion
         std::function<real(const ParameterMap<real>&)> derivative_evaluator_;
 
+        // Closure support - pre-bound variables
+        ParameterMap<real> bound_variables_;
+
         void ensure_parsed() const
         {
             if (!is_parsed_ || !compiled_expression_) {
@@ -153,23 +172,7 @@ namespace fem_bem {
         friend real integrate_over_simplex(
             const Expression& expr,
             const std::vector<std::string>& barycentric_names,
-            MappingFunc mapping,
-            std::size_t intervals);
-
-        template<typename MappingFunc>
-        friend real integrate_product_with(
-            const Expression& expr,
-            const Expression& other,
-            const std::vector<std::string>& barycentric_names,
-            MappingFunc mapping,
-            std::size_t intervals);
-
-        template<typename EvaluatorFunc, typename MappingFunc>
-        friend real integrate_with_mapping(
-            const Expression& expr,
-            EvaluatorFunc evaluator,
-            MappingFunc mapping,
-            const std::vector<std::string>& barycentric_names,
+            const MappingFunc& mapping,
             std::size_t intervals);
 
         template<typename MappingFunc>
@@ -218,92 +221,106 @@ namespace fem_bem {
     };
 
     // Integration methods
-    template<typename MappingFunc = std::nullptr_t>
+    template<typename MappingExpr = std::nullptr_t>
     real integrate_over_simplex(
         const Expression& expr,
         const std::vector<std::string>& barycentric_names,
-        MappingFunc mapping = nullptr,
+        const MappingExpr& mapping_expr = nullptr,
         std::size_t intervals = 100)
     {
-        // Handle compound expressions using numerical integration
-        if (expr.derivative_evaluator_ ||
-            (expr.is_compound_ && expr.outer_expression_)) {
-            auto evaluator = [&expr](const ParameterMap<real>& values) {
-                return expr.evaluate_at(values);
+        Expression final_expr = expr;
+
+        // If mapping is provided, compose it with the expression
+        if constexpr (!std::is_same_v<MappingExpr, std::nullptr_t>) {
+            final_expr =
+                compose_with_mapping(expr, mapping_expr, barycentric_names);
+        }
+
+        // Handle compound expressions or derivatives using numerical
+        // integration
+        if (final_expr.derivative_evaluator_ ||
+            (final_expr.is_compound_ && final_expr.outer_expression_) ||
+            final_expr.has_bound_variables()) {
+            auto evaluator = [&final_expr](const ParameterMap<real>& values) {
+                return final_expr.evaluate_at(values);
             };
-            return integrate_numerical_with_mapping(
-                evaluator, mapping, barycentric_names, intervals);
+            return integrate_numerical_generic(
+                evaluator, barycentric_names, intervals);
         }
 
         // For simple expressions, use existing integration methods
-        expr.ensure_parsed();
-        if constexpr (std::is_same_v<MappingFunc, std::nullptr_t>) {
-            return integrate_simplex(
-                *expr.compiled_expression_, barycentric_names, intervals);
-        }
-        else {
-            return integrate_simplex_with_mapping(
-                *expr.compiled_expression_,
-                mapping,
-                barycentric_names,
-                intervals);
-        }
+        final_expr.ensure_parsed();
+        return integrate_simplex(
+            *final_expr.compiled_expression_, barycentric_names, intervals);
     }
 
-    template<typename MappingFunc = std::nullptr_t>
-    real integrate_product_with(
+    // Helper function to compose expression with mapping
+    template<typename MappingExpr>
+    Expression compose_with_mapping(
         const Expression& expr,
-        const Expression& other,
-        const std::vector<std::string>& barycentric_names,
-        MappingFunc mapping = nullptr,
-        std::size_t intervals = 100)
+        const MappingExpr& mapping_expr,
+        const std::vector<std::string>& barycentric_names)
     {
-        // If either expression is compound or derivative-based, use
-        // numerical integration
-        if (expr.derivative_evaluator_ ||
-            (expr.is_compound_ && expr.outer_expression_) ||
-            (other.derivative_evaluator_ ||
-             (other.is_compound_ && other.outer_expression_))) {
-            auto product_evaluator =
-                [&expr, &other](const ParameterMap<real>& values) {
-                    return expr.evaluate_at(values) * other.evaluate_at(values);
-                };
-            return integrate_numerical_with_mapping(
-                product_evaluator, mapping, barycentric_names, intervals);
+        if constexpr (std::is_same_v<MappingExpr, std::nullptr_t>) {
+            return expr;
         }
-
-        // For simple expressions, use existing integration methods
-        expr.ensure_parsed();
-        other.ensure_parsed();
-
-        if constexpr (std::is_same_v<MappingFunc, std::nullptr_t>) {
-            return integrate_product_simplex(
-                *expr.compiled_expression_,
-                *other.compiled_expression_,
-                barycentric_names,
-                intervals);
+        else if constexpr (std::is_same_v<
+                               MappingExpr,
+                               ParameterMap<Expression>>) {
+            // Handle Expression-based mapping
+            return create_mapped_expression_with_coord_mapping(
+                expr, mapping_expr, barycentric_names);
         }
         else {
-            return integrate_product_simplex_with_mapping(
-                *expr.compiled_expression_,
-                *other.compiled_expression_,
-                mapping,
-                barycentric_names,
-                intervals);
+            // Create a compound expression that applies mapping then evaluates
+            // expr This will be implemented based on the mapping expression
+            // type
+            return create_mapped_expression(
+                expr, mapping_expr, barycentric_names);
         }
     }
 
-    // Numerical integration for compound expressions
-    template<typename EvaluatorFunc, typename MappingFunc = std::nullptr_t>
-    real integrate_numerical_with_mapping(
+    // Create coordinate mapping expressions that bind world vertex coordinates
+    RZFEMBEM_API ParameterMap<Expression> create_coordinate_mapping(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec2d>& world_vertices);
+
+    RZFEMBEM_API ParameterMap<Expression> create_coordinate_mapping(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec3d>& world_vertices);
+
+    // Helper to create mapped expression using coordinate mapping
+    RZFEMBEM_API Expression create_mapped_expression_with_coord_mapping(
+        const Expression& expr,
+        const ParameterMap<Expression>& coord_mapping,
+        const std::vector<std::string>& barycentric_names);
+
+    // Create mapping expression from barycentric to physical coordinates
+    // (legacy)
+    Expression create_mapping_expression(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec2d>& world_vertices);
+
+    Expression create_mapping_expression(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec3d>& world_vertices);
+
+    // Generic mapping expression creation template
+    template<typename MappingExpr>
+    Expression create_mapped_expression(
+        const Expression& expr,
+        const MappingExpr& mapping_expr,
+        const std::vector<std::string>& barycentric_names);
+
+    // Numerical integration for any expression type
+    template<typename EvaluatorFunc>
+    real integrate_numerical_generic(
         EvaluatorFunc evaluator,
-        MappingFunc mapping,
         const std::vector<std::string>& barycentric_names,
         std::size_t intervals)
     {
-        // Create a unified evaluator that handles both coordinate types
+        // Create a unified evaluator that handles coordinate conversion
         auto unified_evaluator = [&](const std::vector<real>& coords) -> real {
-            // Convert vector coords to map format
             ParameterMap<real> values;
 
             // Set barycentric coordinates
@@ -314,73 +331,11 @@ namespace fem_bem {
                     barycentric_names[i].c_str(), coords[i]);
             }
 
-            // Apply mapping if provided
-            if constexpr (!std::is_same_v<MappingFunc, std::nullptr_t>) {
-                if (coords.size() == 1) {
-                    auto mapped_coords = mapping(coords[0]);
-                    if (mapped_coords.size() > 0)
-                        values.insert_or_assign("x", mapped_coords[0]);
-                    if (mapped_coords.size() > 1)
-                        values.insert_or_assign("y", mapped_coords[1]);
-                    if (mapped_coords.size() > 2)
-                        values.insert_or_assign("z", mapped_coords[2]);
-                }
-                else if (coords.size() == 2) {
-                    auto mapped_coords = mapping(coords[0], coords[1]);
-                    if (mapped_coords.size() > 0)
-                        values.insert_or_assign("x", mapped_coords[0]);
-                    if (mapped_coords.size() > 1)
-                        values.insert_or_assign("y", mapped_coords[1]);
-                    if (mapped_coords.size() > 2)
-                        values.insert_or_assign("z", mapped_coords[2]);
-                }
-                else if (coords.size() == 3) {
-                    auto mapped_coords =
-                        mapping(coords[0], coords[1], coords[2]);
-                    if (mapped_coords.size() > 0)
-                        values.insert_or_assign("x", mapped_coords[0]);
-                    if (mapped_coords.size() > 1)
-                        values.insert_or_assign("y", mapped_coords[1]);
-                    if (mapped_coords.size() > 2)
-                        values.insert_or_assign("z", mapped_coords[2]);
-                }
-            }
-
             return evaluator(values);
         };
 
-        // Use the generic integration framework
         return integrate_simplex_generic<real>(
             unified_evaluator, barycentric_names, intervals);
-    }
-    template<typename MappingFunc>
-    real integrate_simplex_with_mapping(
-        const Expression& expr,
-        MappingFunc mapping,
-        const std::vector<std::string>& barycentric_names,
-        std::size_t intervals)
-    {
-        // For compound expressions, use numerical integration
-        if (expr.is_compound_ && expr.outer_expression_) {
-            auto compound_evaluator =
-                [&expr](const ParameterMap<real>& values) {
-                    return expr.evaluate_at(values);
-                };
-            return integrate_numerical_with_mapping(
-                compound_evaluator, mapping, barycentric_names, intervals);
-        }
-
-        // For simple expressions, use the mapping-aware integration from
-        // integrate.hpp
-        Expression unit_expr("1", barycentric_names);
-        unit_expr.ensure_parsed();
-
-        return integrate_product_simplex_with_mapping(
-            *unit_expr.compiled_expression_,
-            expr,
-            mapping,
-            barycentric_names,
-            intervals);
     }
 
 }  // namespace fem_bem

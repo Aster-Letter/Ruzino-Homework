@@ -117,7 +117,7 @@ TEST(ExpressionFocusedTest, IntegrationInterface)
     // Test integration with another expression
     Expression other("z");
     try {
-        integrate_product_with(expr, other, barycentric_vars, nullptr, 10);
+        integrate_over_simplex(expr * other, barycentric_vars, nullptr, 10);
     }
     catch (const std::exception&) {
         // Expected if not implemented
@@ -297,24 +297,28 @@ TEST(ExpressionFocusedTest, CompoundExpressionDebug)
     Expression expr2("x + y");
     Expression element1("u+v");
     Expression element2("(u-v)^2");
-    
+
     // First test individual components
     EXPECT_DOUBLE_EQ(element1.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }), 3.0);
     EXPECT_DOUBLE_EQ(element2.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }), 1.0);
-    
+
     // Test outer expression with direct values
     EXPECT_DOUBLE_EQ(expr2.evaluate_at({ { "x", 3.0 }, { "y", 1.0 } }), 4.0);
-    
+
     // Now test compound - should be u+v + (u-v)^2 = 1+2 + (1-2)^2 = 3 + 1 = 4
     Expression compound(expr2, { { "x", element1 }, { "y", element2 } });
     auto compound_result = compound.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } });
-    
+
     // Debug output - let's see what we actually get
-    std::cout << "Element1 (u+v): " << element1.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }) << std::endl;
-    std::cout << "Element2 (u-v)^2: " << element2.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } }) << std::endl;
+    std::cout << "Element1 (u+v): "
+              << element1.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } })
+              << std::endl;
+    std::cout << "Element2 (u-v)^2: "
+              << element2.evaluate_at({ { "u", 1.0 }, { "v", 2.0 } })
+              << std::endl;
     std::cout << "Compound result: " << compound_result << std::endl;
     std::cout << "Expected: " << 4.0 << std::endl;
-    
+
     EXPECT_DOUBLE_EQ(compound_result, 4.0);
 }
 
@@ -323,17 +327,17 @@ TEST(ExpressionFocusedTest, SimpleCompoundDebug)
     // Even simpler test
     Expression outer("x");
     Expression inner("u + 1");
-    
+
     // Test inner directly
     EXPECT_DOUBLE_EQ(inner.evaluate_at({ { "u", 5.0 } }), 6.0);
-    
+
     // Test compound - should be u + 1 = 5 + 1 = 6
     Expression simple_compound(outer, { { "x", inner } });
     auto result = simple_compound.evaluate_at({ { "u", 5.0 } });
-    
+
     std::cout << "Simple compound result: " << result << std::endl;
     std::cout << "Expected: " << 6.0 << std::endl;
-    
+
     EXPECT_DOUBLE_EQ(result, 6.0);
 }
 
@@ -343,17 +347,17 @@ TEST(ExpressionFocusedTest, CompoundVariableMapping)
     Expression outer("a + b");
     Expression sub1("x * 2");
     Expression sub2("y + 3");
-    
+
     // Test substitutions individually
     EXPECT_DOUBLE_EQ(sub1.evaluate_at({ { "x", 2.0 } }), 4.0);
     EXPECT_DOUBLE_EQ(sub2.evaluate_at({ { "y", 1.0 } }), 4.0);
-    
+
     // Test compound: should be (x*2) + (y+3) = 4 + 4 = 8
     Expression compound(outer, { { "a", sub1 }, { "b", sub2 } });
     auto result = compound.evaluate_at({ { "x", 2.0 }, { "y", 1.0 } });
-    
+
     std::cout << "Variable mapping compound result: " << result << std::endl;
     std::cout << "Expected: " << 8.0 << std::endl;
-    
+
     EXPECT_DOUBLE_EQ(result, 8.0);
 }

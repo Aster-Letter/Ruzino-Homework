@@ -172,7 +172,8 @@ namespace fem_bem {
                   ? std::make_unique<Expression>(*other.outer_expression_)
                   : nullptr),
           substitution_map_(other.substitution_map_),
-          derivative_evaluator_(other.derivative_evaluator_)
+          derivative_evaluator_(other.derivative_evaluator_),
+          bound_variables_(other.bound_variables_)
     {
     }
     Expression& Expression::operator=(const Expression& other)
@@ -190,25 +191,65 @@ namespace fem_bem {
                     : nullptr;
             substitution_map_ = other.substitution_map_;
             derivative_evaluator_ = other.derivative_evaluator_;
+            bound_variables_ = other.bound_variables_;
         }
         return *this;
     }
+    Expression Expression::bind_variables(
+        const ParameterMap<real>& bound_values) const
+    {
+        Expression closure = *this;
+
+        // Merge bound values with existing ones
+        for (std::size_t i = 0; i < bound_values.size(); ++i) {
+            const char* name = bound_values.get_name_at(i);
+            const real& value = bound_values.get_value_at(i);
+            closure.bound_variables_.insert_or_assign(name, value);
+        }
+
+        return closure;
+    }
+
+    Expression Expression::bind_variable(
+        const std::string& var_name,
+        real value) const
+    {
+        Expression closure = *this;
+        closure.bound_variables_.insert_or_assign(var_name.c_str(), value);
+        return closure;
+    }
+
     real Expression::evaluate_at(
         const ParameterMap<real>& variable_values) const
     {
         // Handle expressions created from DerivativeExpression
         if (derivative_evaluator_) {
-            return derivative_evaluator_(variable_values);
+            // Merge bound variables with provided values
+            ParameterMap<real> merged_values = bound_variables_;
+            for (std::size_t i = 0; i < variable_values.size(); ++i) {
+                const char* name = variable_values.get_name_at(i);
+                const real& value = variable_values.get_value_at(i);
+                merged_values.insert_or_assign(name, value);
+            }
+            return derivative_evaluator_(merged_values);
         }
 
         // Handle compound expressions
         if (is_compound_ && outer_expression_) {
-            // Evaluate substitutions first
-            ParameterMap<real> outer_values;
+            // Merge bound variables with provided values for substitution
+            // evaluation
+            ParameterMap<real> merged_values = bound_variables_;
+            for (std::size_t i = 0; i < variable_values.size(); ++i) {
+                const char* name = variable_values.get_name_at(i);
+                const real& value = variable_values.get_value_at(i);
+                merged_values.insert_or_assign(name, value);
+            }
 
+            // Evaluate substitutions
+            ParameterMap<real> outer_values;
             for (std::size_t i = 0; i < substitution_map_.size(); ++i) {
                 const auto& pair = substitution_map_[i];
-                real sub_result = pair.second.evaluate_at(variable_values);
+                real sub_result = pair.second.evaluate_at(merged_values);
                 outer_values.insert_or_assign(pair.first, sub_result);
             }
 
@@ -217,11 +258,14 @@ namespace fem_bem {
 
         // Standard evaluation for non-compound expressions
         if (!is_parsed_ || !compiled_expression_) {
-            // If no variables specified, discover them from the values
-            // provided
+            // If no variables specified, discover them from the values provided
             if (variable_names_.empty()) {
                 for (std::size_t i = 0; i < variable_values.size(); ++i) {
                     variable_names_.push_back(variable_values.get_name_at(i));
+                }
+                // Also add bound variable names
+                for (std::size_t i = 0; i < bound_variables_.size(); ++i) {
+                    variable_names_.push_back(bound_variables_.get_name_at(i));
                 }
             }
             parse_expression();
@@ -232,21 +276,25 @@ namespace fem_bem {
                 "Expression not properly parsed: " + expression_string_);
         }
 
-        // Store original values
-
-        const exprtk::symbol_table<real>& sym_table =
-            compiled_expression_->get_symbol_table();
-
+        // Merge bound variables with provided values (provided values take
+        // precedence)
+        ParameterMap<real> merged_values = bound_variables_;
         for (std::size_t i = 0; i < variable_values.size(); ++i) {
             const char* name = variable_values.get_name_at(i);
             const real& value = variable_values.get_value_at(i);
+            merged_values.insert_or_assign(name, value);
+        }
+
+        // Set all variables in temp_variables_
+        for (std::size_t i = 0; i < merged_values.size(); ++i) {
+            const char* name = merged_values.get_name_at(i);
+            const real& value = merged_values.get_value_at(i);
             auto ptr = temp_variables_.find(name);
             if (ptr)
                 *ptr = value;
         }
 
         real result = compiled_expression_->value();
-
         return result;
     }
 
@@ -301,16 +349,20 @@ namespace fem_bem {
                     break;
                 }
             }
-            // For compound expressions with derivatives, use significantly larger step
+            // For compound expressions with derivatives, use significantly
+            // larger step
             h = has_derivative_substitution ? real(5e-3) : real(1e-4);
-        } else if (derivative_evaluator_) {
-            // This is already a derivative, so we're computing second derivative
+        }
+        else if (derivative_evaluator_) {
+            // This is already a derivative, so we're computing second
+            // derivative
             h = real(5e-3);
-        } else {
+        }
+        else {
             // Simple expression
             h = real(1e-4);
         }
-        
+
         // For compound expressions, use numerical chain rule
         if (is_compound_ && outer_expression_) {
             auto compound_evaluator = [this](const ParameterMap<real>& values) {
@@ -384,6 +436,210 @@ namespace fem_bem {
         }
         return grad;
     }
+
+    // Create mapping expressions for coordinate transformation
+    Expression create_mapping_expression(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec2d>& world_vertices)
+    {
+        if (world_vertices.size() != barycentric_names.size() + 1) {
+            throw std::invalid_argument(
+                "Invalid number of vertices for mapping");
+        }
+
+        // Create linear interpolation expressions for x and y
+        std::string x_expr = std::to_string(world_vertices[0][0]);
+        std::string y_expr = std::to_string(world_vertices[0][1]);
+
+        for (std::size_t i = 0; i < barycentric_names.size(); ++i) {
+            real dx = world_vertices[i + 1][0] - world_vertices[0][0];
+            real dy = world_vertices[i + 1][1] - world_vertices[0][1];
+
+            if (dx != 0) {
+                x_expr +=
+                    " + " + std::to_string(dx) + " * " + barycentric_names[i];
+            }
+            if (dy != 0) {
+                y_expr +=
+                    " + " + std::to_string(dy) + " * " + barycentric_names[i];
+            }
+        }
+
+        // Create a compound expression that sets x and y
+        Expression x_mapping(x_expr, barycentric_names);
+        Expression y_mapping(y_expr, barycentric_names);
+
+        // Return a special mapping expression (this might need custom handling)
+        return x_mapping;  // Simplified for now - might need special mapping
+                           // expression type
+    }
+
+    Expression create_mapping_expression(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec3d>& world_vertices)
+    {
+        if (world_vertices.size() != barycentric_names.size() + 1) {
+            throw std::invalid_argument(
+                "Invalid number of vertices for mapping");
+        }
+
+        // Create linear interpolation expressions for x, y, and z
+        std::string x_expr = std::to_string(world_vertices[0][0]);
+        std::string y_expr = std::to_string(world_vertices[0][1]);
+        std::string z_expr = std::to_string(world_vertices[0][2]);
+
+        for (std::size_t i = 0; i < barycentric_names.size(); ++i) {
+            real dx = world_vertices[i + 1][0] - world_vertices[0][0];
+            real dy = world_vertices[i + 1][1] - world_vertices[0][1];
+            real dz = world_vertices[i + 1][2] - world_vertices[0][2];
+
+            if (dx != 0) {
+                x_expr +=
+                    " + " + std::to_string(dx) + " * " + barycentric_names[i];
+            }
+            if (dy != 0) {
+                y_expr +=
+                    " + " + std::to_string(dy) + " * " + barycentric_names[i];
+            }
+            if (dz != 0) {
+                z_expr +=
+                    " + " + std::to_string(dz) + " * " + barycentric_names[i];
+            }
+        }
+
+        // Create compound expression that sets x, y, z
+        Expression x_mapping(x_expr, barycentric_names);
+        Expression y_mapping(y_expr, barycentric_names);
+        Expression z_mapping(z_expr, barycentric_names);
+
+        return x_mapping;  // Simplified for now
+    }
+
+    // Create coordinate mapping expressions that bind world vertex coordinates
+    ParameterMap<Expression> create_coordinate_mapping(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec2d>& world_vertices)
+    {
+        if (world_vertices.size() != barycentric_names.size() + 1) {
+            throw std::invalid_argument(
+                "Invalid number of vertices for mapping");
+        }
+
+        ParameterMap<Expression> coord_mapping;
+
+        // Create linear interpolation expressions for x and y coordinates
+        std::string x_expr = std::to_string(world_vertices[0][0]);
+        std::string y_expr = std::to_string(world_vertices[0][1]);
+
+        for (std::size_t i = 0; i < barycentric_names.size(); ++i) {
+            real dx = world_vertices[i + 1][0] - world_vertices[0][0];
+            real dy = world_vertices[i + 1][1] - world_vertices[0][1];
+
+            if (dx != 0) {
+                x_expr +=
+                    " + " + std::to_string(dx) + " * " + barycentric_names[i];
+            }
+            if (dy != 0) {
+                y_expr +=
+                    " + " + std::to_string(dy) + " * " + barycentric_names[i];
+            }
+        }
+
+        // Create expressions for each coordinate
+        Expression x_mapping(x_expr, barycentric_names);
+        Expression y_mapping(y_expr, barycentric_names);
+
+        // Store in coordinate mapping
+        coord_mapping.insert_or_assign("x", x_mapping);
+        coord_mapping.insert_or_assign("y", y_mapping);
+
+        return coord_mapping;
+    }
+
+    ParameterMap<Expression> create_coordinate_mapping(
+        const std::vector<std::string>& barycentric_names,
+        const std::vector<pxr::GfVec3d>& world_vertices)
+    {
+        if (world_vertices.size() != barycentric_names.size() + 1) {
+            throw std::invalid_argument(
+                "Invalid number of vertices for mapping");
+        }
+
+        ParameterMap<Expression> coord_mapping;
+
+        // Create linear interpolation expressions for x, y, and z coordinates
+        std::string x_expr = std::to_string(world_vertices[0][0]);
+        std::string y_expr = std::to_string(world_vertices[0][1]);
+        std::string z_expr = std::to_string(world_vertices[0][2]);
+
+        for (std::size_t i = 0; i < barycentric_names.size(); ++i) {
+            real dx = world_vertices[i + 1][0] - world_vertices[0][0];
+            real dy = world_vertices[i + 1][1] - world_vertices[0][1];
+            real dz = world_vertices[i + 1][2] - world_vertices[0][2];
+
+            if (dx != 0) {
+                x_expr +=
+                    " + " + std::to_string(dx) + " * " + barycentric_names[i];
+            }
+            if (dy != 0) {
+                y_expr +=
+                    " + " + std::to_string(dy) + " * " + barycentric_names[i];
+            }
+            if (dz != 0) {
+                z_expr +=
+                    " + " + std::to_string(dz) + " * " + barycentric_names[i];
+            }
+        }
+
+        // Create expressions for each coordinate
+        Expression x_mapping(x_expr, barycentric_names);
+        Expression y_mapping(y_expr, barycentric_names);
+        Expression z_mapping(z_expr, barycentric_names);
+
+        // Store in coordinate mapping
+        coord_mapping.insert_or_assign("x", x_mapping);
+        coord_mapping.insert_or_assign("y", y_mapping);
+        coord_mapping.insert_or_assign("z", z_mapping);
+
+        return coord_mapping;
+    }
+
+    // Helper to create mapped expression using coordinate mapping
+    Expression create_mapped_expression_with_coord_mapping(
+        const Expression& expr,
+        const ParameterMap<Expression>& coord_mapping,
+        const std::vector<std::string>& barycentric_names)
+    {
+        // Create substitution map from coordinate mapping
+        std::vector<std::pair<const char*, Expression>> substitutions;
+
+        for (std::size_t i = 0; i < coord_mapping.size(); ++i) {
+            const char* coord_name = coord_mapping.get_name_at(i);
+            const Expression& coord_expr = coord_mapping.get_value_at(i);
+            substitutions.emplace_back(coord_name, coord_expr);
+        }
+
+        // Create compound expression that substitutes physical coordinates
+        return Expression(expr, substitutions);
+    }
+
+    // Create template function that is missing
+    template<typename MappingExpr>
+    Expression create_mapped_expression(
+        const Expression& expr,
+        const MappingExpr& mapping_expr,
+        const std::vector<std::string>& barycentric_names)
+    {
+        // For now, return the original expression as fallback
+        // This would need specific implementation based on MappingExpr type
+        return expr;
+    }
+
+    // Explicit instantiation for ParameterMap<Expression>
+    template Expression create_mapped_expression<ParameterMap<Expression>>(
+        const Expression& expr,
+        const ParameterMap<Expression>& mapping_expr,
+        const std::vector<std::string>& barycentric_names);
 
 }  // namespace fem_bem
 }  // namespace USTC_CG

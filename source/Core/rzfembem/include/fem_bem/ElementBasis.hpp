@@ -304,19 +304,33 @@ namespace fem_bem {
 
         // Core integration implementation: integrates shape_function *
         // expression over simplex
-        template<typename MappingFunc>
+        template<typename MappingExpr = std::nullptr_t>
         T integrate_shape_function_against_expression(
             const expression_type& shape_func,
             const expression_type& expr,
-            MappingFunc mapping,
-            std::size_t intervals) const
+            const MappingExpr& mapping_expr = nullptr,
+            std::size_t intervals = 100) const
         {
-            // Use the Expression class's integration methods
-            return integrate_product_with(
-                shape_func, expr, barycentric_names_, mapping, intervals);
+            // Use the new Expression-based integration method
+            return integrate_over_simplex(
+                shape_func * expr, barycentric_names_, mapping_expr, intervals);
         }
 
        protected:
+        // Create mapping expression for coordinate transformation
+        ParameterMap<Expression> create_coordinate_mapping(
+            const std::vector<pxr::GfVec2d>& world_vertices) const
+        {
+            return fem_bem::create_coordinate_mapping(
+                barycentric_names_, world_vertices);
+        }
+
+        ParameterMap<Expression> create_coordinate_mapping(
+            const std::vector<pxr::GfVec3d>& world_vertices) const
+        {
+            return fem_bem::create_coordinate_mapping(
+                barycentric_names_, world_vertices);
+        }
         // Barycentric variables for expression parsing
         std::vector<std::string> barycentric_names_;
 
@@ -549,10 +563,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec2d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_vertex_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
@@ -561,10 +577,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec3d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_vertex_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
@@ -573,10 +591,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec2d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_edge_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
@@ -585,10 +605,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec3d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_edge_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
@@ -597,10 +619,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec3d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_face_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
@@ -609,10 +633,12 @@ namespace fem_bem {
             const std::vector<pxr::GfVec3d>& world_vertices,
             std::size_t intervals = 100) const override
         {
-            auto mapping = create_linear_mapping(world_vertices);
+            auto mapping_expr =
+                ElementBasis<ProblemDim, Type>::create_coordinate_mapping(
+                    world_vertices);
             auto results =
                 ElementBasis<ProblemDim, Type>::integrate_volume_against(
-                    expr_str, mapping, intervals);
+                    expr_str, mapping_expr, intervals);
             return std::vector<double>(results.begin(), results.end());
         }
 
