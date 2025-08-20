@@ -5,97 +5,6 @@ namespace USTC_CG {
 namespace fem_bem {
     static exprtk::parser<real> parser;
 
-    real numerical_derivative(
-        const exprtk::expression<real>& expr,
-        exprtk::details::variable_node<real>* var,
-        const real& h)
-    {
-        const real x_init = var->ref();
-
-        // Use 2-point central difference with better stability
-        var->ref() = x_init + h;
-        const real y_plus = expr.value();
-        var->ref() = x_init - h;
-        const real y_minus = expr.value();
-        var->ref() = x_init;
-
-        // Check for numerical issues and use adaptive step if needed
-        real derivative = (y_plus - y_minus) / (real(2) * h);
-
-        // If derivative seems to large, try with smaller step
-        if (std::abs(derivative) > real(1e6)) {
-            real smaller_h = h * real(0.1);
-            var->ref() = x_init + smaller_h;
-            const real y_plus_small = expr.value();
-            var->ref() = x_init - smaller_h;
-            const real y_minus_small = expr.value();
-            var->ref() = x_init;
-            derivative = (y_plus_small - y_minus_small) / (real(2) * smaller_h);
-        }
-
-        return derivative;
-    }
-    std::function<real(const ParameterMap<real>&)> create_derivative_function(
-        const std::string& expression_string,
-        const std::string& variable_name,
-        const real& h)
-    {
-        return [expression_string, variable_name, h](
-                   const ParameterMap<real>& values) -> real {
-            // Create a temporary expression for derivative computation
-            exprtk::symbol_table<real> symbol_table;
-            exprtk::expression<real> expr;
-
-            // Create a mutable copy of values for symbol table
-            ParameterMap<real> temp_values = values;
-
-            // Ensure all coordinate variables exist with default values
-            if (!temp_values.find("x")) {
-                temp_values.insert_or_assign("x", real(0));
-            }
-            if (!temp_values.find("y")) {
-                temp_values.insert_or_assign("y", real(0));
-            }
-            if (!temp_values.find("z")) {
-                temp_values.insert_or_assign("z", real(0));
-            }
-
-            // Ensure barycentric coordinates exist with default values
-            if (!temp_values.find("u1")) {
-                temp_values.insert_or_assign("u1", real(0));
-            }
-            if (!temp_values.find("u2")) {
-                temp_values.insert_or_assign("u2", real(0));
-            }
-            if (!temp_values.find("u3")) {
-                temp_values.insert_or_assign("u3", real(0));
-            }
-
-            // Add all variables to symbol table using mutable references
-            for (std::size_t i = 0; i < temp_values.size(); ++i) {
-                const char* name = temp_values.get_name_at(i);
-                real& value_ref =
-                    const_cast<real&>(temp_values.get_value_at(i));
-                symbol_table.add_variable(name, value_ref);
-            }
-
-            symbol_table.add_constants();
-            expr.register_symbol_table(symbol_table);
-
-            if (!parser.compile(expression_string, expr)) {
-                return real(0);  // Return 0 for invalid expressions
-            }
-
-            // Find the variable node for differentiation
-            auto* var_node = symbol_table.get_variable(variable_name);
-            if (!var_node) {
-                return real(0);  // Variable not found
-            }
-
-            return numerical_derivative(expr, var_node, h);
-        };
-    }
-
     // Create a derivative function for compound expressions using chain rule
     std::function<real(const ParameterMap<real>&)>
     create_compound_derivative_function(
@@ -433,24 +342,17 @@ namespace fem_bem {
         }
 
         // For compound expressions, use numerical chain rule
-        if (is_compound_ && outer_expression_) {
-            auto compound_evaluator = [this](const ParameterMap<real>& values) {
-                return this->evaluate_at(values);
-            };
-            auto derivative_func = create_compound_derivative_function(
-                compound_evaluator, variable_name, h);
-            return DerivativeExpression(derivative_func, variable_name);
-        }
-        // Handle derivative expressions (derivatives of derivatives)
-        else if (derivative_evaluator_) {
+        if (derivative_evaluator_) {
             auto derivative_func = create_compound_derivative_function(
                 derivative_evaluator_, variable_name, h);
             return DerivativeExpression(derivative_func, variable_name);
         }
         else {
-            // For simple expressions, use string-based derivative
-            auto derivative_func = create_derivative_function(
-                expression_string_, variable_name, h);
+            auto evaluator = [this](const ParameterMap<real>& values) {
+                return this->evaluate_at(values);
+            };
+            auto derivative_func = create_compound_derivative_function(
+                evaluator, variable_name, h);
             return DerivativeExpression(derivative_func, variable_name);
         }
     }
