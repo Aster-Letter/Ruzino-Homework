@@ -97,7 +97,7 @@ TEST_F(IntegrationPerformanceTest, PolynomialExpressionIntegration)
     std::vector<std::string> vars = { "u1", "u2", "u3" };
 
     for (const auto& expr_str : expressions) {
-        Expression expr(expr_str, vars);  // Add variable list
+        Expression expr(expr_str);  // Add variable list
         auto test_name = "Polynomial_" + expr_str;
         benchmark_function(test_name, [&]() {
             integrate_over_simplex(expr, vars, nullptr, 50);
@@ -153,7 +153,7 @@ TEST_F(IntegrationPerformanceTest, CoordinateMappingIntegration)
     std::vector<std::string> vars = { "u1", "u2", "u3" };
 
     for (const auto& expr_str : spatial_expressions) {
-        Expression expr(expr_str, { "u1", "u2", "u3", "x", "y", "z" });
+        Expression expr(expr_str);
         auto test_name = "Mapping_" + expr_str;
         benchmark_function(test_name, [&]() {
             integrate_over_simplex(expr, vars, mapping, 50);
@@ -166,8 +166,7 @@ TEST_F(IntegrationPerformanceTest, DerivativeIntegration)
 {
     std::cout << "\n=== Derivative Integration Performance ===" << std::endl;
 
-    Expression base_expr(
-        "u1*u1 + u2*u2 + u3*u3", { "u1", "u2", "u3" });  // Add variable list
+    Expression base_expr("u1*u1 + u2*u2 + u3*u3");  // Add variable list
     std::vector<std::string> vars = { "u1", "u2", "u3" };
 
     // Test derivative computation and integration
@@ -294,8 +293,7 @@ TEST_F(IntegrationPerformanceTest, IntegrationIntervalScaling)
     std::cout << "\n=== Integration Interval Scaling Performance ==="
               << std::endl;
 
-    Expression test_expr(
-        "u1*u2 + u2*u3 + u3*u1", { "u1", "u2", "u3" });  // Add variable list
+    Expression test_expr("u1*u2 + u2*u3 + u3*u1");  // Add variable list
     std::vector<std::string> vars = { "u1", "u2", "u3" };
 
     std::vector<int> intervals = { 5, 10, 20, 30 };
@@ -322,23 +320,23 @@ TEST_F(IntegrationPerformanceTest, MemoryAllocationPerformance)
 
     // Test repeated expression creation and integration
     benchmark_function("Expression_creation_and_integration", [&]() {
-        Expression temp_expr("u1*u1 + u2*u2", vars);  // Add variable list
+        Expression temp_expr("u1*u1 + u2*u2");  // Add variable list
         integrate_over_simplex(temp_expr, vars, nullptr, 20);
     });
 
     // Test compound expression creation
     benchmark_function("Compound_expression_creation", [&]() {
         Expression outer("x + y");
-        Expression inner1("u1", vars);  // Add variable list
-        Expression inner2("u2", vars);  // Add variable list
+        Expression inner1("u1");  // Add variable list
+        Expression inner2("u2");  // Add variable list
         Expression compound(outer, { { "x", inner1 }, { "y", inner2 } });
         integrate_over_simplex(compound, vars, nullptr, 20);
     });
 
     // Test arithmetic operations memory usage
     benchmark_function("Arithmetic_operations_memory", [&]() {
-        Expression e1("u1", vars);  // Add variable list
-        Expression e2("u2", vars);  // Add variable list
+        Expression e1("u1");  // Add variable list
+        Expression e2("u2");  // Add variable list
         auto result = e1 + e2 * Expression::constant(3.0) - e1 / e2;
         integrate_over_simplex(result, vars, nullptr, 20);
     });
@@ -372,8 +370,8 @@ int main(int argc, char** argv)
               << " times." << std::endl;
     std::cout << "insert_unchecked() is called " << g_insert_unchecked_calls
               << " times." << std::endl;
-    std::cout << "evaluate_at() is called " << g_evaluate_calls
-              << " times." << std::endl;
+    std::cout << "evaluate_at() is called " << g_evaluate_calls << " times."
+              << std::endl;
 
     return result;
 }

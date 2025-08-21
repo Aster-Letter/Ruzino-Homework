@@ -26,10 +26,6 @@ namespace fem_bem {
         Expression() = default;
         explicit Expression(const std::string& expr_str);
 
-        Expression(
-            const std::string& expr_str,
-            const std::vector<std::string>& variable_names);
-
         // Compound expression constructor
         Expression(
             const Expression& outer_expr,
