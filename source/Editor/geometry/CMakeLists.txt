@@ -1,7 +1,7 @@
 USTC_CG_ADD_LIB(
 	geometry 
 	SHARED
-	PUBLIC_LIBS OpenMeshCore spdlog::spdlog shaders_interface GPUContext nodes_core igl_core triangle::triangle
+	PUBLIC_LIBS OpenMeshCore spdlog::spdlog shaders_interface nodes_core igl_core triangle::triangle
 	COMPILE_DEFS
 		NOMINMAX 
 		USTC_CG_BACKEND_NVRHI
