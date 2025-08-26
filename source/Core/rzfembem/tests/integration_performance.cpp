@@ -348,12 +348,6 @@ int main(int argc, char** argv)
     std::cout << "Integration Performance Test Suite" << std::endl;
     std::cout << "===================================" << std::endl;
 
-    // Run specific performance tests if needed
-    if (argc > 1 && std::string(argv[1]) == "--performance-only") {
-        // Run only performance tests
-        ::testing::GTEST_FLAG(filter) = "IntegrationPerformanceTest.*";
-    }
-
     auto start_time = std::chrono::high_resolution_clock::now();
     int result = RUN_ALL_TESTS();
     auto end_time = std::chrono::high_resolution_clock::now();
