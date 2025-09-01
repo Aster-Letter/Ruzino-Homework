@@ -1,6 +1,10 @@
 #if USTC_CG_WITH_CUDA
 #include <cuda_runtime.h>
 
+#ifdef _WIN64
+#include <d3d12.h>
+#endif
+
 #include <RHI/internal/cuda_extension.hpp>
 #include <fstream>
 #include <iomanip>
@@ -34,6 +38,13 @@
     } while (0)
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
+
+// Here the resourcetype could be texture or buffer now.
+template<typename ResourceType>
+HANDLE getSharedApiHandle(nvrhi::IDevice* device, ResourceType* texture_handle)
+{
+    return texture_handle->getNativeObject(nvrhi::ObjectTypes::SharedHandle);
+}
 
 static OptixDeviceContext optixContext;
 static bool isOptiXInitalized = false;
@@ -81,15 +92,6 @@ int optix_trace_ray(
         z);
     CUDA_SYNC_CHECK();
     return 0;
-}
-nvrhi::TextureHandle cuda_linear_buffer_to_nvrhi_texture(
-    nvrhi::IDevice* device,
-    CUDALinearBufferHandle buffer,
-    nvrhi::TextureDesc desc,
-    unsigned int row_pitch)
-{
-    desc.isShaderResource = true;
-    auto texture = device->createTexture(desc);
 }
 
 static bool readSourceFile(std::string& str, const std::string& filename)
@@ -754,8 +756,9 @@ OptiXPipeline::OptiXPipeline(
 
         int callable_record_size = callableRecordStrideInBytes * callable_count;
 
-        callable_record = create_cuda_linear_buffer(CUDALinearBufferDesc{
-            callable_count, callableRecordStrideInBytes });
+        callable_record = create_cuda_linear_buffer(
+            CUDALinearBufferDesc{ callable_count,
+                                  callableRecordStrideInBytes });
 
         CUdeviceptr d_callable_record = callable_record->get_device_ptr();
 
@@ -862,13 +865,6 @@ void CUDALinearBufferView::assign_host_data(
 {
     assert(data.size() == desc.element_size * desc.element_count);
     cudaMemcpy(cuda_ptr, data.data(), data.size(), cudaMemcpyHostToDevice);
-}
-
-// Here the resourcetype could be texture or buffer now.
-template<typename ResourceType>
-HANDLE getSharedApiHandle(nvrhi::IDevice* device, ResourceType* texture_handle)
-{
-    return texture_handle->getNativeObject(nvrhi::ObjectTypes::SharedHandle);
 }
 
 CUDASurfaceObject::CUDASurfaceObject(const CUDASurfaceObjectDesc& in_desc)
@@ -1157,38 +1153,35 @@ OptiXProgramGroupHandle create_optix_program_group(
     return OptiXProgramGroupHandle::Create(buffer);
 }
 
-}  // namespace cuda
+void FetchD3DMemory(
+    nvrhi::IResource* resource_handle,
+    nvrhi::IDevice* device,
+    size_t& actualSize,
+    HANDLE sharedHandle,
+    cudaExternalMemoryHandleDesc& externalMemoryHandleDesc)
+{
+#ifdef _WIN64
+    ID3D12Resource* resource =
+        resource_handle->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
+    ID3D12Device* native_device =
+        device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
 
-//
-// void FetchD3DMemory(
-//    nvrhi::IResource* resource_handle,
-//    nvrhi::IDevice* device,
-//    size_t& actualSize,
-//    HANDLE sharedHandle,
-//    cudaExternalMemoryHandleDesc& externalMemoryHandleDesc)
-//{
-// #ifdef _WIN64
-//    ID3D12Resource* resource =
-//        resource_handle->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource);
-//    ID3D12Device* native_device =
-//        getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
-//
-//    D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
-//
-//    D3D12_RESOURCE_DESC texture_desc = resource->GetDesc();
-//
-//    d3d12ResourceAllocationInfo =
-//        native_GetResourceAllocationInfo(0, 1, &texture_desc);
-//    actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
-//
-//    externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
-//    externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
-//    externalMemoryHandleDesc.size = actualSize;
-//    externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
-// #else
-//    throw std::runtime_error("D3D12 in Windows only.");
-// #endif
-//}
+    D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
+
+    D3D12_RESOURCE_DESC texture_desc = resource->GetDesc();
+
+    d3d12ResourceAllocationInfo =
+        native_device->GetResourceAllocationInfo(0, 1, &texture_desc);
+    actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
+
+    externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+    externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
+    externalMemoryHandleDesc.size = actualSize;
+    externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+#else
+    throw std::runtime_error("D3D12 in Windows only.");
+#endif
+}
 //
 // void FetchVulkanMemory(
 //    size_t& actualSize,
@@ -1207,46 +1200,32 @@ OptiXProgramGroupHandle create_optix_program_group(
 //    externalMemoryHandleDesc.size = actualSize;
 //    externalMemoryHandleDesc.flags = 0;
 //}
-//
-// cudaExternalMemory_t FetchExternalTextureMemory(
-//    nvrhi::ITexture* image_handle,
-//    nvrhi::IDevice* device,
-//    size_t& actualSize,
-//    HANDLE sharedHandle)
-//{
-//    cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
-//    memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
-//
-//    if (getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12) {
-//        FetchD3DMemory(
-//            image_handle,
-//            device,
-//            actualSize,
-//            sharedHandle,
-//            externalMemoryHandleDesc);
-//    }
-//    else if (getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN) {
-//        vk::Device native_device =
-//            VkDevice(getNativeObject(nvrhi::ObjectTypes::VK_Device));
-//        VkImage image =
-//            image_handle->getNativeObject(nvrhi::ObjectTypes::VK_Image);
-//
-//        vk::MemoryRequirements vkMemoryRequirements = {};
-//        native_device.getImageMemoryRequirements(image,
-//        &vkMemoryRequirements);
-//
-//        FetchVulkanMemory(
-//            actualSize,
-//            sharedHandle,
-//            externalMemoryHandleDesc,
-//            vkMemoryRequirements);
-//    }
-//
-//    cudaExternalMemory_t externalMemory;
-//    CUDA_CHECK(
-//        cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
-//    return externalMemory;
-//}
+cudaExternalMemory_t FetchExternalTextureMemory(
+    nvrhi::ITexture* image_handle,
+    nvrhi::IDevice* device,
+    size_t& actualSize,
+    HANDLE sharedHandle)
+{
+    cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+    memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+
+    if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12) {
+        FetchD3DMemory(
+            image_handle,
+            device,
+            actualSize,
+            sharedHandle,
+            externalMemoryHandleDesc);
+    }
+    // else if (device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN) {
+    //     // Vulkan implementation would go here
+    // }
+
+    cudaExternalMemory_t externalMemory;
+    CUDA_CHECK(
+        cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
+    return externalMemory;
+}
 //
 // cudaExternalMemory_t FetchExternalBufferMemory(
 //    nvrhi::IBuffer* buffer_handle,
@@ -1351,81 +1330,82 @@ OptiXProgramGroupHandle create_optix_program_group(
 //    return true;
 //}
 //
-// bool importTextureToMipmappedArray(
-//    nvrhi::ITexture* image_handle,
-//    cudaMipmappedArray_t& mipmappedArray,
-//    uint32_t cudaUsageFlags,
-//    nvrhi::IDevice* device)
-//{
-//    HANDLE sharedHandle = getSharedApiHandle(device, image_handle);
-//    if (sharedHandle == NULL) {
-//        throw std::runtime_error(
-//            "FalcorCUDA::importTextureToMipmappedArray - texture shared handle
-//            " "creation failed");
-//        return false;
-//    }
+bool importTextureToMipmappedArray(
+    nvrhi::ITexture* image_handle,
+    cudaMipmappedArray_t& mipmappedArray,
+    uint32_t cudaUsageFlags,
+    nvrhi::IDevice* device)
+{
+    HANDLE sharedHandle = getSharedApiHandle(device, image_handle);
+    if (sharedHandle == NULL) {
+        throw std::runtime_error(
+            "FalcorCUDA::importTextureToMipmappedArray - texture shared handle "
+            "creation failed");
+        return false;
+    }
+
+    size_t actualSize;
+
+    cudaExternalMemory_t externalMemory = FetchExternalTextureMemory(
+        image_handle, device, actualSize, sharedHandle);
+
+    cudaExternalMemoryMipmappedArrayDesc mipDesc;
+    memset(&mipDesc, 0, sizeof(mipDesc));
+
+    nvrhi::Format format = image_handle->getDesc().format;
+    auto formatInfo = nvrhi::getFormatInfo(format);
+
+    mipDesc.formatDesc.x = 8;  // Default to 8-bit channels
+    mipDesc.formatDesc.y = 8;
+    mipDesc.formatDesc.z = 8;
+    mipDesc.formatDesc.w = 8;
+    mipDesc.formatDesc.f = (formatInfo.kind == nvrhi::FormatKind::Float)
+                               ? cudaChannelFormatKindFloat
+                               : cudaChannelFormatKindUnsigned;
+
+    mipDesc.extent.depth = 0;
+    mipDesc.extent.width = image_handle->getDesc().width;
+    mipDesc.extent.height = image_handle->getDesc().height;
+    mipDesc.flags = cudaUsageFlags;
+    mipDesc.numLevels = 1;
+    mipDesc.offset = 0;
+
+    CUDA_CHECK(cudaExternalMemoryGetMappedMipmappedArray(
+        &mipmappedArray, externalMemory, &mipDesc));
+
+    // CloseHandle(sharedHandle);
+    return true;
+}
 //
-//    size_t actualSize;
-//
-//    cudaExternalMemory_t externalMemory = FetchExternalTextureMemory(
-//        image_handle, device, actualSize, sharedHandle);
-//
-//    cudaExternalMemoryMipmappedArrayDesc mipDesc;
-//    memset(&mipDesc, 0, sizeof(mipDesc));
-//
-//    nvrhi::Format format = image_handle->getDesc().format;
-//    mipDesc.formatDesc.x = formatBitsInfo[format].redBits;
-//    mipDesc.formatDesc.y = formatBitsInfo[format].greenBits;
-//    mipDesc.formatDesc.z = formatBitsInfo[format].blueBits;
-//    mipDesc.formatDesc.w = formatBitsInfo[format].alphaBits;
-//    mipDesc.formatDesc.f =
-//        (nvrhi::getFormatInfo(format).kind == nvrhi::FormatKind::Float)
-//            ? cudaChannelFormatKindFloat
-//            : cudaChannelFormatKindUnsigned;
-//
-//    mipDesc.extent.depth = 0;
-//    mipDesc.extent.width = image_handle->getDesc().width;
-//    mipDesc.extent.height = image_handle->getDesc().height;
-//    mipDesc.flags = cudaUsageFlags;
-//    mipDesc.numLevels = 1;
-//    mipDesc.offset = 0;
-//
-//    CUDA_CHECK(cudaExternalMemoryGetMappedMipmappedArray(
-//        &mipmappedArray, externalMemory, &mipDesc));
-//
-//    // CloseHandle(sharedHandle);
-//    return true;
-//}
-//
-// CUsurfObject mapTextureToSurface(
-//    nvrhi::ITexture* image_handle,
-//    uint32_t cudaUsageFlags,
-//    nvrhi::IDevice* device)
-//{
-//    // Create a mipmapped array from the texture
-//    cudaMipmappedArray_t mipmap;
-//
-//    if (!importTextureToMipmappedArray(
-//            image_handle, mipmap, cudaUsageFlags, device)) {
-//        throw std::runtime_error(
-//            "Failed to import texture into a mipmapped array");
-//        return 0;
-//    }
-//
-//    // Grab level 0
-//    cudaArray_t cudaArray;
-//    CUDA_CHECK(cudaGetMipmappedArrayLevel(&cudaArray, mipmap, 0));
-//
-//    // Create cudaSurfObject_t from CUDA array
-//    cudaResourceDesc resDesc;
-//    memset(&resDesc, 0, sizeof(resDesc));
-//    resDesc.res.array.array = cudaArray;
-//    resDesc.resType = cudaResourceTypeArray;
-//
-//    cudaSurfaceObject_t surface;
-//    CUDA_CHECK(cudaCreateSurfaceObject(&surface, &resDesc));
-//    return surface;
-//}
+CUsurfObject mapTextureToSurface(
+    nvrhi::ITexture* image_handle,
+    uint32_t cudaUsageFlags,
+    nvrhi::IDevice* device)
+{
+    // Create a mipmapped array from the texture
+    cudaMipmappedArray_t mipmap;
+
+    if (!importTextureToMipmappedArray(
+            image_handle, mipmap, cudaUsageFlags, device)) {
+        throw std::runtime_error(
+            "Failed to import texture into a mipmapped array");
+        return 0;
+    }
+
+    // Grab level 0
+    cudaArray_t cudaArray;
+    CUDA_CHECK(cudaGetMipmappedArrayLevel(&cudaArray, mipmap, 0));
+
+    // Create cudaSurfObject_t from CUDA array
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.res.array.array = cudaArray;
+    resDesc.resType = cudaResourceTypeArray;
+
+    cudaSurfaceObject_t surface;
+    CUDA_CHECK(cudaCreateSurfaceObject(&surface, &resDesc));
+    return surface;
+}
 //
 // CUtexObject mapTextureToCUDATex(
 //    nvrhi::ITexture* image_handle,
@@ -1504,6 +1484,33 @@ OptiXProgramGroupHandle create_optix_program_group(
 //
 //    return (CUdeviceptr)devicePtr;
 //}
+
+nvrhi::TextureHandle cuda_linear_buffer_to_nvrhi_texture(
+    nvrhi::IDevice* device,
+    CUDALinearBufferHandle buffer,
+    nvrhi::TextureDesc desc)
+{
+    desc.sharedResourceFlags = nvrhi::SharedResourceFlags::Shared;
+    auto texture = device->createTexture(desc);
+
+    // Map the texture to a CUDA surface for writing
+    CUsurfObject surface = mapTextureToSurface(texture.Get(), 0, device);
+
+    // Copy data from linear buffer to texture using GPU parallel for
+    CUdeviceptr src_ptr = buffer->get_device_ptr();
+    uint32_t width = desc.width;
+    uint32_t height = desc.height;
+    uint32_t element_size = buffer->getDesc().element_size;
+
+    auto row_pitch = width * element_size;
+
+    // Launch CUDA kernel to copy data
+    copy_linear_buffer_to_surface(
+        src_ptr, surface, width, height, element_size, row_pitch);
+
+    return texture;
+}
+}  // namespace cuda
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE
 

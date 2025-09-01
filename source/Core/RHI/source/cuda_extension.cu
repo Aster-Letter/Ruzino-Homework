@@ -79,6 +79,78 @@ CUDALinearBufferHandle create_cuda_linear_buffer(
     return CUDALinearBufferHandle::Create(buffer);
 }
 
+void copy_linear_buffer_to_surface(
+    CUdeviceptr src_ptr,
+    CUsurfObject surface,
+    uint32_t width,
+    uint32_t height,
+    uint32_t element_size,
+    uint32_t row_pitch)
+{
+#ifdef __CUDACC__
+    GPUParallelFor2D(
+        "copy_linear_buffer_to_surface",
+        make_int2(width, height),
+        GPU_LAMBDA_Ex(int y, int x) {
+            if (x >= width || y >= height)
+                return;
+
+            // Calculate source offset
+            uint32_t src_offset = y * row_pitch + x * element_size;
+            const uint8_t* src_data = reinterpret_cast<const uint8_t*>(src_ptr);
+
+            // Copy data based on element size
+            if (element_size == 1) {
+                uint8_t value = src_data[src_offset];
+                surf2Dwrite(value, surface, x * sizeof(uint8_t), y);
+            }
+            else if (element_size == 2) {
+                uint16_t value =
+                    *reinterpret_cast<const uint16_t*>(&src_data[src_offset]);
+                surf2Dwrite(value, surface, x * sizeof(uint16_t), y);
+            }
+            else if (element_size == 4) {
+                uint32_t value =
+                    *reinterpret_cast<const uint32_t*>(&src_data[src_offset]);
+                surf2Dwrite(value, surface, x * sizeof(uint32_t), y);
+            }
+            else if (element_size == 8) {
+                uint64_t value =
+                    *reinterpret_cast<const uint64_t*>(&src_data[src_offset]);
+                surf2Dwrite(value, surface, x * sizeof(uint64_t), y);
+            }
+            else if (element_size == 12) {
+                // Handle 3-component data (RGB float, etc.)
+                // Write as 3 consecutive 32-bit values
+                const uint32_t* src_data32 =
+                    reinterpret_cast<const uint32_t*>(&src_data[src_offset]);
+                surf2Dwrite(
+                    src_data32[0], surface, (x * 3 + 0) * sizeof(uint32_t), y);
+                surf2Dwrite(
+                    src_data32[1], surface, (x * 3 + 1) * sizeof(uint32_t), y);
+                surf2Dwrite(
+                    src_data32[2], surface, (x * 3 + 2) * sizeof(uint32_t), y);
+            }
+            else if (element_size == 16) {
+                // Handle 4-component data (RGBA float, etc.)
+                // Write as 4 consecutive 32-bit values or as uchar4 for RGBA8
+                const uint32_t* src_data32 =
+                    reinterpret_cast<const uint32_t*>(&src_data[src_offset]);
+                surf2Dwrite(
+                    src_data32[0], surface, (x * 4 + 0) * sizeof(uint32_t), y);
+                surf2Dwrite(
+                    src_data32[1], surface, (x * 4 + 1) * sizeof(uint32_t), y);
+                surf2Dwrite(
+                    src_data32[2], surface, (x * 4 + 2) * sizeof(uint32_t), y);
+                surf2Dwrite(
+                    src_data32[3], surface, (x * 4 + 3) * sizeof(uint32_t), y);
+            }
+        });
+#else
+    throw std::runtime_error(
+        "CUDA compilation required for copy_linear_buffer_to_surface");
+#endif
+}
 }  // namespace cuda
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

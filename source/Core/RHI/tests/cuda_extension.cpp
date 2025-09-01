@@ -3,6 +3,8 @@
 
 #include <gtest/gtest.h>
 
+#include "RHI/rhi.hpp"
+
 using namespace USTC_CG::cuda;
 
 TEST(cuda_extension, cuda_init)
@@ -139,6 +141,30 @@ TEST(cuda_extension, create_optix_pipeline)
     auto pipeline = create_optix_pipeline({ raygen_group, hg, miss_group });
 
     EXPECT_NE(pipeline, nullptr);
+}
+
+TEST(cuda_extension, cuda_linear_buffer_to_nvrhi_texture)
+{
+    cuda_init();
+
+    // Create a simple RGBA test buffer
+    std::vector<uint32_t> test_data(64 * 64, 0xFF0000FF);  // Red color
+    auto buffer = create_cuda_linear_buffer(test_data);
+
+    // Create texture descriptor
+    nvrhi::TextureDesc desc;
+    desc.width = 64;
+    desc.height = 64;
+    desc.format = nvrhi::Format::RGBA8_UNORM;
+    desc.isShaderResource = true;
+    desc.isRenderTarget = false;
+    desc.debugName = "test_texture";
+
+    // This would need a valid NVRHI device to work properly
+    // For now just verify buffer creation worked
+    auto texture = cuda_linear_buffer_to_nvrhi_texture(
+        USTC_CG::RHI::get_device(), buffer, desc);
+    EXPECT_NE(texture, nullptr);
 }
 
 #endif
