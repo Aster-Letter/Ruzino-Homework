@@ -132,11 +132,14 @@ std::vector<std::string> PythonInterpreter::Suggest(
     std::string_view const cmdline,
     size_t cursor_pos)
 {
-    if (python_initialized_ && IsPythonCode(cmdline)) {
-        return SuggestPythonCompletion(cmdline);
+    std::vector<std::string> ret;
+    if (python_initialized_) {
+        ret = SuggestPythonCompletion(cmdline);
     }
-
-    return console::Interpreter::Suggest(cmdline, cursor_pos);
+    // merge.
+    auto cons = console::Interpreter::Suggest(cmdline, cursor_pos);
+    ret.insert(ret.end(), cons.begin(), cons.end());
+    return ret;
 }
 
 PythonInterpreter::Result PythonInterpreter::ExecuteCommand(
@@ -168,13 +171,6 @@ bool PythonInterpreter::IsValidCommand(std::string_view command) const
 {
     return command == "python" || command == "exec" ||
            console::Interpreter::IsValidCommand(command);
-}
-
-bool PythonInterpreter::IsPythonCode(std::string_view code) const
-{
-    // This method is now mainly for suggestion purposes
-    // The main detection is handled in ShouldHandleCommand
-    return true;  // Simplified since detection logic moved
 }
 
 PythonInterpreter::Result PythonInterpreter::ExecutePythonCode(

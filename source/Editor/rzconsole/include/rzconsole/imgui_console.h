@@ -139,6 +139,7 @@ class RZCONSOLE_API ImGui_Console : public IWidget {
     std::vector<LogItem> m_ItemsLog;
     std::vector<std::string> m_History;
     int m_HistoryPos = -1;
+    bool m_ExecutingFromHistory = false;
 
    private:
     Options m_Options;

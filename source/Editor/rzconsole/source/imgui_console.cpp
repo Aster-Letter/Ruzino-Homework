@@ -53,6 +53,7 @@ SOFTWARE.
 #include <cctype>
 #include <cstdarg>
 #include <cstring>
+#include <algorithm>
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
@@ -217,6 +218,12 @@ bool ImGui_Console::BuildUI()
             },
             (void*)this)) {
         if (m_InputBuffer.front() != '0') {
+            // Check if we're executing from history
+            std::string currentInput(m_InputBuffer.data());
+            m_ExecutingFromHistory = (m_HistoryPos >= 0 && 
+                                    m_HistoryPos < m_History.size() && 
+                                    m_History[m_HistoryPos] == currentInput);
+            
             this->ExecCommand(m_InputBuffer.data());
             m_InputBuffer.front() = 0;
         }
@@ -280,9 +287,27 @@ void ImGui_Console::ExecCommand(char const* cmdline)
         }
 
         if (result.status) {
-            // Success - add to history
-            m_History.push_back(cmd.data());
+            // Success - handle history appropriately
+            std::string cmdStr(cmd.data());
+            
+            if (m_ExecutingFromHistory) {
+                // Command came from history - just move it to the top
+                auto it = std::find(m_History.begin(), m_History.end(), cmdStr);
+                if (it != m_History.end()) {
+                    m_History.erase(it);
+                    m_History.push_back(cmdStr);
+                }
+            } else {
+                // New command - remove if it exists and add to end
+                auto it = std::find(m_History.begin(), m_History.end(), cmdStr);
+                if (it != m_History.end()) {
+                    m_History.erase(it);
+                }
+                m_History.push_back(cmdStr);
+            }
+            
             m_HistoryPos = -1;
+            m_ExecutingFromHistory = false;
         }
         else {
             // Failure - show error message if output is empty
