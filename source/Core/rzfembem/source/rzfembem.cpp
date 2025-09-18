@@ -266,7 +266,7 @@ class FEMSolver2D : public ElementSolver {
     {
         // Use iterative solver for sparse system
         auto solver = Solver::SolverFactory::create(
-            Solver::SolverType::CUDA_GMRES);
+            Solver::SolverType::EIGEN_ITERATIVE_BICGSTAB);
 
         Eigen::VectorXf x = Eigen::VectorXf::Zero(b.size());
 
@@ -368,7 +368,7 @@ class FEMSolver3D : public ElementSolver {
         volumemesh_ = operand_to_openvolulemesh(geom_ptr);
 
         // Validate the volume mesh
-        validate_volume_mesh();
+//        validate_volume_mesh();
     }
 
     void validate_volume_mesh()
@@ -700,7 +700,7 @@ class FEMSolver3D : public ElementSolver {
         const Eigen::SparseMatrix<float>& A,
         const Eigen::VectorXf& b)
     {
-        auto solver = Solver::SolverFactory::create(Solver::SolverType::CUDA_GMRES);
+        auto solver = Solver::SolverFactory::create(Solver::SolverType::EIGEN_ITERATIVE_BICGSTAB);
 
         Eigen::VectorXf x = Eigen::VectorXf::Zero(b.size());
 
