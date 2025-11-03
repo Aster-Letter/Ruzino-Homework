@@ -107,7 +107,7 @@ jobs:
           
           exit 0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
   build-sdk:
     name: Build SDK
@@ -293,7 +293,7 @@ jobs:
             exit 1
           }
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Extract SDK
         shell: powershell
