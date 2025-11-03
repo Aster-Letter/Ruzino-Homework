@@ -126,13 +126,6 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Cache submodules
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          restore-keys: submodules-
-
       - name: Setup MSVC Build Tools
         shell: cmd
         run: |
@@ -277,13 +270,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Save submodules to cache
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          save-always: true
-
   restore-sdk:
     name: Restore or build SDK
     needs: [check-sdk, build-sdk]
@@ -295,13 +281,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
-
-      - name: Restore submodules from cache
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          restore-keys: submodules-
 
       - name: Download SDK from workflow artifact (if rebuilt)
         if: needs.check-sdk.outputs.needs-rebuild == 'true'
@@ -366,13 +345,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
-
-      - name: Restore submodules from cache
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          restore-keys: submodules-
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -497,13 +469,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
-
-      - name: Restore submodules from cache
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          restore-keys: submodules-
 
       - name: Setup Python
         uses: actions/setup-python@v4

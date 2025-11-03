@@ -372,12 +372,35 @@ def pack_sdk(dry_run=False):
             shutil.make_archive("SDK\\SDK", "zip", dst_dir)
             print(f"Packed {dst_dir} into SDK.zip")
 
-        # Delete the SDK_temp directory
+        # Delete the SDK_temp directory with retry logic
         if dry_run:
             print(f"[DRY RUN] Would delete {dst_dir}")
         else:
-            shutil.rmtree(dst_dir)
-            print(f"Deleted {dst_dir}")
+            import time
+            max_retries = 5
+            retry_count = 0
+            while retry_count < max_retries:
+                try:
+                    def remove_readonly(func, path, exc):
+                        """Error handler for shutil.rmtree to handle read-only files"""
+                        import stat
+                        if not os.access(path, os.W_OK):
+                            os.chmod(path, stat.S_IWUSR | stat.S_IREAD)
+                            func(path)
+                        else:
+                            raise
+                    
+                    shutil.rmtree(dst_dir, onerror=remove_readonly)
+                    print(f"Deleted {dst_dir}")
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        print(f"Warning: Failed to delete {dst_dir}, retrying ({retry_count}/{max_retries})...")
+                        time.sleep(1)
+                    else:
+                        print(f"Error: Failed to delete {dst_dir} after {max_retries} retries: {e}")
+                        print(f"SDK.zip has been created successfully, but temporary directory could not be cleaned up.")
 
 
 def find_and_replace(file_path, replacements):
