@@ -17,7 +17,6 @@ jobs:
     outputs:
       needs-rebuild: ${{ steps.check.outputs.needs-rebuild }}
       configure-hash: ${{ steps.check.outputs.configure-hash }}
-      sdk-from-release: ${{ steps.check.outputs.sdk-from-release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,54 +32,85 @@ jobs:
             $configureHash = (Get-FileHash configure.py).Hash
             Write-Output "configure-hash=$configureHash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             
+            $needsRebuild = $false
+            
+            # First check if configure.py changed
             $sdkDir = "SDK"
             $hashFile = Join-Path $sdkDir ".configure_hash"
-            $binariesDir = "Binaries"
             
-            $needsRebuild = $false
-            $sdkFromRelease = $false
-            
-            # Check if hash file exists and matches
             if (Test-Path -Path $hashFile) {
               $storedHash = (Get-Content $hashFile -Raw).Trim()
               if ($storedHash -ne $configureHash) {
                 Write-Output "configure.py changed, SDK rebuild required"
                 $needsRebuild = $true
               } else {
-                Write-Output "configure.py unchanged, checking if SDK exists locally or in release"
-                # Check if SDK binaries exist locally
-                $hasDebugBinaries = Test-Path -Path (Join-Path $binariesDir "Debug/bin")
-                $hasReleaseBinaries = Test-Path -Path (Join-Path $binariesDir "Release/bin")
+                Write-Output "configure.py unchanged, checking if SDK exists in remote Release..."
                 
-                if ($hasDebugBinaries -and $hasReleaseBinaries) {
-                  Write-Output "SDK binaries found locally, no rebuild needed"
+                # Check if SDK exists in GitHub Release
+                $tagName = "sdk-$configureHash"
+                $releaseExists = $false
+                
+                try {
+                  $releaseInfo = & gh release view $tagName --repo ${{ github.repository }} 2>$null
+                  if ($LASTEXITCODE -eq 0) {
+                    Write-Output "Found release with tag: $tagName"
+                    $releaseExists = $true
+                  } else {
+                    Write-Output "Release not found with tag: $tagName"
+                  }
+                } catch {
+                  Write-Output "Error checking release: $_"
+                }
+                
+                if ($releaseExists) {
+                  Write-Output "SDK exists in remote Release, no rebuild needed"
+                  $needsRebuild = $false
                 } else {
-                  Write-Output "SDK binaries not found locally, will check GitHub Release"
-                  $sdkFromRelease = $true
+                  Write-Output "SDK not found in remote Release, will rebuild and upload"
+                  $needsRebuild = $true
                 }
               }
             } else {
-              Write-Output "No hash file found, will check GitHub Release first"
-              $sdkFromRelease = $true
+              Write-Output "No hash file found, will check if SDK exists in remote Release..."
+              
+              # Check if SDK exists in GitHub Release with current hash
+              $tagName = "sdk-$configureHash"
+              $releaseExists = $false
+              
+              try {
+                $releaseInfo = & gh release view $tagName --repo ${{ github.repository }} 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Output "Found release with tag: $tagName"
+                  $releaseExists = $true
+                } else {
+                  Write-Output "Release not found with tag: $tagName"
+                }
+              } catch {
+                Write-Output "Error checking release: $_"
+              }
+              
+              if ($releaseExists) {
+                Write-Output "SDK exists in remote Release, will download instead of rebuild"
+                $needsRebuild = $false
+              } else {
+                Write-Output "SDK not found in remote Release, will rebuild and upload"
+                $needsRebuild = $true
+              }
             }
             
             if ($needsRebuild) {
               Write-Output "needs-rebuild=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "sdk-from-release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
               Write-Output "SDK rebuild needed"
-            } elseif ($sdkFromRelease) {
-              Write-Output "needs-rebuild=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "sdk-from-release=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "Will try to restore SDK from GitHub Release"
             } else {
               Write-Output "needs-rebuild=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "sdk-from-release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "SDK is up to date"
+              Write-Output "SDK is up to date, will restore from Release"
             }
           } catch {
             Write-Error "Error checking SDK: $_"
             exit 1
           }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-sdk:
     name: Build SDK
@@ -273,15 +303,15 @@ jobs:
           key: submodules-${{ hashFiles('.gitmodules') }}
           restore-keys: submodules-
 
-      - name: Download SDK if rebuilt
+      - name: Download SDK from workflow artifact (if rebuilt)
         if: needs.check-sdk.outputs.needs-rebuild == 'true'
         uses: actions/download-artifact@v4
         with:
           name: sdk-build
           path: SDK/
 
-      - name: Try to download SDK from GitHub Release
-        if: needs.check-sdk.outputs.sdk-from-release == 'true'
+      - name: Download SDK from GitHub Release (if not rebuilt)
+        if: needs.check-sdk.outputs.needs-rebuild == 'false'
         shell: powershell
         run: |
           try {
@@ -289,38 +319,25 @@ jobs:
             $tagName = "sdk-$configureHash"
             $sdkZip = "SDK/SDK.zip"
             
-            Write-Output "Attempting to download SDK from release with tag: $tagName"
+            Write-Output "Downloading SDK from release with tag: $tagName"
+            New-Item -ItemType Directory -Path "SDK" -Force -ErrorAction SilentlyContinue | Out-Null
             
-            # Use GitHub CLI to download the release asset
-            $releaseInfo = & gh release view $tagName --repo ${{ github.repository }} 2>$null
+            & gh release download $tagName --repo ${{ github.repository }} -p "SDK.zip" -O $sdkZip
             
-            if ($LASTEXITCODE -eq 0) {
-              Write-Output "Found release: $tagName"
-              & gh release download $tagName --repo ${{ github.repository }} -p "SDK.zip" -O $sdkZip 2>$null
-              
-              if (Test-Path -Path $sdkZip) {
-                Write-Output "SDK downloaded successfully from Release"
-                exit 0
-              } else {
-                Write-Output "Failed to download SDK from Release, will check for artifact"
-              }
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -Path $sdkZip)) {
+              Write-Output "SDK downloaded successfully from Release"
             } else {
-              Write-Output "Release not found with tag: $tagName"
+              Write-Output "ERROR: Failed to download SDK from Release"
+              exit 1
             }
           } catch {
-            Write-Output "Warning: Could not download from Release: $_"
+            Write-Error "Error downloading SDK: $_"
+            exit 1
           }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download SDK from workflow artifact (fallback)
-        if: needs.check-sdk.outputs.sdk-from-release == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: sdk-build
-          path: SDK/
-
-      - name: Restore SDK from cache
+      - name: Extract SDK
         shell: powershell
         run: |
           try {
@@ -328,18 +345,13 @@ jobs:
             if (Test-Path -Path $sdkZip) {
               Write-Output "Extracting SDK.zip..."
               Expand-Archive -Path $sdkZip -DestinationPath "SDK/" -Force
-              Write-Output "SDK restored successfully"
+              Write-Output "SDK extracted successfully"
             } else {
-              Write-Output "SDK.zip not found, checking for existing binaries..."
-              if ((Test-Path -Path "Binaries/Debug/bin") -and (Test-Path -Path "Binaries/Release/bin")) {
-                Write-Output "Existing binaries found, no extraction needed"
-              } else {
-                Write-Output "ERROR: No SDK available"
-                exit 1
-              }
+              Write-Output "ERROR: SDK.zip not found"
+              exit 1
             }
           } catch {
-            Write-Error "Error restoring SDK: $_"
+            Write-Error "Error extracting SDK: $_"
             exit 1
           }
 
