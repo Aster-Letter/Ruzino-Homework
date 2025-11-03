@@ -17,6 +17,7 @@ jobs:
     outputs:
       needs-rebuild: ${{ steps.check.outputs.needs-rebuild }}
       configure-hash: ${{ steps.check.outputs.configure-hash }}
+      sdk-from-release: ${{ steps.check.outputs.sdk-from-release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,6 +38,7 @@ jobs:
             $binariesDir = "Binaries"
             
             $needsRebuild = $false
+            $sdkFromRelease = $false
             
             # Check if hash file exists and matches
             if (Test-Path -Path $hashFile) {
@@ -45,27 +47,34 @@ jobs:
                 Write-Output "configure.py changed, SDK rebuild required"
                 $needsRebuild = $true
               } else {
-                Write-Output "configure.py unchanged"
+                Write-Output "configure.py unchanged, checking if SDK exists locally or in release"
+                # Check if SDK binaries exist locally
+                $hasDebugBinaries = Test-Path -Path (Join-Path $binariesDir "Debug/bin")
+                $hasReleaseBinaries = Test-Path -Path (Join-Path $binariesDir "Release/bin")
+                
+                if ($hasDebugBinaries -and $hasReleaseBinaries) {
+                  Write-Output "SDK binaries found locally, no rebuild needed"
+                } else {
+                  Write-Output "SDK binaries not found locally, will check GitHub Release"
+                  $sdkFromRelease = $true
+                }
               }
             } else {
-              Write-Output "No hash file found"
-              $needsRebuild = $true
-            }
-            
-            # Check if SDK binaries exist
-            $hasDebugBinaries = Test-Path -Path (Join-Path $binariesDir "Debug/bin")
-            $hasReleaseBinaries = Test-Path -Path (Join-Path $binariesDir "Release/bin")
-            
-            if (-not $hasDebugBinaries -or -not $hasReleaseBinaries) {
-              Write-Output "Missing binaries"
-              $needsRebuild = $true
+              Write-Output "No hash file found, will check GitHub Release first"
+              $sdkFromRelease = $true
             }
             
             if ($needsRebuild) {
               Write-Output "needs-rebuild=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "sdk-from-release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
               Write-Output "SDK rebuild needed"
+            } elseif ($sdkFromRelease) {
+              Write-Output "needs-rebuild=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "sdk-from-release=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "Will try to restore SDK from GitHub Release"
             } else {
               Write-Output "needs-rebuild=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "sdk-from-release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
               Write-Output "SDK is up to date"
             }
           } catch {
@@ -74,14 +83,12 @@ jobs:
           }
 
   build-sdk:
-    name: Build SDK - ${{ matrix.build-variant }}
+    name: Build SDK
     needs: check-sdk
     if: needs.check-sdk.outputs.needs-rebuild == 'true'
+    outputs:
+      configure-hash: ${{ needs.check-sdk.outputs.configure-hash }}
     runs-on: self-hosted
-    strategy:
-      matrix:
-        build-variant: [Debug, Release]
-      max-parallel: 2
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -126,16 +133,7 @@ jobs:
             Write-Output "Warning: Could not enable long path support: $_"
           }
 
-      - name: Clean previous build artifacts
-        shell: powershell
-        run: |
-          $variantDir = "Binaries/${{ matrix.build-variant }}"
-          if (Test-Path -Path $variantDir) {
-            Write-Output "Cleaning $variantDir"
-            Remove-Item -Recurse -Force $variantDir
-          }
-
-      - name: Build SDK - ${{ matrix.build-variant }}
+      - name: Build SDK - Debug
         shell: cmd
         run: |
           REM Initialize Visual Studio environment
@@ -151,60 +149,52 @@ jobs:
           git config --global core.longpaths true
           
           REM Build SDK
-          echo Building OpenUSD SDK with variant: ${{ matrix.build-variant }}
-          python configure.py --library openusd --build_variant ${{ matrix.build-variant }}
+          echo Building OpenUSD SDK with variant: Debug
+          python configure.py --library openusd --build_variant Debug
           if %ERRORLEVEL% neq 0 (
-            echo Build failed with error code %ERRORLEVEL%
+            echo Build Debug failed with error code %ERRORLEVEL%
             exit /b %ERRORLEVEL%
           )
 
-      - name: Verify build output
+      - name: Build SDK - Release
+        shell: cmd
+        run: |
+          REM Initialize Visual Studio environment
+          if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
+            call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat" (
+            call "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
+          ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
+            call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          )
+          
+          REM Enable Git long path support
+          git config --global core.longpaths true
+          
+          REM Build SDK
+          echo Building OpenUSD SDK with variant: Release
+          python configure.py --library openusd --build_variant Release
+          if %ERRORLEVEL% neq 0 (
+            echo Build Release failed with error code %ERRORLEVEL%
+            exit /b %ERRORLEVEL%
+          )
+
+      - name: Verify SDK build output
         shell: powershell
         run: |
           try {
-            $binDir = "Binaries/${{ matrix.build-variant }}"
-            if (Test-Path -Path $binDir) {
-              $fileCount = (Get-ChildItem -Path $binDir -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-              Write-Output "Build successful - $fileCount files in $binDir"
-            } else {
-              Write-Output "ERROR: Build directory not found!"
+            $debugSdk = Test-Path -Path "SDK/OpenUSD/Debug"
+            $releaseSdk = Test-Path -Path "SDK/OpenUSD/Release"
+            
+            Write-Output "Debug SDK present: $debugSdk"
+            Write-Output "Release SDK present: $releaseSdk"
+            
+            if (-not $debugSdk -or -not $releaseSdk) {
+              Write-Output "ERROR: SDK directories not found!"
               exit 1
             }
           } catch {
-            Write-Error "Error verifying build: $_"
-            exit 1
-          }
-
-      - name: Save submodules to cache
-        uses: actions/cache@v3
-        with:
-          path: external/
-          key: submodules-${{ hashFiles('.gitmodules') }}
-          save-always: true
-
-  pack-and-upload-sdk:
-    name: Pack SDK and upload
-    needs: build-sdk
-    if: success()
-    runs-on: self-hosted
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 1
-
-      - name: Verify all binaries are present
-        shell: powershell
-        run: |
-          $debugBin = Test-Path -Path "Binaries/Debug/bin"
-          $releaseBin = Test-Path -Path "Binaries/Release/bin"
-          
-          Write-Output "Debug binaries present: $debugBin"
-          Write-Output "Release binaries present: $releaseBin"
-          
-          if (-not $debugBin -or -not $releaseBin) {
-            Write-Output "ERROR: Missing binaries!"
+            Write-Error "Error verifying SDK: $_"
             exit 1
           }
 
@@ -238,28 +228,6 @@ jobs:
             exit 1
           }
 
-      - name: Create release artifacts
-        shell: powershell
-        run: |
-          Write-Output "Creating archive for release..."
-          $archivePath = "SDK-${{ github.sha }}.zip"
-          
-          # Since SDK.zip is already compressed, just copy it
-          Copy-Item -Path "SDK/SDK.zip" -Destination $archivePath
-          
-          if (Test-Path -Path $archivePath) {
-            $size = (Get-Item $archivePath).Length / 1GB
-            Write-Output "Archive created - Size: $([Math]::Round($size, 2)) GB"
-          }
-
-      - name: Upload SDK to GitHub release (if tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdk-release
-          path: SDK-*.zip
-          retention-days: 90
-
       - name: Upload SDK for workflow
         uses: actions/upload-artifact@v4
         with:
@@ -267,9 +235,28 @@ jobs:
           path: SDK/SDK.zip
           retention-days: 7
 
+      - name: Upload SDK to GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: SDK/SDK.zip
+          tag_name: sdk-${{ needs.check-sdk.outputs.configure-hash }}
+          body: "SDK build for configure.py hash: ${{ needs.check-sdk.outputs.configure-hash }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save submodules to cache
+        uses: actions/cache@v3
+        with:
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          save-always: true
+
   restore-sdk:
     name: Restore or build SDK
-    needs: [check-sdk, pack-and-upload-sdk]
+    needs: [check-sdk, build-sdk]
     if: always()
     runs-on: self-hosted
     steps:
@@ -288,6 +275,46 @@ jobs:
 
       - name: Download SDK if rebuilt
         if: needs.check-sdk.outputs.needs-rebuild == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-build
+          path: SDK/
+
+      - name: Try to download SDK from GitHub Release
+        if: needs.check-sdk.outputs.sdk-from-release == 'true'
+        shell: powershell
+        run: |
+          try {
+            $configureHash = "${{ needs.check-sdk.outputs.configure-hash }}"
+            $tagName = "sdk-$configureHash"
+            $sdkZip = "SDK/SDK.zip"
+            
+            Write-Output "Attempting to download SDK from release with tag: $tagName"
+            
+            # Use GitHub CLI to download the release asset
+            $releaseInfo = & gh release view $tagName --repo ${{ github.repository }} 2>$null
+            
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output "Found release: $tagName"
+              & gh release download $tagName --repo ${{ github.repository }} -p "SDK.zip" -O $sdkZip 2>$null
+              
+              if (Test-Path -Path $sdkZip) {
+                Write-Output "SDK downloaded successfully from Release"
+                exit 0
+              } else {
+                Write-Output "Failed to download SDK from Release, will check for artifact"
+              }
+            } else {
+              Write-Output "Release not found with tag: $tagName"
+            }
+          } catch {
+            Write-Output "Warning: Could not download from Release: $_"
+          }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download SDK from workflow artifact (fallback)
+        if: needs.check-sdk.outputs.sdk-from-release == 'true'
         uses: actions/download-artifact@v4
         with:
           name: sdk-build
