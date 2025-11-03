@@ -155,6 +155,16 @@ def process_usd(targets, dry_run=False, keep_original_files=True, copy_only=Fals
                 # Apply FindTBB.cmake patch after building
                 if target == "RelWithDebInfo":  # Only patch once for RelWithDebInfo
                     patch_findtbb_cmake(dry_run)
+                
+                # Enable long path support for Windows before building
+                import subprocess
+                try:
+                    # Enable Git long path support
+                    subprocess.run(["git", "config", "--global", "core.longpaths", "true"], check=False)
+                    print("Enabled Git long path support")
+                except Exception as e:
+                    print(f"Warning: Could not enable Git long path support: {e}")
+                
                 os.system(build_command)
                 
 

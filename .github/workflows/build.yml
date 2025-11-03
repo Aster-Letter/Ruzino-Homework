@@ -89,15 +89,12 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Restore submodule cache
+      - name: Cache submodules
         uses: actions/cache@v3
         with:
-          path: |
-            external/
-          key: submodules-cache-${{ hashFiles('.gitmodules') }}-${{ github.sha }}
-          restore-keys: |
-            submodules-cache-${{ hashFiles('.gitmodules') }}-
-            submodules-cache-
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          restore-keys: submodules-
 
       - name: Setup MSVC Build Tools
         shell: cmd
@@ -113,6 +110,21 @@ jobs:
             echo Visual Studio not found at expected locations
             exit /b 1
           )
+
+      - name: Enable Windows long path support
+        shell: powershell
+        run: |
+          try {
+            # Enable Git long path support
+            & git config --global core.longpaths true
+            Write-Output "Git long path support enabled"
+            
+            # Enable Windows long path support in registry (if running with admin)
+            # This is commented out as it requires admin, but Git long path should be sufficient
+            # New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -Force
+          } catch {
+            Write-Output "Warning: Could not enable long path support: $_"
+          }
 
       - name: Clean previous build artifacts
         shell: powershell
@@ -134,6 +146,9 @@ jobs:
           ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
             call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           )
+          
+          REM Enable Git long path support
+          git config --global core.longpaths true
           
           REM Build SDK
           echo Building OpenUSD SDK with variant: ${{ matrix.build-variant }}
@@ -159,6 +174,13 @@ jobs:
             Write-Error "Error verifying build: $_"
             exit 1
           }
+
+      - name: Save submodules to cache
+        uses: actions/cache@v3
+        with:
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          save-always: true
 
   pack-and-upload-sdk:
     name: Pack SDK and upload
@@ -257,6 +279,13 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Restore submodules from cache
+        uses: actions/cache@v3
+        with:
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          restore-keys: submodules-
+
       - name: Download SDK if rebuilt
         if: needs.check-sdk.outputs.needs-rebuild == 'true'
         uses: actions/download-artifact@v4
@@ -298,6 +327,13 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
+
+      - name: Restore submodules from cache
+        uses: actions/cache@v3
+        with:
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          restore-keys: submodules-
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -422,6 +458,13 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
+
+      - name: Restore submodules from cache
+        uses: actions/cache@v3
+        with:
+          path: external/
+          key: submodules-${{ hashFiles('.gitmodules') }}
+          restore-keys: submodules-
 
       - name: Setup Python
         uses: actions/setup-python@v4
