@@ -34,7 +34,7 @@ jobs:
 
       - name: Check SDK status
         id: check
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $configureHash = (Get-FileHash configure.py).Hash
@@ -116,7 +116,7 @@ jobs:
             submodules-cache-
 
       - name: Clean previous build artifacts
-        shell: pwsh
+        shell: powershell
         run: |
           $variantDir = "Binaries/${{ matrix.build-variant }}"
           if (Test-Path -Path $variantDir) {
@@ -125,13 +125,13 @@ jobs:
           }
 
       - name: Build SDK - ${{ matrix.build-variant }}
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Output "Building OpenUSD SDK with variant: ${{ matrix.build-variant }}"
           python configure.py --library openusd --build_variant ${{ matrix.build-variant }}
 
       - name: Verify build output
-        shell: pwsh
+        shell: powershell
         run: |
           $binDir = "Binaries/${{ matrix.build-variant }}"
           if (Test-Path -Path $binDir) {
@@ -163,7 +163,7 @@ jobs:
             git-cache-
 
       - name: Verify all binaries are present
-        shell: pwsh
+        shell: powershell
         run: |
           $debugBin = Test-Path -Path "Binaries/Debug/bin"
           $releaseBin = Test-Path -Path "Binaries/Release/bin"
@@ -177,7 +177,7 @@ jobs:
           }
 
       - name: Pack SDK
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Output "Packing SDK..."
           python configure.py --pack
@@ -191,7 +191,7 @@ jobs:
           }
 
       - name: Store configure hash
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $configureHash = (Get-FileHash configure.py).Hash
@@ -207,7 +207,7 @@ jobs:
           }
 
       - name: Create release artifacts
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Output "Creating archive for release..."
           $archivePath = "SDK-${{ github.sha }}.zip"
@@ -263,7 +263,7 @@ jobs:
           path: SDK/
 
       - name: Restore SDK from cache
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $sdkZip = "SDK/SDK.zip"
@@ -311,7 +311,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             python -m pip install --upgrade pip
@@ -324,7 +324,7 @@ jobs:
           }
 
       - name: Configure CMake (No CUDA)
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $buildDir = "build_nocuda"
@@ -346,7 +346,7 @@ jobs:
           }
 
       - name: Build (No CUDA)
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             Push-Location build_nocuda
@@ -358,7 +358,7 @@ jobs:
           }
 
       - name: Install (No CUDA)
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             Push-Location build_nocuda
@@ -402,7 +402,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             python -m pip install --upgrade pip
@@ -416,7 +416,7 @@ jobs:
 
       - name: Check CUDA availability
         id: cuda-check
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             if (Test-Path -Env:CUDA_PATH) {
@@ -434,7 +434,7 @@ jobs:
 
       - name: Configure CMake (With CUDA)
         if: steps.cuda-check.outputs.cuda-available == 'true'
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $buildDir = "build_cuda"
@@ -458,7 +458,7 @@ jobs:
 
       - name: Build (With CUDA)
         if: steps.cuda-check.outputs.cuda-available == 'true'
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             Push-Location build_cuda
@@ -471,7 +471,7 @@ jobs:
 
       - name: Install (With CUDA)
         if: steps.cuda-check.outputs.cuda-available == 'true'
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             Push-Location build_cuda
@@ -484,7 +484,7 @@ jobs:
 
       - name: CUDA not available
         if: steps.cuda-check.outputs.cuda-available == 'false'
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Output "CUDA is not available on this runner"
           Write-Output "Skipping CUDA build"
@@ -517,7 +517,7 @@ jobs:
             git-cache-
 
       - name: Print summary
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             Write-Output ""
