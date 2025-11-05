@@ -202,6 +202,14 @@ jobs:
             Write-Output "Warning: Could not enable long path support: $_"
           }
 
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          Write-Output "Installing Python dependencies..."
+          python -m pip install --upgrade pip
+          python -m pip install requests tqdm
+          Write-Output "✓ Dependencies installed"
+
       - name: Build SDK - All libraries (except OpenUSD for debugging)
         shell: powershell
         run: |
