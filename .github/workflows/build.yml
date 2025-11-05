@@ -61,30 +61,26 @@ jobs:
           fetch-depth: 1
 
       - name: Setup MSVC Build Tools
-        shell: powershell
+        shell: cmd
         run: |
-          $vsVersions = @("Community", "Professional", "Enterprise")
-          $msvcInitialized = $false
+          setlocal enabledelayedexpansion
           
-          foreach ($version in $vsVersions) {
-            $vcvarsPath = "C:\Program Files\Microsoft Visual Studio\2022\$version\VC\Auxiliary\Build\vcvars64.bat"
-            if (Test-Path $vcvarsPath) {
-              Write-Output "Initializing MSVC from $version edition"
-              & cmd /c "call `"$vcvarsPath`" && set" | Where-Object { $_ -match '=' } | ForEach-Object {
-                $name, $value = $_.split('=', 2)
-                if ($name -and $value) {
-                  [Environment]::SetEnvironmentVariable($name, $value)
-                }
-              }
-              $msvcInitialized = $true
-              break
-            }
-          }
+          REM Find and initialize MSVC
+          set MSVC_INIT=
+          for %%v in (Community Professional Enterprise) do (
+            if exist "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat" (
+              echo Initializing MSVC from %%v edition
+              call "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat"
+              set MSVC_INIT=1
+              goto msvc_initialized
+            )
+          )
           
-          if (-not $msvcInitialized) {
-            Write-Error "Visual Studio 2022 not found"
-            exit 1
-          }
+          :msvc_initialized
+          if not defined MSVC_INIT (
+            echo Visual Studio 2022 not found
+            exit /b 1
+          )
 
       - name: Enable Windows long path support
         shell: powershell
@@ -102,39 +98,34 @@ jobs:
           }
 
       - name: Build SDK - All libraries (except OpenUSD for debugging)
-        shell: powershell
+        shell: cmd
         run: |
-          # Initialize MSVC Build Tools environment inline
-          $vsVersions = @("Community", "Professional", "Enterprise")
-          $msvcInitialized = $false
+          setlocal enabledelayedexpansion
           
-          foreach ($version in $vsVersions) {
-            $vcvarsPath = "C:\Program Files\Microsoft Visual Studio\2022\$version\VC\Auxiliary\Build\vcvars64.bat"
-            if (Test-Path $vcvarsPath) {
-              Write-Output "Initializing MSVC from $version edition"
-              & cmd /c "call `"$vcvarsPath`" && set" | Where-Object { $_ -match '=' } | ForEach-Object {
-                $name, $value = $_.split('=', 2)
-                if ($name -and $value) {
-                  [Environment]::SetEnvironmentVariable($name, $value)
-                }
-              }
-              $msvcInitialized = $true
-              break
-            }
-          }
+          REM Find and initialize MSVC
+          set MSVC_INIT=
+          for %%v in (Community Professional Enterprise) do (
+            if exist "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat" (
+              echo Initializing MSVC from %%v edition
+              call "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat"
+              set MSVC_INIT=1
+              goto msvc_initialized
+            )
+          )
           
-          if (-not $msvcInitialized) {
-            Write-Error "Visual Studio 2022 not found"
-            exit 1
-          }
+          :msvc_initialized
+          if not defined MSVC_INIT (
+            echo Visual Studio 2022 not found
+            exit /b 1
+          )
           
-          # Build SDK
-          Write-Output "Building SDK with all libraries"
+          REM Build SDK
+          echo Building SDK with all libraries
           python configure.py --all
-          if ($LASTEXITCODE -ne 0) {
-            Write-Output "Build failed with error code $LASTEXITCODE"
-            exit $LASTEXITCODE
-          }
+          if %ERRORLEVEL% neq 0 (
+            echo Build failed with error code %ERRORLEVEL%
+            exit /b %ERRORLEVEL%
+          )
 
       - name: Verify SDK build output
         shell: powershell
@@ -395,30 +386,26 @@ jobs:
           }
 
       - name: Setup MSVC Build Tools
-        shell: powershell
+        shell: cmd
         run: |
-          $vsVersions = @("Community", "Professional", "Enterprise")
-          $msvcInitialized = $false
+          setlocal enabledelayedexpansion
           
-          foreach ($version in $vsVersions) {
-            $vcvarsPath = "C:\Program Files\Microsoft Visual Studio\2022\$version\VC\Auxiliary\Build\vcvars64.bat"
-            if (Test-Path $vcvarsPath) {
-              Write-Output "Initializing MSVC from $version edition"
-              & cmd /c "call `"$vcvarsPath`" && set" | Where-Object { $_ -match '=' } | ForEach-Object {
-                $name, $value = $_.split('=', 2)
-                if ($name -and $value) {
-                  [Environment]::SetEnvironmentVariable($name, $value)
-                }
-              }
-              $msvcInitialized = $true
-              break
-            }
-          }
+          REM Find and initialize MSVC
+          set MSVC_INIT=
+          for %%v in (Community Professional Enterprise) do (
+            if exist "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat" (
+              echo Initializing MSVC from %%v edition
+              call "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat"
+              set MSVC_INIT=1
+              goto msvc_initialized
+            )
+          )
           
-          if (-not $msvcInitialized) {
-            Write-Error "Visual Studio 2022 not found"
-            exit 1
-          }
+          :msvc_initialized
+          if not defined MSVC_INIT (
+            echo Visual Studio 2022 not found
+            exit /b 1
+          )
 
       - name: Configure CMake (No CUDA)
         shell: cmd
@@ -553,30 +540,26 @@ jobs:
           }
 
       - name: Setup MSVC Build Tools
-        shell: powershell
+        shell: cmd
         run: |
-          $vsVersions = @("Community", "Professional", "Enterprise")
-          $msvcInitialized = $false
+          setlocal enabledelayedexpansion
           
-          foreach ($version in $vsVersions) {
-            $vcvarsPath = "C:\Program Files\Microsoft Visual Studio\2022\$version\VC\Auxiliary\Build\vcvars64.bat"
-            if (Test-Path $vcvarsPath) {
-              Write-Output "Initializing MSVC from $version edition"
-              & cmd /c "call `"$vcvarsPath`" && set" | Where-Object { $_ -match '=' } | ForEach-Object {
-                $name, $value = $_.split('=', 2)
-                if ($name -and $value) {
-                  [Environment]::SetEnvironmentVariable($name, $value)
-                }
-              }
-              $msvcInitialized = $true
-              break
-            }
-          }
+          REM Find and initialize MSVC
+          set MSVC_INIT=
+          for %%v in (Community Professional Enterprise) do (
+            if exist "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat" (
+              echo Initializing MSVC from %%v edition
+              call "C:\Program Files\Microsoft Visual Studio\2022\%%v\VC\Auxiliary\Build\vcvars64.bat"
+              set MSVC_INIT=1
+              goto msvc_initialized
+            )
+          )
           
-          if (-not $msvcInitialized) {
-            Write-Error "Visual Studio 2022 not found"
-            exit 1
-          }
+          :msvc_initialized
+          if not defined MSVC_INIT (
+            echo Visual Studio 2022 not found
+            exit /b 1
+          )
 
       - name: Configure CMake (With CUDA)
         if: steps.cuda-check.outputs.cuda-available == 'true'
