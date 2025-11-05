@@ -28,39 +28,26 @@ def copytree_common_to_binaries(folder, target="Debug", dst=None, dry_run=False)
 
 
 def copy_python_dlls_to_binaries(targets, dry_run=False):
-    """Copy Python DLLs from SDK/python to Binaries/{target}/bin for each target"""
+    """Copy entire Python directory contents from SDK/python to Binaries/{target}/ for each target"""
     sdk_python_dir = os.path.join(os.path.dirname(__file__), "SDK", "python")
     if not os.path.exists(sdk_python_dir):
         return
     
     for target in targets:
-        bin_dir = os.path.join(os.getcwd(), "Binaries", target)
-        os.makedirs(bin_dir, exist_ok=True)
+        target_dir = os.path.join(os.getcwd(), "Binaries", target)
         
-        # Copy Python DLLs from SDK python directory
-        for file in os.listdir(sdk_python_dir):
-            if file.endswith(".dll"):
-                src_file = os.path.join(sdk_python_dir, file)
-                dst_file = os.path.join(bin_dir, file)
-                if dry_run:
-                    print(f"  [DRY RUN] Would copy Python DLL: {file}")
-                else:
-                    shutil.copy2(src_file, dst_file)
-        
-        # Also copy DLLs from SDK python/DLLs directory if exists
-        dlls_dir = os.path.join(sdk_python_dir, "DLLs")
-        if os.path.exists(dlls_dir):
-            for file in os.listdir(dlls_dir):
-                if file.endswith(".dll"):
-                    src_file = os.path.join(dlls_dir, file)
-                    dst_file = os.path.join(bin_dir, file)
-                    if dry_run:
-                        print(f"  [DRY RUN] Would copy Python DLL: {file}")
-                    else:
-                        shutil.copy2(src_file, dst_file)
+        if dry_run:
+            print(f"  [DRY RUN] Would copy Python directory to Binaries/{target}/")
+        else:
+            os.makedirs(target_dir, exist_ok=True)
+            
+            # Use copytree with dirs_exist_ok to copy entire python directory efficiently
+            shutil.copytree(sdk_python_dir, target_dir, dirs_exist_ok=True)
+            
+            print(f"  Copied Python directory to Binaries/{target}/")
     
-    if not dry_run:
-        print(f"  Copied Python DLLs from SDK to Binaries for targets: {targets}")
+    if not dry_run and targets:
+        print(f"  Copied entire Python installation from SDK to Binaries for targets: {targets}")
 
 
 def download_with_progress(url, zip_path, dry_run=False):
@@ -238,6 +225,7 @@ import subprocess
 def extract_and_setup_sdk(sdk_zip_path, targets=None, dry_run=False):
     """
     Extract SDK.zip and copy its contents to Binaries folder for each build type.
+    Uses the same copy logic as --copy-only --all.
     
     Args:
         sdk_zip_path: Path to SDK.zip file (relative to project root)
@@ -270,47 +258,54 @@ def extract_and_setup_sdk(sdk_zip_path, targets=None, dry_run=False):
         else:
             print(f"[DRY RUN] Would extract {sdk_zip} to {sdk_dir}")
         
-        # Copy SDK content to Binaries for each target
-        print("\nSetting up SDK structure for builds...")
+        # Copy SDK content to Binaries using the same logic as --copy-only --all
+        print("\nSetting up SDK structure for builds (using --copy-only --all logic)...")
         
-        sdk_bin = os.path.join(sdk_dir, "OpenUSD", "bin")
-        sdk_lib = os.path.join(sdk_dir, "OpenUSD", "lib")
-        sdk_include = os.path.join(sdk_dir, "OpenUSD", "include")
-        sdk_plugin = os.path.join(sdk_dir, "OpenUSD", "plugin")
-        sdk_libraries = os.path.join(sdk_dir, "OpenUSD", "libraries")
-        sdk_resources = os.path.join(sdk_dir, "OpenUSD", "resources")
-        
-        binaries_dir = os.path.join(project_root, "Binaries")
-        
+        # Copy OpenUSD components
         for target in targets:
-            target_dir = os.path.join(binaries_dir, target)
-            
-            if not dry_run:
-                os.makedirs(target_dir, exist_ok=True)
-            
-            # Copy each component
-            components = [
-                (sdk_bin, "bin"),
-                (sdk_lib, "lib"),
-                (sdk_include, "include"),
-                (sdk_plugin, "plugin"),
-                (sdk_libraries, "libraries"),
-                (sdk_resources, "resources"),
-            ]
-            
-            for src_path, dst_name in components:
-                if os.path.exists(src_path):
-                    dest_path = os.path.join(target_dir, dst_name)
-                    
-                    if not dry_run:
-                        if os.path.exists(dest_path):
-                            shutil.rmtree(dest_path)
-                        shutil.copytree(src_path, dest_path)
-                        print(f"  Copied {dst_name} to Binaries/{target}")
-                    else:
-                        print(f"  [DRY RUN] Would copy {dst_name} to Binaries/{target}")
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "bin"), target=target, dry_run=dry_run
+            )
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "lib"), target=target, dry_run=dry_run
+            )
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "plugin"), target=target, dry_run=dry_run
+            )
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "libraries"),
+                target=target,
+                dst="libraries",
+                dry_run=dry_run,
+            )
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "resources"),
+                target=target,
+                dst="resources",
+                dry_run=dry_run,
+            )
         
-        # Copy Python DLLs using the shared function (same as copy_only mode)
+        # Copy Slang
+        folders = {"slang": "slang/bin", "d3d12": "d3d12/bin", "dxc": "dxc/bin/x64"}
+        for target in targets:
+            copytree_common_to_binaries(
+                folders["slang"], target=target, dry_run=dry_run
+            )
+        
+        # Copy D3D12 (Windows only)
+        if os.name == "nt":
+            for target in targets:
+                copytree_common_to_binaries(
+                    folders["d3d12"], target=target, dry_run=dry_run
+                )
+        
+        # Copy DXC
+        for target in targets:
+            copytree_common_to_binaries(
+                folders["dxc"], target=target, dry_run=dry_run
+            )
+        
+        # Copy Python DLLs
         copy_python_dlls_to_binaries(targets, dry_run=dry_run)
         
         print("✓ SDK structure setup complete")

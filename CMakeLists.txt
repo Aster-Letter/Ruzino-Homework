@@ -177,12 +177,10 @@ option(ENABLE_SUBMISSION "Enable USTC Homework Submission" OFF)
 if (ENABLE_SUBMISSION)
     set(editor_dir ${CMAKE_CURRENT_SOURCE_DIR}/source/Editor)
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/submissions_inner)
-      message(STATUS [./SUBMISSION FOUND])
       add_subdirectory(submissions_inner)
     endif ()
     
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../submissions)
-      message(STATUS [../SUBMISSION FOUND])
       get_filename_component(
         ABS_SUBMISSION
         ${CMAKE_CURRENT_SOURCE_DIR}/../submissions
