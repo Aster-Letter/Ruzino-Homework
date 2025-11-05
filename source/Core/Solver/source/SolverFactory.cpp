@@ -7,9 +7,11 @@ USTC_CG_NAMESPACE_OPEN_SCOPE
 namespace Solver {
 
 // Forward declarations of factory functions
+#if USTC_CG_WITH_CUDA
 std::unique_ptr<LinearSolver> createCudaCGSolver();
 std::unique_ptr<LinearSolver> createCudaBiCGStabSolver();  // 新增
 std::unique_ptr<LinearSolver> createCudaGMRESSolver();     // 新增
+#endif
 std::unique_ptr<LinearSolver> createEigenCGSolver();
 std::unique_ptr<LinearSolver> createEigenBiCGStabSolver();
 std::unique_ptr<LinearSolver> createEigenLUSolver();
@@ -19,8 +21,10 @@ std::unique_ptr<LinearSolver> createEigenQRSolver();
 using SolverCreator = std::function<std::unique_ptr<LinearSolver>()>;
 
 static std::unordered_map<SolverType, SolverCreator> solverRegistry = {
+#if USTC_CG_WITH_CUDA
     { SolverType::CUDA_CG, createCudaCGSolver },
     { SolverType::CUDA_BICGSTAB, createCudaBiCGStabSolver },  // 新增
+#endif
     { SolverType::EIGEN_ITERATIVE_CG, createEigenCGSolver },
     { SolverType::EIGEN_ITERATIVE_BICGSTAB, createEigenBiCGStabSolver },
     { SolverType::EIGEN_DIRECT_LU, createEigenLUSolver },
@@ -29,8 +33,10 @@ static std::unordered_map<SolverType, SolverCreator> solverRegistry = {
 };
 
 static std::unordered_map<SolverType, std::string> solverNames = {
+#if USTC_CG_WITH_CUDA
     { SolverType::CUDA_CG, "CUDA Conjugate Gradient" },
     { SolverType::CUDA_BICGSTAB, "CUDA BiCGSTAB" },  // 新增
+#endif
     { SolverType::EIGEN_ITERATIVE_CG, "Eigen Conjugate Gradient" },
     { SolverType::EIGEN_ITERATIVE_BICGSTAB, "Eigen BiCGSTAB" },
     { SolverType::EIGEN_DIRECT_LU, "Eigen Sparse LU" },
@@ -42,11 +48,13 @@ std::unique_ptr<LinearSolver> SolverFactory::create(SolverType type)
 {
     try {
         switch (type) {
+#if USTC_CG_WITH_CUDA
             case SolverType::CUDA_CG: return createCudaCGSolver();
             case SolverType::CUDA_BICGSTAB:
                 return createCudaBiCGStabSolver();  // 新增
             case SolverType::CUDA_GMRES:
                 return createCudaGMRESSolver();  // 新增
+#endif
             case SolverType::EIGEN_ITERATIVE_CG: return createEigenCGSolver();
             case SolverType::EIGEN_ITERATIVE_BICGSTAB:
                 return createEigenBiCGStabSolver();
@@ -68,9 +76,12 @@ std::vector<SolverType> SolverFactory::getAvailableTypes()
     std::vector<SolverType> types;
 
     // Try to create each solver to check availability
-    std::vector<SolverType> all_types = { SolverType::CUDA_CG,
+    std::vector<SolverType> all_types = {
+#if USTC_CG_WITH_CUDA
+                                          SolverType::CUDA_CG,
                                           SolverType::CUDA_BICGSTAB,  // 新增
                                           SolverType::CUDA_GMRES,     // 新增
+#endif
                                           SolverType::EIGEN_ITERATIVE_CG,
                                           SolverType::EIGEN_ITERATIVE_BICGSTAB/*,
                                           SolverType::EIGEN_DIRECT_LU,
@@ -97,9 +108,11 @@ std::vector<SolverType> SolverFactory::getAvailableTypes()
 std::string SolverFactory::getTypeName(SolverType type)
 {
     switch (type) {
+#if USTC_CG_WITH_CUDA
         case SolverType::CUDA_CG: return "CUDA Conjugate Gradient";
         case SolverType::CUDA_BICGSTAB: return "CUDA BiCGSTAB";
         case SolverType::CUDA_GMRES: return "CUDA GMRES";  // 新增
+#endif
         case SolverType::EIGEN_ITERATIVE_CG: return "Eigen Conjugate Gradient";
         case SolverType::EIGEN_ITERATIVE_BICGSTAB: return "Eigen BiCGSTAB";
         case SolverType::EIGEN_DIRECT_LU: return "Eigen Sparse LU";

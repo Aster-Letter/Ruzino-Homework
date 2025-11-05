@@ -1,11 +1,9 @@
-#define USTC_CG_WITH_CUDA 1
 #include <gtest/gtest.h>
 #include <nvrhi/nvrhi.h>
 
 #include "GUI/image_widget.hpp"
 #include "GUI/widget.h"
 #include "GUI/window.h"
-#include "RHI/internal/cuda_extension.hpp"
 #include "RHI/rhi.hpp"
 #include "imgui.h"
 
