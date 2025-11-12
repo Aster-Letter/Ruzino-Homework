@@ -1,7 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include "widgets/usdtree/usd_fileviewer.h"
-
+#include "macro_map.h"
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -22,6 +22,177 @@
 #include "pxr/usd/usdGeom/xformOp.h"
 #include "stage/stage.hpp"
 USTC_CG_NAMESPACE_OPEN_SCOPE
+
+// Macro for creating drag float component controls (X/Y/Z)
+#define DRAG_FLOAT_COMPONENT(label, var, index, modified_flag) \
+    ImGui::Text(label ":"); ImGui::SameLine(); \
+    if (ImGui::DragFloat("##" label, &var, 0.1f, -1000.f, 1000.f, "%.2f")) { \
+        modified_flag = true; \
+    } \
+    ImGui::SameLine();
+
+// Macro for creating rotation component controls with custom range
+#define DRAG_ROT_COMPONENT(label, var, index, eulerVec, modified_flag, min_val, max_val) \
+    ImGui::Text(label ":"); ImGui::SameLine(); \
+    if (ImGui::DragFloat("##rot_" label, &var, 1.0f, min_val, max_val, "%.1f°")) { \
+        eulerVec[index] = var; \
+        modified_flag = true; \
+    } \
+    ImGui::SameLine();
+
+// Macro for creating scale component controls
+#define DRAG_SCALE_COMPONENT(label, var, scaleVec, index, modified_flag) \
+    ImGui::Text(label ":"); ImGui::SameLine(); \
+    if (ImGui::DragFloat("##scale_" label, &var, 0.01f, 0.001f, 100.f, "%.3f")) { \
+        scaleVec[index] = var; \
+        modified_flag = true; \
+    } \
+    ImGui::SameLine();
+
+// Macro for simple scalar attribute handling
+#define HANDLE_SCALAR_ATTR(Type, ImGuiFunc, ...) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        if (ImGuiFunc("##value", &value, __VA_ARGS__)) { \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for DragScalar types
+#define HANDLE_DRAGSCALAR_ATTR(Type, DataType) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        if (ImGui::DragScalar("##value", DataType, &value, 1.0f)) { \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for vector attribute handling with optional color editing
+#define HANDLE_VEC_ATTR(Type, dim) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        if (ImGui::DragFloat##dim("##value", value.data(), 0.01f)) { \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for vector attribute with color support
+#define HANDLE_VEC_ATTR_COLOR(Type, dim) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        if (attrName.find("color") != std::string::npos || \
+            attrName.find("Color") != std::string::npos) { \
+            if (ImGui::ColorEdit##dim("##value", value.data())) { \
+                attr.Set(value); \
+            } \
+        } \
+        else { \
+            if (ImGui::DragFloat##dim("##value", value.data(), 0.01f)) { \
+                attr.Set(value); \
+            } \
+        } \
+    }
+
+// Macro for double vector attribute handling with float conversion
+#define HANDLE_VECD_ATTR(Type, dim) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        float tmp[dim]; \
+        for (int i = 0; i < dim; ++i) tmp[i] = static_cast<float>(value[i]); \
+        if (ImGui::DragFloat##dim("##value", tmp, 0.01f)) { \
+            for (int i = 0; i < dim; ++i) value[i] = static_cast<double>(tmp[i]); \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for double vector attribute with color support
+#define HANDLE_VECD_ATTR_COLOR(Type, dim) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        float tmp[dim]; \
+        for (int i = 0; i < dim; ++i) tmp[i] = static_cast<float>(value[i]); \
+        bool changed = false; \
+        if (attrName.find("color") != std::string::npos || \
+            attrName.find("Color") != std::string::npos) { \
+            changed = ImGui::ColorEdit##dim("##value", tmp); \
+        } \
+        else { \
+            changed = ImGui::DragFloat##dim("##value", tmp, 0.01f); \
+        } \
+        if (changed) { \
+            for (int i = 0; i < dim; ++i) value[i] = static_cast<double>(tmp[i]); \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for integer vector attribute handling
+#define HANDLE_VECI_ATTR(Type, dim) \
+    else if (v.IsHolding<Type>()) { \
+        Type value = v.Get<Type>(); \
+        if (ImGui::DragInt##dim("##value", value.data())) { \
+            attr.Set(value); \
+        } \
+    }
+
+// Macro for array preview display - scalar types
+#define PREVIEW_SCALAR_ARRAY(ArrType, format) \
+    else if (v.IsHolding<ArrType>()) { \
+        auto arr = v.Get<ArrType>(); \
+        for (size_t i = 0; i < previewCount; ++i) { \
+            ImGui::Text(format, i, arr[i]); \
+        } \
+        if (hasMore) { \
+            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+            for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
+                ImGui::Text(format, i, arr[i]); \
+            } \
+        } \
+    }
+
+// Macro for array preview display - Vec2 types
+#define PREVIEW_VEC2_ARRAY(ArrType) \
+    else if (v.IsHolding<ArrType>()) { \
+        auto arr = v.Get<ArrType>(); \
+        for (size_t i = 0; i < previewCount; ++i) { \
+            ImGui::Text("[%zu]: (%.3f, %.3f)", i, arr[i][0], arr[i][1]); \
+        } \
+        if (hasMore) { \
+            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+            for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
+                ImGui::Text("[%zu]: (%.3f, %.3f)", i, arr[i][0], arr[i][1]); \
+            } \
+        } \
+    }
+
+// Macro for array preview display - Vec3 types
+#define PREVIEW_VEC3_ARRAY(ArrType) \
+    else if (v.IsHolding<ArrType>()) { \
+        auto arr = v.Get<ArrType>(); \
+        for (size_t i = 0; i < previewCount; ++i) { \
+            ImGui::Text("[%zu]: (%.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2]); \
+        } \
+        if (hasMore) { \
+            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+            for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
+                ImGui::Text("[%zu]: (%.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2]); \
+            } \
+        } \
+    }
+
+// Macro for array preview display - Vec4 types
+#define PREVIEW_VEC4_ARRAY(ArrType) \
+    else if (v.IsHolding<ArrType>()) { \
+        auto arr = v.Get<ArrType>(); \
+        for (size_t i = 0; i < previewCount; ++i) { \
+            ImGui::Text("[%zu]: (%.3f, %.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2], arr[i][3]); \
+        } \
+        if (hasMore) { \
+            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+            for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
+                ImGui::Text("[%zu]: (%.3f, %.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2], arr[i][3]); \
+            } \
+        } \
+    }
 void UsdFileViewer::ShowFileTree()
 {
     auto root = stage->get_usd_stage()->GetPseudoRoot();
@@ -298,25 +469,12 @@ void UsdFileViewer::EditValue()
                 float itemWidth = (availWidth - 120.0f) / 3.0f;  // 120 for labels and spacing
                 
                 ImGui::PushItemWidth(itemWidth);
-                ImGui::Text("X:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##trans_x", &trans_tmp[0], 0.1f, -1000.f, 1000.f, "%.2f")) {
-                    translation[0] = trans_tmp[0];
-                    modified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Y:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##trans_y", &trans_tmp[1], 0.1f, -1000.f, 1000.f, "%.2f")) {
-                    translation[1] = trans_tmp[1];
-                    modified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Z:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##trans_z", &trans_tmp[2], 0.1f, -1000.f, 1000.f, "%.2f")) {
-                    translation[2] = trans_tmp[2];
-                    modified = true;
-                }
+                DRAG_FLOAT_COMPONENT("X", trans_tmp[0], 0, modified)
+                translation[0] = trans_tmp[0];
+                DRAG_FLOAT_COMPONENT("Y", trans_tmp[1], 1, modified)
+                translation[1] = trans_tmp[1];
+                DRAG_FLOAT_COMPONENT("Z", trans_tmp[2], 2, modified)
+                translation[2] = trans_tmp[2];
                 ImGui::PopItemWidth();
                 ImGui::Unindent();
 
@@ -332,25 +490,9 @@ void UsdFileViewer::EditValue()
                 ImGui::PushItemWidth(itemWidth);
                 bool rotModified = false;
 
-                ImGui::Text("X:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##rot_x", &rot_tmp[0], 1.0f, -180.f, 180.f, "%.1f°")) {
-                    eulerXYZ[0] = rot_tmp[0];
-                    rotModified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Y:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##rot_y", &rot_tmp[1], 1.0f, -89.9f, 89.9f, "%.1f°")) {
-                    eulerXYZ[1] = rot_tmp[1];
-                    rotModified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Z:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##rot_z", &rot_tmp[2], 1.0f, -180.f, 180.f, "%.1f°")) {
-                    eulerXYZ[2] = rot_tmp[2];
-                    rotModified = true;
-                }
+                DRAG_ROT_COMPONENT("X", rot_tmp[0], 0, eulerXYZ, rotModified, -180.f, 180.f)
+                DRAG_ROT_COMPONENT("Y", rot_tmp[1], 1, eulerXYZ, rotModified, -89.9f, 89.9f)
+                DRAG_ROT_COMPONENT("Z", rot_tmp[2], 2, eulerXYZ, rotModified, -180.f, 180.f)
                 ImGui::PopItemWidth();
                 ImGui::Unindent();
 
@@ -374,25 +516,9 @@ void UsdFileViewer::EditValue()
                 bool scaleModified = false;
                 
                 ImGui::PushItemWidth(itemWidth);
-                ImGui::Text("X:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##scale_x", &scale_x, 0.01f, 0.001f, 100.f, "%.3f")) {
-                    scaleVec[0] = scale_x;
-                    scaleModified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Y:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##scale_y", &scale_y, 0.01f, 0.001f, 100.f, "%.3f")) {
-                    scaleVec[1] = scale_y;
-                    scaleModified = true;
-                }
-                ImGui::SameLine();
-                
-                ImGui::Text("Z:"); ImGui::SameLine();
-                if (ImGui::DragFloat("##scale_z", &scale_z, 0.01f, 0.001f, 100.f, "%.3f")) {
-                    scaleVec[2] = scale_z;
-                    scaleModified = true;
-                }
+                DRAG_SCALE_COMPONENT("X", scale_x, scaleVec, 0, scaleModified)
+                DRAG_SCALE_COMPONENT("Y", scale_y, scaleVec, 1, scaleModified)
+                DRAG_SCALE_COMPONENT("Z", scale_z, scaleVec, 2, scaleModified)
                 ImGui::PopItemWidth();
 
                 // Uniform scale button
@@ -518,185 +644,23 @@ void UsdFileViewer::EditValue()
 
                         if (v.IsHolding<double>()) {
                             double value = v.Get<double>();
-                            if (ImGui::DragScalar(
-                                    "##value",
-                                    ImGuiDataType_Double,
-                                    &value,
-                                    0.01,
-                                    nullptr,
-                                    nullptr,
-                                    "%.3f")) {
+                            if (ImGui::DragScalar("##value", ImGuiDataType_Double, &value, 0.01, nullptr, nullptr, "%.3f")) {
                                 attr.Set(value);
                             }
                         }
-                        else if (v.IsHolding<float>()) {
-                            float value = v.Get<float>();
-                            if (ImGui::DragFloat(
-                                    "##value",
-                                    &value,
-                                    0.01f,
-                                    0.0f,
-                                    0.0f,
-                                    "%.3f")) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<int>()) {
-                            int value = v.Get<int>();
-                            if (ImGui::DragInt("##value", &value, 1.0f)) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<unsigned int>()) {
-                            unsigned int value = v.Get<unsigned int>();
-                            if (ImGui::DragScalar(
-                                    "##value",
-                                    ImGuiDataType_U32,
-                                    &value,
-                                    1.0f)) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<int64_t>()) {
-                            int64_t value = v.Get<int64_t>();
-                            if (ImGui::DragScalar(
-                                    "##value",
-                                    ImGuiDataType_S64,
-                                    &value,
-                                    1.0f)) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec2f>()) {
-                            GfVec2f value = v.Get<GfVec2f>();
-                            if (ImGui::DragFloat2(
-                                    "##value", value.data(), 0.01f)) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec3f>()) {
-                            GfVec3f value = v.Get<GfVec3f>();
-
-                            // Special handling for color attributes
-                            if (attrName.find("color") != std::string::npos ||
-                                attrName.find("Color") != std::string::npos) {
-                                if (ImGui::ColorEdit3(
-                                        "##value", value.data())) {
-                                    attr.Set(value);
-                                }
-                            }
-                            else {
-                                if (ImGui::DragFloat3(
-                                        "##value", value.data(), 0.01f)) {
-                                    attr.Set(value);
-                                }
-                            }
-                        }
-                        else if (v.IsHolding<GfVec4f>()) {
-                            GfVec4f value = v.Get<GfVec4f>();
-
-                            // Special handling for color attributes
-                            if (attrName.find("color") != std::string::npos ||
-                                attrName.find("Color") != std::string::npos) {
-                                if (ImGui::ColorEdit4(
-                                        "##value", value.data())) {
-                                    attr.Set(value);
-                                }
-                            }
-                            else {
-                                if (ImGui::DragFloat4(
-                                        "##value", value.data(), 0.01f)) {
-                                    attr.Set(value);
-                                }
-                            }
-                        }
-                        else if (v.IsHolding<GfVec2i>()) {
-                            GfVec2i value = v.Get<GfVec2i>();
-                            if (ImGui::DragInt2("##value", value.data())) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec3i>()) {
-                            GfVec3i value = v.Get<GfVec3i>();
-                            if (ImGui::DragInt3("##value", value.data())) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec4i>()) {
-                            GfVec4i value = v.Get<GfVec4i>();
-                            if (ImGui::DragInt4("##value", value.data())) {
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec2d>()) {
-                            GfVec2d value = v.Get<GfVec2d>();
-                            float tmp[2] = { static_cast<float>(value[0]),
-                                             static_cast<float>(value[1]) };
-                            if (ImGui::DragFloat2("##value", tmp, 0.01f)) {
-                                value[0] = static_cast<double>(tmp[0]);
-                                value[1] = static_cast<double>(tmp[1]);
-                                attr.Set(value);
-                            }
-                        }
-                        else if (v.IsHolding<GfVec3d>()) {
-                            GfVec3d value = v.Get<GfVec3d>();
-                            float tmp[3] = { static_cast<float>(value[0]),
-                                             static_cast<float>(value[1]),
-                                             static_cast<float>(value[2]) };
-
-                            // Special handling for color attributes
-                            bool isColor =
-                                attrName.find("color") != std::string::npos ||
-                                attrName.find("Color") != std::string::npos;
-
-                            if (isColor) {
-                                if (ImGui::ColorEdit3("##value", tmp)) {
-                                    value[0] = static_cast<double>(tmp[0]);
-                                    value[1] = static_cast<double>(tmp[1]);
-                                    value[2] = static_cast<double>(tmp[2]);
-                                    attr.Set(value);
-                                }
-                            }
-                            else {
-                                if (ImGui::DragFloat3("##value", tmp, 0.01f)) {
-                                    value[0] = static_cast<double>(tmp[0]);
-                                    value[1] = static_cast<double>(tmp[1]);
-                                    value[2] = static_cast<double>(tmp[2]);
-                                    attr.Set(value);
-                                }
-                            }
-                        }
-                        else if (v.IsHolding<GfVec4d>()) {
-                            GfVec4d value = v.Get<GfVec4d>();
-                            float tmp[4] = { static_cast<float>(value[0]),
-                                             static_cast<float>(value[1]),
-                                             static_cast<float>(value[2]),
-                                             static_cast<float>(value[3]) };
-
-                            // Special handling for color attributes
-                            bool isColor =
-                                attrName.find("color") != std::string::npos ||
-                                attrName.find("Color") != std::string::npos;
-
-                            if (isColor) {
-                                if (ImGui::ColorEdit4("##value", tmp)) {
-                                    value[0] = static_cast<double>(tmp[0]);
-                                    value[1] = static_cast<double>(tmp[1]);
-                                    value[2] = static_cast<double>(tmp[2]);
-                                    value[3] = static_cast<double>(tmp[3]);
-                                    attr.Set(value);
-                                }
-                            }
-                            else {
-                                if (ImGui::DragFloat4("##value", tmp, 0.01f)) {
-                                    value[0] = static_cast<double>(tmp[0]);
-                                    value[1] = static_cast<double>(tmp[1]);
-                                    value[2] = static_cast<double>(tmp[2]);
-                                    value[3] = static_cast<double>(tmp[3]);
-                                    attr.Set(value);
-                                }
-                            }
-                        }
+                        HANDLE_SCALAR_ATTR(float, ImGui::DragFloat, 0.01f, 0.0f, 0.0f, "%.3f")
+                        HANDLE_SCALAR_ATTR(int, ImGui::DragInt, 1.0f)
+                        HANDLE_DRAGSCALAR_ATTR(unsigned int, ImGuiDataType_U32)
+                        HANDLE_DRAGSCALAR_ATTR(int64_t, ImGuiDataType_S64)
+                        HANDLE_VEC_ATTR(GfVec2f, 2)
+                        HANDLE_VEC_ATTR_COLOR(GfVec3f, 3)
+                        HANDLE_VEC_ATTR_COLOR(GfVec4f, 4)
+                        HANDLE_VECI_ATTR(GfVec2i, 2)
+                        HANDLE_VECI_ATTR(GfVec3i, 3)
+                        HANDLE_VECI_ATTR(GfVec4i, 4)
+                        HANDLE_VECD_ATTR(GfVec2d, 2)
+                        HANDLE_VECD_ATTR_COLOR(GfVec3d, 3)
+                        HANDLE_VECD_ATTR_COLOR(GfVec4d, 4)
                         else {
                             // Read-only display for unsupported types
                             if (v.IsArrayValued()) {
@@ -714,223 +678,16 @@ void UsdFileViewer::EditValue()
 
                                 ImGui::Indent();
 
-                                if (v.IsHolding<VtArray<float>>()) {
-                                    auto arr = v.Get<VtArray<float>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text("[%zu]: %.3f", i, arr[i]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: %.3f", i, arr[i]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<double>>()) {
-                                    auto arr = v.Get<VtArray<double>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text("[%zu]: %.3f", i, arr[i]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: %.3f", i, arr[i]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<int>>()) {
-                                    auto arr = v.Get<VtArray<int>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text("[%zu]: %d", i, arr[i]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text("[%zu]: %d", i, arr[i]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec2f>>()) {
-                                    auto arr = v.Get<VtArray<GfVec2f>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec2d>>()) {
-                                    auto arr = v.Get<VtArray<GfVec2d>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec3f>>()) {
-                                    auto arr = v.Get<VtArray<GfVec3f>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1],
-                                            arr[i][2]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f, %.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1],
-                                                arr[i][2]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec3d>>()) {
-                                    auto arr = v.Get<VtArray<GfVec3d>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1],
-                                            arr[i][2]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f, %.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1],
-                                                arr[i][2]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec4f>>()) {
-                                    auto arr = v.Get<VtArray<GfVec4f>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f, %.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1],
-                                            arr[i][2],
-                                            arr[i][3]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f, %.3f, "
-                                                "%.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1],
-                                                arr[i][2],
-                                                arr[i][3]);
-                                        }
-                                    }
-                                }
-                                else if (v.IsHolding<VtArray<GfVec4d>>()) {
-                                    auto arr = v.Get<VtArray<GfVec4d>>();
-                                    for (size_t i = 0; i < previewCount; ++i) {
-                                        ImGui::Text(
-                                            "[%zu]: (%.3f, %.3f, %.3f, %.3f)",
-                                            i,
-                                            arr[i][0],
-                                            arr[i][1],
-                                            arr[i][2],
-                                            arr[i][3]);
-                                    }
-                                    if (hasMore) {
-                                        ImGui::TextDisabled(
-                                            "... (%zu elements omitted) ...",
-                                            arraySize - 6);
-                                        for (size_t i =
-                                                 arraySize - previewCount;
-                                             i < arraySize;
-                                             ++i) {
-                                            ImGui::Text(
-                                                "[%zu]: (%.3f, %.3f, %.3f, "
-                                                "%.3f)",
-                                                i,
-                                                arr[i][0],
-                                                arr[i][1],
-                                                arr[i][2],
-                                                arr[i][3]);
-                                        }
-                                    }
-                                }
+                                if (false) {}  // Start the else-if chain
+                                PREVIEW_SCALAR_ARRAY(VtArray<float>, "[%zu]: %.3f")
+                                PREVIEW_SCALAR_ARRAY(VtArray<double>, "[%zu]: %.3f")
+                                PREVIEW_SCALAR_ARRAY(VtArray<int>, "[%zu]: %d")
+                                PREVIEW_VEC2_ARRAY(VtArray<GfVec2f>)
+                                PREVIEW_VEC2_ARRAY(VtArray<GfVec2d>)
+                                PREVIEW_VEC3_ARRAY(VtArray<GfVec3f>)
+                                PREVIEW_VEC3_ARRAY(VtArray<GfVec3d>)
+                                PREVIEW_VEC4_ARRAY(VtArray<GfVec4f>)
+                                PREVIEW_VEC4_ARRAY(VtArray<GfVec4d>)
                                 else {
                                     // Unknown array type
                                     ImGui::TextDisabled(
