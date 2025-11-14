@@ -15,7 +15,6 @@ NODE_EXECUTION_FUNCTION(create_grid)
 {
     int resolution = params.get_input<int>("resolution");
     float size = params.get_input<float>("size");
-
     Geometry geometry = create_grid(resolution, size);
     params.set_output("Geometry", std::move(geometry));
     return true;

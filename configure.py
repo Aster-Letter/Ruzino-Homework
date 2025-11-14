@@ -258,6 +258,15 @@ def process_usd(targets, dry_run=False, keep_original_files=True, copy_only=Fals
             dst="resources",
             dry_run=dry_run,
         )
+        
+        # Copy USD Python bindings (pxr module) directly to Binaries/{target}/
+        # This allows Python to import pxr directly when running from Binaries/{target}/
+        copytree_common_to_binaries(
+            os.path.join("OpenUSD", target, "lib", "python"),
+            target=target,
+            dst="",  # Copy directly to Binaries/{target}/, not to python/ subdirectory
+            dry_run=dry_run,
+        )
 
 
 import concurrent.futures
@@ -324,6 +333,14 @@ def extract_and_setup_sdk(sdk_zip_path, targets=None, dry_run=False):
                 os.path.join("OpenUSD", target, "resources"),
                 target=target,
                 dst="resources",
+                dry_run=dry_run,
+            )
+            
+            # Copy USD Python bindings (pxr module) directly to Binaries/{target}/
+            copytree_common_to_binaries(
+                os.path.join("OpenUSD", target, "lib", "python"),
+                target=target,
+                dst="",  # Copy directly to Binaries/{target}/, not to python/ subdirectory
                 dry_run=dry_run,
             )
         
