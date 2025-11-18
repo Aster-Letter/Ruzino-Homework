@@ -114,8 +114,22 @@ private:
     // Create leaves on a branch
     void create_leaves(std::shared_ptr<TreeBranch> branch);
     
-    // Calculate leaf normal direction
-    glm::vec3 calculate_leaf_normal(const glm::vec3& branch_dir, int leaf_index);
+    // Calculate leaf normal direction with phototropism
+    glm::vec3 calculate_leaf_normal(const glm::vec3& branch_dir, 
+                                    const glm::vec3& position,
+                                    int leaf_index);
+    
+    // Calculate leaf orientation (tangent, binormal) from normal
+    void calculate_leaf_orientation(const glm::vec3& normal,
+                                   const glm::vec3& branch_dir,
+                                   glm::vec3& tangent,
+                                   glm::vec3& binormal);
+    
+    // Calculate leaf inclination angle based on position and light
+    float calculate_leaf_inclination(const glm::vec3& position, float height_factor);
+    
+    // Check if branch should have leaves (terminal branch check)
+    bool should_have_leaves(std::shared_ptr<TreeBranch> branch, int max_tree_depth);
     
     // ===== Utility Functions =====
     

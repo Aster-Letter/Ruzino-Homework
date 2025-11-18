@@ -82,7 +82,8 @@ def test_tree_grid_5x5x5():
                 
                 # Connect: tree_generate -> tree_to_mesh -> transform -> merge
                 g.addEdge(tree_gen, "Tree Branches", to_mesh, "Tree Branches")
-                g.addEdge(to_mesh, "Mesh", transform, "Geometry")
+                g.addEdge(tree_gen, "Leaves", to_mesh, "Leaves")
+                g.addEdge(to_mesh, "Branch Mesh", transform, "Geometry")
                 g.addEdge(transform, "Geometry", merge_node, "Geometries")
                 
                 # Calculate position

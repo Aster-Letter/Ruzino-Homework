@@ -44,14 +44,22 @@ struct TreeBud {
 // Tree leaf structure
 struct TreeLeaf {
     glm::vec3 position = glm::vec3(0.0f);
-    glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);
-    glm::vec3 tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+    glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);   // Points out of leaf surface
+    glm::vec3 tangent = glm::vec3(1.0f, 0.0f, 0.0f);  // Along leaf length
+    glm::vec3 binormal = glm::vec3(0.0f, 0.0f, 1.0f); // Along leaf width
     
-    float size = 1.0f;              // Leaf scale
+    float size = 1.0f;              // Overall scale
+    float width = 1.0f;             // Width factor
+    float length = 1.0f;            // Length factor
     float rotation = 0.0f;          // Rotation around normal (radians)
+    float inclination = 0.0f;       // Angle from horizontal (radians)
+    float curvature = 0.0f;         // Bending factor
     
     int age = 0;                    // Age in growth cycles
     int parent_level = 0;           // Level of parent branch
+    
+    // Attachment point direction (for proper orientation)
+    glm::vec3 attachment_direction = glm::vec3(0.0f, 1.0f, 0.0f);
     
     TreeBranch* parent_branch = nullptr;
 };
@@ -76,6 +84,26 @@ struct TreeBranch {
     
     // For structural bending
     float accumulated_weight = 0.0f;
+    
+    // Check if this is a terminal branch (has no children or only young children)
+    bool is_terminal() const {
+        if (children.empty()) return true;
+        // A branch is terminal if all children are very young
+        for (const auto& child : children) {
+            if (child->age > 1) return false;
+        }
+        return true;
+    }
+    
+    // Get the maximum depth from this branch
+    int max_depth() const {
+        if (children.empty()) return 0;
+        int max_d = 0;
+        for (const auto& child : children) {
+            max_d = std::max(max_d, child->max_depth());
+        }
+        return max_d + 1;
+    }
 };
 
 // Tree structure - root container

@@ -4,6 +4,7 @@
 #include "TreeGen/TreeGrowth.h"
 #include "TreeGen/TreeParameters.h"
 #include "TreeGen/TreeStructure.h"
+#include <glm/gtx/rotate_vector.hpp>
 
 using namespace TreeGen;
 
@@ -33,8 +34,14 @@ NODE_DECLARATION_FUNCTION(tree_generate)
     
     // Leaf parameters
     b.add_input<bool>("Generate Leaves").default_val(true);
-    b.add_input<int>("Leaves Per Internode").min(0).max(10).default_val(3);
+    b.add_input<bool>("Terminal Leaves Only").default_val(true);
+    b.add_input<int>("Leaf Terminal Levels").min(1).max(10).default_val(3);
+    b.add_input<int>("Leaves Per Internode").min(0).max(10).default_val(4);
     b.add_input<float>("Leaf Size").min(0.01f).max(1.0f).default_val(0.15f);
+    b.add_input<float>("Leaf Aspect Ratio").min(0.5f).max(10.0f).default_val(2.0f);
+    b.add_input<float>("Leaf Inclination").min(0.0f).max(90.0f).default_val(45.0f);
+    b.add_input<float>("Leaf Phototropism").min(0.0f).max(1.0f).default_val(0.5f);
+    b.add_input<float>("Leaf Curvature").min(0.0f).max(1.0f).default_val(0.2f);
     
     // Output
     b.add_output<Geometry>("Tree Branches");
@@ -59,8 +66,14 @@ NODE_EXECUTION_FUNCTION(tree_generate)
     tree_params.phototropism = params.get_input<float>("Phototropism");
     tree_params.gravitropism = params.get_input<float>("Gravitropism");
     tree_params.generate_leaves = params.get_input<bool>("Generate Leaves");
+    tree_params.leaves_on_terminal_only = params.get_input<bool>("Terminal Leaves Only");
+    tree_params.leaf_terminal_levels = params.get_input<int>("Leaf Terminal Levels");
     tree_params.leaves_per_internode = params.get_input<int>("Leaves Per Internode");
     tree_params.leaf_size_base = params.get_input<float>("Leaf Size");
+    tree_params.leaf_aspect_ratio = params.get_input<float>("Leaf Aspect Ratio");
+    tree_params.leaf_inclination_mean = params.get_input<float>("Leaf Inclination");
+    tree_params.leaf_phototropism = params.get_input<float>("Leaf Phototropism");
+    tree_params.leaf_curvature = params.get_input<float>("Leaf Curvature");
     
     // Create tree growth system
     TreeGrowth growth(tree_params);
@@ -116,27 +129,53 @@ NODE_EXECUTION_FUNCTION(tree_generate)
             
             int base_idx = leaf_vertices.size();
             
-            // Create diamond-shaped leaf
-            float hw = leaf->size * 0.5f;  // half width
-            float hh = leaf->size * 0.7f;  // half height (slightly elongated)
+            // Use new leaf properties: length and width
+            float half_length = leaf->length * 0.5f;
+            float half_width = leaf->width * 0.5f;
             
-            // Calculate leaf coordinate system
-            glm::vec3 right = leaf->tangent;
-            glm::vec3 up = leaf->normal;
-            glm::vec3 forward = glm::normalize(glm::cross(right, up));
+            // Use the complete coordinate system from leaf structure
+            glm::vec3 leaf_normal = glm::normalize(leaf->normal);     // perpendicular to leaf surface
+            glm::vec3 leaf_tangent = glm::normalize(leaf->tangent);   // along leaf length
+            glm::vec3 leaf_binormal = glm::normalize(leaf->binormal); // along leaf width
             
-            // 4 vertices in diamond shape
-            glm::vec3 v0 = leaf->position + up * hh;                    // top
-            glm::vec3 v1 = leaf->position + right * hw;                 // right
-            glm::vec3 v2 = leaf->position - up * hh;                    // bottom
-            glm::vec3 v3 = leaf->position - right * hw;                 // left
+            // Apply inclination angle
+            // Rotate the tangent and binormal around the binormal axis
+            float incl = leaf->inclination;
+            if (std::abs(incl) > 0.01f) {
+                // Rotate tangent towards normal
+                glm::vec3 rot_axis = leaf_binormal;
+                leaf_tangent = glm::rotate(leaf_tangent, incl, rot_axis);
+                leaf_normal = glm::rotate(leaf_normal, incl, rot_axis);
+            }
+            
+            // Apply rotation around normal
+            if (std::abs(leaf->rotation) > 0.01f) {
+                leaf_tangent = glm::rotate(leaf_tangent, leaf->rotation, leaf_normal);
+                leaf_binormal = glm::rotate(leaf_binormal, leaf->rotation, leaf_normal);
+            }
+            
+            // Create leaf vertices in diamond/ellipse shape
+            // More realistic leaf shape with curved edges
+            glm::vec3 v0 = leaf->position + leaf_tangent * half_length;           // tip
+            glm::vec3 v1 = leaf->position + leaf_binormal * half_width;           // right
+            glm::vec3 v2 = leaf->position - leaf_tangent * half_length;           // base
+            glm::vec3 v3 = leaf->position - leaf_binormal * half_width;           // left
+            
+            // Apply curvature (bend leaf slightly along its length)
+            if (leaf->curvature > 0.01f) {
+                float curve_amount = leaf->curvature * half_length * 0.3f;
+                // Bend the tip and base towards the normal direction
+                v0 += leaf_normal * curve_amount;
+                v2 += leaf_normal * curve_amount * 0.5f;
+            }
             
             leaf_vertices.push_back(v0);
             leaf_vertices.push_back(v1);
             leaf_vertices.push_back(v2);
             leaf_vertices.push_back(v3);
             
-            // Two triangular faces (front)
+            // Two triangular faces for each side (front and back for double-sided rendering)
+            // Front face (visible from normal direction)
             leaf_face_indices.push_back(base_idx + 0);
             leaf_face_indices.push_back(base_idx + 1);
             leaf_face_indices.push_back(base_idx + 2);
@@ -147,9 +186,20 @@ NODE_EXECUTION_FUNCTION(tree_generate)
             leaf_face_indices.push_back(base_idx + 3);
             leaf_face_counts.push_back(3);
             
-            // Normals (all point in leaf normal direction)
+            // Back face (reversed winding for back-face culling)
+            leaf_face_indices.push_back(base_idx + 0);
+            leaf_face_indices.push_back(base_idx + 3);
+            leaf_face_indices.push_back(base_idx + 2);
+            leaf_face_counts.push_back(3);
+            
+            leaf_face_indices.push_back(base_idx + 0);
+            leaf_face_indices.push_back(base_idx + 2);
+            leaf_face_indices.push_back(base_idx + 1);
+            leaf_face_counts.push_back(3);
+            
+            // Normals - use the computed leaf normal
             for (int i = 0; i < 4; ++i) {
-                leaf_normals.push_back(forward);
+                leaf_normals.push_back(leaf_normal);
             }
         }
     }

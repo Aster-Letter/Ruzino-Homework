@@ -501,57 +501,162 @@ void TreeGrowth::create_leaves(std::shared_ptr<TreeBranch> branch) {
     if (!params_.generate_leaves) return;
     if (branch->level < params_.min_leaf_level) return;
     
+    // Calculate tree's maximum depth from this branch
+    int max_depth = branch->max_depth();
+    
+    // Check if this branch should have leaves (terminal branches only if specified)
+    if (!should_have_leaves(branch, max_depth)) return;
+    
     int num_leaves = params_.leaves_per_internode;
+    
+    // Calculate tree height for normalization
+    float tree_height = 0.0f;
+    std::shared_ptr<TreeBranch> current = branch;
+    while (current) {
+        tree_height = std::max(tree_height, current->end_position.y);
+        current = (current->parent) ? std::shared_ptr<TreeBranch>(current->parent, [](TreeBranch*){}) : nullptr;
+    }
     
     for (int i = 0; i < num_leaves; ++i) {
         auto leaf = std::make_shared<TreeLeaf>();
         
-        // Position along the branch
-        float t = (i + 1.0f) / (num_leaves + 1.0f);
+        // Position along the branch (avoid exact start and end)
+        float t = (i + 0.5f) / num_leaves;
+        t = random_normal(t, 0.1f);
+        t = glm::clamp(t, 0.1f, 0.9f);
+        
         leaf->position = branch->start_position + 
                         (branch->end_position - branch->start_position) * t;
         
-        // Calculate leaf orientation using phyllotaxis
+        // Calculate leaf orientation with improved phyllotaxis
         glm::vec3 branch_dir = glm::normalize(branch->direction);
-        leaf->normal = calculate_leaf_normal(branch_dir, i);
         
-        // Calculate tangent perpendicular to normal
-        leaf->tangent = glm::normalize(glm::cross(leaf->normal, branch_dir));
+        // Calculate normal with phototropism
+        leaf->normal = calculate_leaf_normal(branch_dir, leaf->position, i);
         
-        // Leaf size decreases with branch level
-        float level_factor = std::pow(0.8f, branch->level - params_.min_leaf_level);
-        leaf->size = random_normal(params_.leaf_size_base * level_factor, 
+        // Calculate tangent and binormal
+        calculate_leaf_orientation(leaf->normal, branch_dir, 
+                                  leaf->tangent, leaf->binormal);
+        
+        // Leaf size decreases with branch level but increases in terminal branches
+        float level_factor = std::pow(0.85f, branch->level - params_.min_leaf_level);
+        
+        // Terminal branches have larger leaves
+        float terminal_bonus = branch->is_terminal() ? 1.3f : 1.0f;
+        
+        leaf->size = random_normal(params_.leaf_size_base * level_factor * terminal_bonus, 
                                    params_.leaf_size_variance);
-        leaf->size = std::max(0.01f, leaf->size);  // Minimum size
+        leaf->size = std::max(0.01f, leaf->size);
         
-        // Add rotation variation
+        // Apply aspect ratio
+        leaf->length = leaf->size * params_.leaf_aspect_ratio;
+        leaf->width = leaf->size;
+        
+        // Calculate inclination (angle from horizontal)
+        float height_factor = (tree_height > 0.0f) ? (leaf->position.y / tree_height) : 0.5f;
+        leaf->inclination = calculate_leaf_inclination(leaf->position, height_factor);
+        
+        // Add rotation variation around the normal
         leaf->rotation = random_normal(0.0f, 
                                       glm::radians(params_.leaf_rotation_variance));
+        
+        // Curvature
+        leaf->curvature = random_normal(params_.leaf_curvature, 0.1f);
+        leaf->curvature = glm::clamp(leaf->curvature, 0.0f, 1.0f);
         
         leaf->age = 0;
         leaf->parent_level = branch->level;
         leaf->parent_branch = branch.get();
+        leaf->attachment_direction = branch_dir;
         
         branch->leaves.push_back(leaf);
     }
 }
 
-glm::vec3 TreeGrowth::calculate_leaf_normal(const glm::vec3& branch_dir, int leaf_index) {
-    // Use phyllotaxis angle for spiral arrangement
+bool TreeGrowth::should_have_leaves(std::shared_ptr<TreeBranch> branch, int max_depth) {
+    if (!params_.leaves_on_terminal_only) {
+        return true;  // All branches can have leaves
+    }
+    
+    // Only terminal branches (within certain depth from tips)
+    return max_depth <= params_.leaf_terminal_levels;
+}
+
+glm::vec3 TreeGrowth::calculate_leaf_normal(const glm::vec3& branch_dir, 
+                                           const glm::vec3& position,
+                                           int leaf_index) {
+    // Use golden angle phyllotaxis for spiral arrangement
     float phyllotaxis = glm::radians(params_.leaf_phyllotaxis_angle);
     float angle = phyllotaxis * (leaf_index + 1.0f);
     
     // Get perpendicular to branch
     glm::vec3 perp = get_perpendicular(branch_dir);
     
-    // Rotate around branch direction
+    // Rotate around branch direction to get radial direction
     glm::vec3 radial = glm::rotate(perp, angle, branch_dir);
     
-    // Leaf normal points outward with slight upward bias
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    glm::vec3 normal = glm::normalize(radial * 0.7f + up * 0.3f);
+    // Start with radial direction (pointing outward from branch)
+    glm::vec3 normal = radial;
     
-    return normal;
+    // Apply phototropism - bend towards light
+    if (params_.leaf_phototropism > 0.0f) {
+        glm::vec3 to_light = glm::normalize(params_.light_direction);
+        normal = glm::normalize(normal + to_light * params_.leaf_phototropism);
+    }
+    
+    // Add slight upward bias to avoid pointing down (most leaves face upward)
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    float dot_up = glm::dot(normal, up);
+    if (dot_up < 0.2f) {
+        // If pointing too far down, add more upward component
+        normal = glm::normalize(normal + up * 0.3f);
+    }
+    
+    return glm::normalize(normal);
+}
+
+void TreeGrowth::calculate_leaf_orientation(const glm::vec3& normal,
+                                           const glm::vec3& branch_dir,
+                                           glm::vec3& tangent,
+                                           glm::vec3& binormal) {
+    // Tangent should be perpendicular to normal and roughly aligned with branch direction
+    // This represents the "length" direction of the leaf
+    
+    // Project branch direction onto plane perpendicular to normal
+    glm::vec3 branch_projected = branch_dir - normal * glm::dot(branch_dir, normal);
+    
+    if (glm::length(branch_projected) < 0.01f) {
+        // Branch is parallel to normal, use arbitrary perpendicular
+        tangent = get_perpendicular(normal);
+    } else {
+        tangent = glm::normalize(branch_projected);
+    }
+    
+    // Binormal is perpendicular to both (represents leaf "width" direction)
+    binormal = glm::normalize(glm::cross(normal, tangent));
+    
+    // Ensure right-handed coordinate system
+    tangent = glm::normalize(glm::cross(binormal, normal));
+}
+
+float TreeGrowth::calculate_leaf_inclination(const glm::vec3& position, float height_factor) {
+    // Leaves lower in the tree tend to be more horizontal to catch light
+    // Leaves higher up can be more angled
+    
+    float base_inclination = params_.leaf_inclination_mean;
+    
+    // Lower leaves are more horizontal
+    float height_adjustment = -20.0f * (1.0f - height_factor);
+    
+    float inclination = random_normal(
+        base_inclination + height_adjustment,
+        params_.leaf_inclination_variance
+    );
+    
+    // Clamp to reasonable range (10° to 80°)
+    inclination = glm::clamp(inclination, 10.0f, 80.0f);
+    
+    return glm::radians(inclination);
 }
 
 } // namespace TreeGen

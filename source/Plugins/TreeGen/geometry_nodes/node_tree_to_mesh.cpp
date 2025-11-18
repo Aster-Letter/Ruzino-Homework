@@ -9,24 +9,31 @@ NODE_DEF_OPEN_SCOPE
 NODE_DECLARATION_FUNCTION(tree_to_mesh)
 {
     b.add_input<Geometry>("Tree Branches");
-    b.add_input<int>("Radial Segments").min(3).max(32).default_val(8);
+    b.add_input<Geometry>("Leaves");
+    b.add_input<int>("Radial Segments").min(3).max(5).default_val(8);
     
-    b.add_output<Geometry>("Mesh");
+    b.add_output<Geometry>("Branch Mesh");
+    b.add_output<Geometry>("Leaf Mesh");
 }
 
 NODE_EXECUTION_FUNCTION(tree_to_mesh)
 {
     auto tree_branches = params.get_input<Geometry>("Tree Branches");
+    auto leaves_geom = params.get_input<Geometry>("Leaves");
     int radial_segments = params.get_input<int>("Radial Segments");
+    
     tree_branches.apply_transform();
     auto curve = tree_branches.get_component<CurveComponent>();
     if (!curve) {
-        return false;
+        // If no branches, output empty geometries
+        params.set_output("Branch Mesh", Geometry::CreateMesh());
+        params.set_output("Leaf Mesh", Geometry::CreateMesh());
+        return true;
     }
     
-    // Create mesh geometry
-    Geometry mesh_geom = Geometry::CreateMesh();
-    auto mesh = mesh_geom.get_component<MeshComponent>();
+    // Create branch mesh geometry
+    Geometry branch_mesh_geom = Geometry::CreateMesh();
+    auto branch_mesh = branch_mesh_geom.get_component<MeshComponent>();
     
     std::vector<glm::vec3> vertices;
     std::vector<int> face_vertex_counts;
@@ -38,7 +45,6 @@ NODE_EXECUTION_FUNCTION(tree_to_mesh)
     auto curve_widths = curve->get_widths();
     
     // Process each branch (curve segment)
-    int vert_offset = 0;
     int curve_offset = 0;
     
     for (int branch_idx = 0; branch_idx < curve_counts.size(); ++branch_idx) {
@@ -51,10 +57,22 @@ NODE_EXECUTION_FUNCTION(tree_to_mesh)
         // Get branch start and end
         glm::vec3 start = curve_verts[curve_offset];
         glm::vec3 end = curve_verts[curve_offset + 1];
-        glm::vec3 dir = glm::normalize(end - start);
+        glm::vec3 dir = end - start;
+        float length = glm::length(dir);
+        if (length < 1e-6f) {
+            curve_offset += segment_count;
+            continue;
+        }
+        dir = dir / length;
         
+        // Use average radius to avoid sudden changes
         float start_radius = curve_widths[curve_offset];
         float end_radius = curve_widths[curve_offset + 1];
+        float avg_radius = (start_radius + end_radius) * 0.5f;
+        
+        // Ensure minimum radius
+        start_radius = std::max(start_radius, 0.001f);
+        end_radius = std::max(end_radius, 0.001f);
         
         // Get perpendicular vector for creating circle
         glm::vec3 perp;
@@ -99,12 +117,16 @@ NODE_EXECUTION_FUNCTION(tree_to_mesh)
         curve_offset += segment_count;
     }
     
-    mesh->set_vertices(vertices);
-    mesh->set_face_vertex_counts(face_vertex_counts);
-    mesh->set_face_vertex_indices(face_vertex_indices);
-    mesh->set_normals(normals);
+    branch_mesh->set_vertices(vertices);
+    branch_mesh->set_face_vertex_counts(face_vertex_counts);
+    branch_mesh->set_face_vertex_indices(face_vertex_indices);
+    branch_mesh->set_normals(normals);
     
-    params.set_output("Mesh", mesh_geom);
+    params.set_output("Branch Mesh", branch_mesh_geom);
+    
+    // Pass through leaf geometry unchanged
+    params.set_output("Leaf Mesh", leaves_geom);
+    
     return true;
 }
 

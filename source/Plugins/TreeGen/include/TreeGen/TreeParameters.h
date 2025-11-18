@@ -86,14 +86,23 @@ struct TreeParameters {
     // Generate leaves on branches
     bool generate_leaves = true;
     
+    // Only generate leaves on terminal branches (last 2-3 levels)
+    bool leaves_on_terminal_only = true;
+    
+    // Number of terminal levels to generate leaves on
+    int leaf_terminal_levels = 3;
+    
     // Number of leaves per internode
-    int leaves_per_internode = 3;
+    int leaves_per_internode = 4;
     
     // Leaf size base (scales with branch level)
     float leaf_size_base = 0.15f;
     
     // Leaf size variation
     float leaf_size_variance = 0.03f;
+    
+    // Leaf length to width ratio
+    float leaf_aspect_ratio = 2.0f;  // length / width
     
     // Minimum branch level to generate leaves (0=trunk)
     int min_leaf_level = 1;
@@ -103,6 +112,16 @@ struct TreeParameters {
     
     // Leaf phyllotaxis angle (like branches)
     float leaf_phyllotaxis_angle = 137.5f;  // golden angle
+    
+    // Leaf inclination angle from horizontal (0=horizontal, 90=vertical)
+    float leaf_inclination_mean = 45.0f;  // degrees
+    float leaf_inclination_variance = 15.0f;
+    
+    // Leaf bending factor (0=flat, 1=curved)
+    float leaf_curvature = 0.2f;
+    
+    // Phototropic response for leaves (bend towards light)
+    float leaf_phototropism = 0.5f;
     
     // ========== Simulation Parameters ==========
     

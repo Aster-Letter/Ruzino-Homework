@@ -107,17 +107,6 @@ glm::vec3 apply_gravitropism(const glm::vec3& direction, float strength);
 
 ### Geometry Nodes
 
-#### 1. `tree_simple_branch`
-创建简单的树枝曲线（用于测试）
-
-**输入**:
-- `Length`: 枝条长度
-- `Radius`: 基础半径
-- `Subdivisions`: 细分数
-
-**输出**:
-- `Branch Curve`: 曲线几何体
-
 #### 2. `tree_generate`
 主要的树生成节点
 

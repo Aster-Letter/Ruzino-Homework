@@ -125,26 +125,159 @@ R_parent = √(Σ R_child²)
 
 ### 3. 叶子生成
 
-#### 3.1 叶子位置
-- 叶子沿节间均匀分布
-- 数量由 `leaves_per_internode` 控制
-- 仅在高于最小层级（min_leaf_level）的枝条上生成
+TreeGen实现了基于论文和生物学原理的叶子生成系统，参考了Livny et al. [LPC*11]的方法。
 
-#### 3.2 叶子排列
-- 使用叶序（phyllotaxis）实现螺旋排列
-- 黄金角（137.5°）确保叶子均匀分布，避免重叠
+#### 3.1 叶子分布策略
+
+**终端分支优先**：
+- 叶子主要生成在终端分支（末梢枝条）上
+- 通过 `leaves_on_terminal_only` 参数控制
+- `leaf_terminal_levels` 定义了从树梢开始的几层分支会生成叶子
+- 这符合真实树木的生长模式：叶子集中在树冠外围
+
+**位置分布**：
+- 叶子沿节间均匀分布，但添加了随机扰动
+- 数量由 `leaves_per_internode` 控制
+- 避免在枝条的起点和终点生成（保留0.1-0.9的范围）
+- 位置添加10%的随机变化，使分布更自然
+
+#### 3.2 叶序排列（Phyllotaxis）
+
+使用黄金角（137.5°）实现螺旋排列：
+- 第 i 个叶子的旋转角度：137.5° × i
+- 这种排列在自然界中广泛存在
+- 最大化空间利用和光照接收
+- 避免上层叶子完全遮挡下层
 
 #### 3.3 叶子朝向
-- 法向量主要指向外侧
-- 添加向上偏置（30%），模拟叶片的向光性
-- 切向量垂直于枝条方向
 
-#### 3.4 叶子大小
-- 基础大小由 `leaf_size_base` 控制
-- 随分支层级衰减（每层级 × 0.8）
-- 添加随机变化 `leaf_size_variance`
+**法向量计算**：
+```
+1. 基础方向：从枝条径向指出（perpendicular to branch）
+2. 应用黄金角旋转：实现螺旋排列
+3. 添加向光性：向光源方向弯曲
+4. 添加向上偏置：避免叶片朝下
+```
+
+**向光性（Phototropism）**：
+- 受 `leaf_phototropism` 参数控制（默认0.5）
+- 叶片会向光源方向弯曲
+- 模拟植物叶片的向光生长
+
+**向上偏置**：
+- 确保叶片不会指向地面
+- 如果法向与上方夹角小于0.2，添加额外的向上分量
+- 大多数植物的叶片都倾向于面向上方
+
+#### 3.4 叶子姿态
+
+**倾斜角（Inclination）**：
+- 从水平面的角度（0°=水平，90°=垂直）
+- 基础角度由 `leaf_inclination_mean` 控制（默认45°）
+- 下层叶片更水平（接收更多光照）
+- 上层叶片可以更倾斜
+- 公式：`inclination = base + (-20° × (1 - height_factor))`
+
+**旋转角（Rotation）**：
+- 围绕法向的额外旋转
+- 添加随机变化 `leaf_rotation_variance`（默认±30°）
+- 使叶片排列更加自然
+
+**弯曲度（Curvature）**：
+- 模拟叶片的弯曲形态
+- `leaf_curvature` 参数控制（0=平展，1=弯曲）
+- 添加随机变化（±0.1）
+
+#### 3.5 叶子尺寸
+
+**基础尺寸**：
+```
+size = leaf_size_base × level_factor × terminal_bonus
+```
+
+**层级衰减**：
+- 每增加一个分支层级，尺寸 × 0.85
+- 从 `min_leaf_level` 开始计算
+- 高层枝条的叶子更小
+
+**终端奖励**：
+- 终端分支的叶子增大30%（× 1.3）
+- 模拟树木将资源集中在末梢的特性
+
+**长宽比**：
+- `leaf_aspect_ratio` 定义长宽比（默认2.0）
+- length = size × aspect_ratio
+- width = size
+- 可模拟不同形状的叶片（椭圆、长条等）
+
+**随机变化**：
+- 每片叶子的尺寸有随机扰动
+- 由 `leaf_size_variance` 控制（默认±0.03）
+- 最小尺寸限制为0.01
+
+#### 3.6 叶子坐标系
+
+每片叶子有完整的局部坐标系：
+- **Normal**：法向量，指向叶片表面
+- **Tangent**：切向量，沿叶片长度方向
+- **Binormal**：副法向量，沿叶片宽度方向
+
+坐标系构建：
+```
+1. Normal: 通过phyllotaxis和phototropism计算
+2. Tangent: 枝条方向投影到垂直于Normal的平面
+3. Binormal: Normal × Tangent
+4. 重新正交化Tangent: Binormal × Normal
+```
+
+这个右手坐标系确保：
+- 叶片几何正确定向
+- 纹理坐标正确映射
+- 光照计算准确
+
+#### 3.7 与论文的对应
+
+**Stava et al. 2014，第4.2节（Foliage）**：
+- ✅ 论文："叶子位于终端分支上"
+  - 实现：`leaves_on_terminal_only` 和 `is_terminal()` 检查
+  
+- ✅ 论文："使用Livny et al.的程序化系统"
+  - 实现：改进的叶序和朝向计算
+  
+- ✅ 论文："增加树冠密度，特别是扫描模型"
+  - 实现：终端分支叶子尺寸奖励机制
+  
+- ✅ 论文："在生长周期结束时生成叶子"
+  - 实现：在 `grow_one_cycle` 最后调用 `create_leaves`
 
 ## 代码结构
+
+### 参数详解
+
+#### 叶子参数组
+
+| 参数名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `generate_leaves` | bool | true | 是否生成叶子 |
+| `leaves_on_terminal_only` | bool | true | 仅在终端分支生成叶子 |
+| `leaf_terminal_levels` | int | 3 | 定义终端分支的层级深度 |
+| `leaves_per_internode` | int | 4 | 每个节间的叶子数量 |
+| `leaf_size_base` | float | 0.15 | 叶子基础尺寸 |
+| `leaf_size_variance` | float | 0.03 | 叶子尺寸随机变化 |
+| `leaf_aspect_ratio` | float | 2.0 | 长宽比（length/width） |
+| `min_leaf_level` | int | 1 | 最小生成叶子的分支层级 |
+| `leaf_rotation_variance` | float | 30° | 围绕法向的旋转变化 |
+| `leaf_phyllotaxis_angle` | float | 137.5° | 黄金角，叶序螺旋排列 |
+| `leaf_inclination_mean` | float | 45° | 平均倾斜角（从水平） |
+| `leaf_inclination_variance` | float | 15° | 倾斜角随机变化 |
+| `leaf_curvature` | float | 0.2 | 叶片弯曲程度（0-1） |
+| `leaf_phototropism` | float | 0.5 | 叶片向光性强度 |
+
+**使用建议**：
+- 针叶树：`aspect_ratio=5.0`, `size=0.05`, `curvature=0.0`
+- 阔叶树：`aspect_ratio=1.5-2.5`, `size=0.15-0.25`, `curvature=0.2-0.4`
+- 柳树：`aspect_ratio=4.0`, `inclination_mean=60°`, `curvature=0.3`
+- 橡树：`aspect_ratio=1.8`, `inclination_mean=40°`, `leaves_per_internode=5`
 
 ### 核心类
 
@@ -264,12 +397,29 @@ g.prepare_and_execute(inputs, required_node=write_usd)
 #### 叶子调节
 
 **浓密树冠**：
-- 增加 `Leaves Per Internode`（3 → 5）
+- 开启 `Leaves On Terminal Only` = True
+- 增加 `Leaves Per Internode`（4 → 6）
 - 增大 `Leaf Size`（0.15 → 0.25）
+- 增大 `Leaf Terminal Levels`（3 → 4）
 
 **稀疏树冠**：
-- 减少 `Leaves Per Internode`（3 → 1）
+- 减少 `Leaves Per Internode`（4 → 2）
 - 减小 `Leaf Size`（0.15 → 0.08）
+- 减小 `Leaf Terminal Levels`（3 → 2）
+
+**更向光的叶片**：
+- 增大 `Leaf Phototropism`（0.5 → 0.8）
+- 减小 `Leaf Inclination Mean`（45° → 30°）
+
+**更自然的叶片**：
+- 增大 `Leaf Rotation Variance`（30° → 45°）
+- 增大 `Leaf Curvature`（0.2 → 0.4）
+- 增大 `Leaf Size Variance`（0.03 → 0.05）
+
+**不同叶型**：
+- 宽叶：`Leaf Aspect Ratio` = 1.5（接近圆形）
+- 窄叶：`Leaf Aspect Ratio` = 3.0（长条形）
+- 针叶：`Leaf Aspect Ratio` = 5.0 + 减小 `Leaf Size`
 
 ## 实现细节与论文对照
 
@@ -303,9 +453,14 @@ g.prepare_and_execute(inputs, required_node=write_usd)
 - 分支层级系统
 
 ✅ **叶子生成**
-- 基于叶序的螺旋排列
-- 尺寸随层级衰减
-- 向外向上的朝向
+- 基于叶序的螺旋排列（黄金角137.5°）
+- 尺寸随层级衰减，终端分支奖励
+- 向外向上的朝向，带向光性
+- 完整的局部坐标系（法向、切向、副法向）
+- 倾斜角随高度变化
+- 长宽比控制叶片形状
+- 弯曲度模拟
+- 终端分支优先策略
 
 ### 简化的特性
 
@@ -334,6 +489,67 @@ g.prepare_and_execute(inputs, required_node=write_usd)
 🔧 **生长方向归一化**
 - 原问题：某些向量叉积未归一化
 - 修正：确保所有方向向量归一化
+
+## 测试
+
+TreeGen插件包含多个测试用例来验证功能：
+
+### 运行测试
+
+```bash
+cd source/Plugins/TreeGen/tests
+pytest -v
+```
+
+### 测试文件说明
+
+1. **test_treegen.py** - 基础功能测试
+   - 树木生成
+   - 参数变化
+   - 叶子系统基础功能
+
+2. **test_leaf_system.py** - 叶子系统专项测试（新增）
+   - 终端分支叶子生成验证
+   - 叶子参数变化测试（窄叶、宽叶、弯曲、向光性）
+   - 叶子密度对比测试
+
+3. **test_full_tree.py** - 完整流程测试
+   - 生成 → 转网格 → 导出USD
+
+4. **test_tree_export.py** - USD导出测试
+   - 完整树木导出为USD格式
+   - 可用于Houdini/usdview查看
+
+5. **test_tree_grid.py** - 批量生成测试
+   - 5×5×5 = 125棵树的参数网格
+   - X轴：生长年份
+   - Y轴：分支角度
+   - Z轴：顶端控制
+
+### 叶子系统测试用例
+
+新的 `test_leaf_system.py` 包含以下测试：
+
+**测试1：终端叶子模式**
+```python
+# 仅在末端2层分支生成叶子
+"Terminal Leaves Only": True
+"Leaf Terminal Levels": 2
+"Leaves Per Internode": 5
+```
+
+**测试2：叶子形态变化**
+- 窄叶（柳树型）：`Aspect Ratio: 4.0, Inclination: 60°`
+- 宽叶（橡树型）：`Aspect Ratio: 1.5, Inclination: 30°`
+- 弯曲叶：`Curvature: 0.6, Aspect Ratio: 2.5`
+- 向光叶：`Phototropism: 0.9, Inclination: 20°`
+
+**测试3：密度对比**
+- 稀疏：2叶/节间，2层终端
+- 中等：4叶/节间，3层终端
+- 密集：6叶/节间，4层终端
+
+输出文件位于 `Binaries/Debug/` 目录，可直接在USD查看器中打开。
 
 ## 扩展建议
 

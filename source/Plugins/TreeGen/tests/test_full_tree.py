@@ -47,11 +47,11 @@ def test_full_tree_generation():
     print(f"✓ Created write_usd node for leaves")
     
     # Connect nodes: 
-    # tree_generate -> tree_to_mesh -> write_usd (branches)
-    # tree_generate -> write_usd (leaves)
+    # tree_generate -> tree_to_mesh -> write_usd (branches and leaves)
     g.addEdge(tree_gen, "Tree Branches", to_mesh, "Tree Branches")
-    g.addEdge(to_mesh, "Mesh", write_branches, "Geometry")
-    g.addEdge(tree_gen, "Leaves", write_leaves, "Geometry")
+    g.addEdge(tree_gen, "Leaves", to_mesh, "Leaves")
+    g.addEdge(to_mesh, "Branch Mesh", write_branches, "Geometry")
+    g.addEdge(to_mesh, "Leaf Mesh", write_leaves, "Geometry")
     print(f"✓ Connected nodes")
     
     # Set parameters for tree generation
@@ -60,12 +60,18 @@ def test_full_tree_generation():
         (tree_gen, "Internode Length"): 1.0,
         (tree_gen, "Branch Angle"): 30.0,
         (tree_gen, "Generate Leaves"): True,
-        (tree_gen, "Leaves Per Internode"): 3,
+        (tree_gen, "Terminal Leaves Only"): True,
+        (tree_gen, "Leaf Terminal Levels"): 3,
+        (tree_gen, "Leaves Per Internode"): 4,
+        (tree_gen, "Leaf Size"): 0.2,
+        (tree_gen, "Leaf Aspect Ratio"): 2.0,
+        (tree_gen, "Leaf Inclination"): 45.0,
+        (tree_gen, "Leaf Phototropism"): 0.5,
         (to_mesh, "Radial Segments"): 8,
         (write_branches, "Sub Path"): "branches",
         (write_leaves, "Sub Path"): "leaves",
     }
-    print(f"✓ Set parameters: Years=3, Internode=1.0, Angle=30°, Segments=8, Leaves=ON")
+    print(f"✓ Set parameters: Years=3, Internode=1.0, Angle=30°, Segments=8, Leaves=ON with new leaf system")
     
     # Create Stage and convert to GeomPayload
     stage = stage_py.Stage(output_file)

@@ -194,8 +194,8 @@ def main():
         test_filter = sys.argv[1]
         print(f"Running tests matching: {test_filter}")
     
-    # Setup paths
-    script_dir = Path(__file__).parent
+    # Setup paths - script is now in scripts/ directory, so go up one level to project root
+    script_dir = Path(__file__).parent.parent  # Go up from scripts/ to project root
     source_dir = script_dir / 'source'
     binaries_dir = script_dir / 'Binaries' / 'Debug'
     

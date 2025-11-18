@@ -714,7 +714,7 @@ jobs:
         shell: powershell
         run: |
           Write-Output "Starting test suite..."
-          python run_all_tests.py
+          python scripts/run_all_tests.py
           
           if ($LASTEXITCODE -eq 0) {
             Write-Output "test-status=success" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
