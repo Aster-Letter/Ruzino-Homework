@@ -10,7 +10,7 @@ import geometry_py  # This triggers geometry nodes loading
 def get_binary_dir():
     """Get the binary directory path"""
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    binary_dir = os.path.join(test_dir, '..', '..', '..', '..', 'Binaries', 'Debug')
+    binary_dir = os.path.join(test_dir, '..', '..', '..', '..', 'Binaries', 'Release')
     return os.path.abspath(binary_dir)
 
 

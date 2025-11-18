@@ -10,7 +10,7 @@ import sys
 import os
 
 # Setup paths
-binary_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'Binaries', 'Debug'))
+binary_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'Binaries', 'Release'))
 rznode_python = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'Core', 'rznode', 'python'))
 
 sys.path.insert(0, binary_dir)
