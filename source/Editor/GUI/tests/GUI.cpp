@@ -2,6 +2,7 @@
 #include <nvrhi/nvrhi.h>
 
 #include "GUI/image_widget.hpp"
+#include "GUI/text_editor_widget_wrapper.hpp"
 #include "GUI/widget.h"
 #include "GUI/window.h"
 #include "RHI/rhi.hpp"
@@ -133,8 +134,7 @@ TEST(FileDialog, create_dialog)
     window.run();
 }
 
-// TEST(ImageWidget, red_texture)
-int main()
+TEST(ImageWidget, red_texture)
 {
 #if USTC_CG_WITH_CUDA
     // Initialize RHI and CUDA
@@ -255,3 +255,79 @@ int main()
     RHI::shutdown();
 #endif
 }
+
+TEST(TextEditor, basic_editor)
+{
+    Window window;
+    window.register_widget(std::make_unique<TextEditorWidget>("Code Editor"));
+    window.run();
+}
+
+TEST(TextEditor, advanced_features)
+{
+    Window window;
+    
+    // Create a text editor widget
+    auto editor_widget = std::make_unique<TextEditorWidget>("Advanced Editor");
+    
+    // Set custom font size
+    editor_widget->SetFontSize(16.0f);
+    
+    // Bind to an external string for editing
+    static std::string my_code = R"(// Edit this code!
+#include <iostream>
+
+int main() {
+    std::cout << "Hello from bound text!" << std::endl;
+    return 0;
+})";
+    
+    editor_widget->BindText(&my_code);
+    
+    // Set a save callback
+    editor_widget->SetSaveCallback([](const std::string& text) {
+        std::cout << "Text saved! Length: " << text.length() << " bytes" << std::endl;
+        std::cout << "Content preview: " << text.substr(0, 50) << "..." << std::endl;
+    });
+    
+    window.register_widget(std::move(editor_widget));
+    window.run();
+    
+    // After window closes, the bound text will contain any edits made
+    std::cout << "Final text:\n" << my_code << std::endl;
+}
+
+TEST(TextEditor, xml_support)
+{
+    Window window;
+    
+    auto xml_editor = std::make_unique<TextEditorWidget>("XML Editor");
+    
+    // Set XML language
+    xml_editor->SetLanguage(TextEditorWidget::Language::XML);
+    
+    // Set sample XML text
+    static std::string xml_text = R"(<?xml version="1.0" encoding="UTF-8"?>
+<!-- This is a comment -->
+<root>
+    <element attribute="value">
+        <child>Content here</child>
+        <empty />
+    </element>
+    <data>
+        Special characters: &lt; &gt; &amp; &quot; &apos;
+    </data>
+</root>)";
+    
+    xml_editor->BindText(&xml_text);
+    xml_editor->SetFontSize(16.0f);
+    
+    xml_editor->SetSaveCallback([](const std::string& text) {
+        std::cout << "XML saved!" << std::endl;
+    });
+    
+    window.register_widget(std::move(xml_editor));
+    window.run();
+}
+
+

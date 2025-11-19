@@ -59,13 +59,13 @@ int main()
     system_->init(std::move(tree));
 
     Window window;
-    window.register_function_after_frame([](Window* window) {
-        static int frame_count = 0;
-        frame_count++;
-        if (frame_count > 100) {
-            window->close();
-        }
-    });
+    // window.register_function_after_frame([](Window* window) {
+    //     static int frame_count = 0;
+    //     frame_count++;
+    //     if (frame_count > 100) {
+    //         window->close();
+    //     }
+    // });
     FileBasedNodeWidgetSettings widget_desc;
     widget_desc.system = system_;
     system_->set_node_tree_executor(create_node_tree_executor({}));
