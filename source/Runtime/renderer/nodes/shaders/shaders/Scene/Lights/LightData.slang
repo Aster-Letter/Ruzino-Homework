@@ -41,6 +41,7 @@ enum class LightType : uint32_t
     Rect,           ///< Quad shaped area light source
     Disc,           ///< Disc shaped area light source
     Sphere,         ///< Spherical area light source
+    Dome,           ///< Dome/Environment light source
 };
 
 /** This is a host/device structure that describes analytic light sources.
@@ -64,6 +65,10 @@ struct LightData
     float    _pad1;
     float4x4 transMat           = {};               ///< Transformation matrix of the light shape, from local to world space.
     float4x4 transMatIT         = {};               ///< Inverse-transpose of transformation matrix of the light shape
+    
+    // Dome light specific parameters
+    int      textureIndex       = -1;               ///< Bindless texture index for dome light environment map (-1 if no texture)
+    uint3    _pad2;                                 ///< Padding for alignment
 };
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

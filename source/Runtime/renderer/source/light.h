@@ -9,6 +9,7 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/assetPath.h"
 #include "internal/memory/DeviceMemoryPool.hpp"
+#include "DescriptorTableManager.h"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
@@ -167,6 +168,9 @@ class HD_USTC_CG_API Hd_USTC_CG_Dome_Light : public Hd_USTC_CG_Light {
 
         GLuint glTexture = 0;
         TfToken input_name;
+        
+        nvrhi::TextureHandle texture;
+        DescriptorHandle descriptor;
     } ;
 
     Hd_USTC_CG_Dome_Light(const SdfPath& id, const TfToken& lightType)

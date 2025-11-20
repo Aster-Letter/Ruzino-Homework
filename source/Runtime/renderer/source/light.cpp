@@ -11,6 +11,7 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 #include "renderParam.h"
 #include "../nodes/shaders/shaders/Scene/Lights/LightData.slang"
+#include "RHI/Hgi/format_conversion.hpp"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
@@ -581,16 +582,20 @@ void Hd_USTC_CG_Dome_Light::_PrepareDomeLight(
     env_texture.image =
         HioImage::OpenForReading(textureFileName.GetAssetPath(), 0, 0);
 
-    if (env_texture.glTexture) {
-        glDeleteTextures(1, &env_texture.glTexture);
-        env_texture.glTexture = 0;
-    }
-
     auto diffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse)
-                       .Get<float>();
+                       .GetWithDefault<float>(1.0f);
     radiance = sceneDelegate->GetLightParamValue(id, HdLightTokens->color)
-                   .Get<GfVec3f>() *
+                   .GetWithDefault<GfVec3f>(GfVec3f(1.0f, 1.0f, 1.0f)) *
                diffuse;
+    
+    auto intensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity)
+                         .GetWithDefault<float>(1.0f);
+    auto exposure = sceneDelegate->GetLightParamValue(id, HdLightTokens->exposure)
+                        .GetWithDefault<float>(0.0f);
+    
+    // Combine with exposure: intensity * 2^exposure
+    float finalIntensity = intensity * pow(2.0f, exposure);
+    radiance *= finalIntensity;
 }
 
 void Hd_USTC_CG_Dome_Light::Sync(
@@ -600,8 +605,135 @@ void Hd_USTC_CG_Dome_Light::Sync(
 {
     Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
-    auto id = GetId();
-    _PrepareDomeLight(id, sceneDelegate);
+    const SdfPath& id = GetId();
+    HdDirtyBits bits = *dirtyBits;
+    
+    if (bits & (DirtyParams | DirtyTransform)) {
+        _PrepareDomeLight(id, sceneDelegate);
+        
+        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        
+        // Allocate light buffer if needed
+        if (!this->light_buffer) {
+            this->light_buffer = render_param->InstanceCollection->light_pool.allocate(1);
+        }
+        
+        LightData lightData;
+        lightData.type = (uint32_t)LightType::Dome;
+        lightData.intensity = float3(radiance[0], radiance[1], radiance[2]);
+        
+        // Get transform with domeOffset
+        auto transform = this->Get(HdTokens->transform).GetWithDefault<GfMatrix4d>();
+        VtValue domeOffset = sceneDelegate->GetLightParamValue(id, HdLightTokens->domeOffset);
+        if (domeOffset.IsHolding<GfMatrix4d>()) {
+            transform = domeOffset.UncheckedGet<GfMatrix4d>() * transform;
+        }
+        
+        // Store transformation matrix for dome light rotation
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                lightData.transMat[i][j] = transform[i][j];
+            }
+        }
+        
+        // Load and register texture with bindless system if available
+        if (env_texture.image) {
+            int width = env_texture.image->GetWidth();
+            int height = env_texture.image->GetHeight();
+            auto hioFormat = env_texture.image->GetFormat();
+            
+            // Read image data
+            HioImage::StorageSpec storage;
+            storage.width = width;
+            storage.height = height;
+            storage.format = hioFormat;
+            storage.flipped = false;
+            storage.data = nullptr;
+            
+            env_texture.image->Read(storage);
+            
+            if (storage.data) {
+                // Convert format to NVRHI format
+                nvrhi::Format format = nvrhi::Format::RGBA8_UNORM;
+                size_t bytesPerPixel = 4;
+                
+                if (hioFormat == HioFormatFloat32Vec3) {
+                    format = nvrhi::Format::RGBA32_FLOAT;
+                    bytesPerPixel = 16; // Will convert RGB to RGBA
+                }
+                else if (hioFormat == HioFormatFloat16Vec3) {
+                    format = nvrhi::Format::RGBA16_FLOAT;
+                    bytesPerPixel = 8;
+                }
+                else if (hioFormat == HioFormatUNorm8Vec3) {
+                    format = nvrhi::Format::RGBA8_UNORM;
+                    bytesPerPixel = 4;
+                }
+                
+                // Create texture descriptor
+                nvrhi::TextureDesc desc;
+                desc.width = width;
+                desc.height = height;
+                desc.format = format;
+                desc.isRenderTarget = false;
+                desc.isUAV = false;
+                desc.debugName = "DomeLight_" + id.GetString();
+                desc.initialState = nvrhi::ResourceStates::ShaderResource;
+                desc.keepInitialState = true;
+                
+                // Convert RGB to RGBA if needed
+                std::vector<uint8_t> rgba_data;
+                const uint8_t* source_data = static_cast<const uint8_t*>(storage.data);
+                
+                if (hioFormat == HioFormatFloat32Vec3) {
+                    // RGB32F -> RGBA32F
+                    rgba_data.resize(width * height * 16);
+                    const float* src = reinterpret_cast<const float*>(source_data);
+                    float* dst = reinterpret_cast<float*>(rgba_data.data());
+                    for (int i = 0; i < width * height; i++) {
+                        dst[i * 4 + 0] = src[i * 3 + 0];
+                        dst[i * 4 + 1] = src[i * 3 + 1];
+                        dst[i * 4 + 2] = src[i * 3 + 2];
+                        dst[i * 4 + 3] = 1.0f;
+                    }
+                    source_data = rgba_data.data();
+                }
+                else if (hioFormat == HioFormatUNorm8Vec3) {
+                    // RGB8 -> RGBA8
+                    rgba_data.resize(width * height * 4);
+                    for (int i = 0; i < width * height; i++) {
+                        rgba_data[i * 4 + 0] = source_data[i * 3 + 0];
+                        rgba_data[i * 4 + 1] = source_data[i * 3 + 1];
+                        rgba_data[i * 4 + 2] = source_data[i * 3 + 2];
+                        rgba_data[i * 4 + 3] = 255;
+                    }
+                    source_data = rgba_data.data();
+                }
+                
+                // Load texture to GPU
+                auto [gpu_texture, staging] = RHI::load_texture(desc, source_data);
+                env_texture.texture = gpu_texture;
+                
+                // Register with bindless texture system
+                auto descriptor_table = render_param->InstanceCollection->get_texture_descriptor_table();
+                env_texture.descriptor = descriptor_table->CreateDescriptorHandle(
+                    nvrhi::BindingSetItem::Texture_SRV(0, env_texture.texture, format));
+                
+                lightData.textureIndex = env_texture.descriptor.Get();
+                
+                spdlog::info("DomeLight {}: Loaded texture '{}' ({}x{}) with bindless index {}", 
+                             id.GetText(), textureFileName.GetAssetPath(), width, height, lightData.textureIndex);
+            }
+        }
+        else {
+            // No texture - use solid color
+            lightData.textureIndex = -1;
+            spdlog::info("DomeLight {}: Using solid color ({},{},{})", 
+                         id.GetText(), radiance[0], radiance[1], radiance[2]);
+        }
+        
+        this->light_buffer->write_data(&lightData);
+    }
     
     // Clear dirty bits
     *dirtyBits = Clean;
@@ -609,6 +741,12 @@ void Hd_USTC_CG_Dome_Light::Sync(
 
 void Hd_USTC_CG_Dome_Light::Finalize(HdRenderParam* renderParam)
 {
+    // Clean up texture descriptor
+    if (env_texture.descriptor.IsValid()) {
+        env_texture.descriptor.Reset();
+    }
+    
+    // Clean up old GL texture if it exists
     if (env_texture.glTexture) {
         glDeleteTextures(1, &env_texture.glTexture);
         env_texture.glTexture = 0;

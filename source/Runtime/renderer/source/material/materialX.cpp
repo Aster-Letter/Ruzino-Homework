@@ -49,7 +49,7 @@ void Hd_USTC_CG_MaterialX::Sync(
     HdDirtyBits* dirtyBits)
 {
     spdlog::info("MaterialX::Sync called for material '{}'", GetId().GetText());
-    
+
     auto param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
 
     ensure_material_data_handle(param);
@@ -62,8 +62,10 @@ void Hd_USTC_CG_MaterialX::Sync(
     HdMaterialNetwork2Interface netInterface = FetchMaterialNetwork(
         sceneDelegate, hdNetwork, materialPath, surfTerminalPath, surfTerminal);
 
-    spdlog::info("MaterialX: MaterialPath = '{}', SurfTerminalPath = '{}'", 
-                 materialPath.GetText(), surfTerminalPath.GetText());
+    spdlog::info(
+        "MaterialX: MaterialPath = '{}', SurfTerminalPath = '{}'",
+        materialPath.GetText(),
+        surfTerminalPath.GetText());
 
     HdMtlxTexturePrimvarData hdMtlxData;
 
@@ -74,15 +76,17 @@ void Hd_USTC_CG_MaterialX::Sync(
         materialPath,
         libraries,
         &hdMtlxData);
-    
+
     if (!mtlx_document) {
-        spdlog::error("MaterialX: Failed to create MaterialX document for '{}'", GetId().GetText());
+        spdlog::error(
+            "MaterialX: Failed to create MaterialX document for '{}'",
+            GetId().GetText());
         *dirtyBits = HdChangeTracker::Clean;
         return;
     }
-    
+
     spdlog::info("MaterialX: Created MaterialX document successfully");
-    
+
     CollectTextures(netInterface, hdMtlxData);
 
     MtlxGenerateShader(mtlx_document, netInterface, hdMtlxData);
@@ -94,18 +98,17 @@ void Hd_USTC_CG_MaterialX::Sync(
 
 void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
 {
-    spdlog::info("MaterialX::ensure_shader_ready called for material '{}'", GetId().GetText());
-    
     if (shader_ready) {
-        spdlog::info("MaterialX: Shader already ready for '{}'", GetId().GetText());
         return;
     }
 
     Hd_USTC_CG_Material::ensure_shader_ready(factory);
 
     if (!eval_shader_source.empty()) {
-        spdlog::info("MaterialX: Processing shader source ({} bytes)", eval_shader_source.size());
-        
+        spdlog::info(
+            "MaterialX: Processing shader source ({} bytes)",
+            eval_shader_source.size());
+
         // Replace the data loading placeholder with actual data code
         constexpr char DATA_PLACEHOLDER[] = "$BindlessDataLoading";
         size_t pos = eval_shader_source.find(DATA_PLACEHOLDER);
@@ -121,7 +124,9 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
             if (out.is_open()) {
                 out << eval_shader_source;
                 out.close();
-                spdlog::info("MaterialX: Saved shader to generated_shaders/{}.slang", material_name);
+                spdlog::info(
+                    "MaterialX: Saved shader to generated_shaders/{}.slang",
+                    material_name);
             }
         }
         catch (const std::exception& e) {
@@ -129,8 +134,11 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
         }
 #endif
         final_shader_source = eval_shader_source + slang_source_code_main;
-    } else {
-        spdlog::warn("MaterialX: eval_shader_source is empty for material '{}'", GetId().GetText());
+    }
+    else {
+        spdlog::warn(
+            "MaterialX: eval_shader_source is empty for material '{}'",
+            GetId().GetText());
     }
 
     // Combine shader parts into final source
@@ -142,13 +150,18 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
 
     spdlog::info("MaterialX: Creating shader program for '{}'", material_name);
     final_program = factory.createProgram(program_desc);
-    
+
     if (!final_program) {
-        spdlog::error("MaterialX: Failed to create shader program for '{}'", material_name);
-    } else {
-        spdlog::info("MaterialX: Shader program created successfully for '{}'", material_name);
+        spdlog::error(
+            "MaterialX: Failed to create shader program for '{}'",
+            material_name);
     }
-    
+    else {
+        spdlog::info(
+            "MaterialX: Shader program created successfully for '{}'",
+            material_name);
+    }
+
     assert(final_program);
 
     shader_ready = true;
@@ -345,8 +358,9 @@ void Hd_USTC_CG_MaterialX::MtlxGenerateShader(
 
     std::string elementName(element->getNamePath());
     material_name = mx::createValidName(elementName);
-    
-    spdlog::info("MaterialX: Generating shader for material '{}'", material_name);
+
+    spdlog::info(
+        "MaterialX: Generating shader for material '{}'", material_name);
 
     ShaderGenerator& shader_generator_ =
         shader_gen_context_->getShaderGenerator();
@@ -355,38 +369,50 @@ void Hd_USTC_CG_MaterialX::MtlxGenerateShader(
         try {
             auto shader = shader_generator_.generate(
                 material_name, element, *shader_gen_context_);
-            
+
             if (!shader) {
-                TF_RUNTIME_ERROR("MaterialX: Shader generation failed for material '%s'", material_name.c_str());
+                TF_RUNTIME_ERROR(
+                    "MaterialX: Shader generation failed for material '%s'",
+                    material_name.c_str());
                 return;
             }
-            
+
             eval_shader_source = shader->getSourceCode(mx::Stage::PIXEL);
-            
+
             if (eval_shader_source.empty()) {
-                TF_RUNTIME_ERROR("MaterialX: Empty shader source generated for material '%s'", material_name.c_str());
+                TF_RUNTIME_ERROR(
+                    "MaterialX: Empty shader source generated for material "
+                    "'%s'",
+                    material_name.c_str());
                 return;
             }
-            
-            spdlog::info("MaterialX: Generated {} bytes of shader code", eval_shader_source.size());
+
+            spdlog::info(
+                "MaterialX: Generated {} bytes of shader code",
+                eval_shader_source.size());
 
             BindlessContextPtr context =
                 shader_gen_context_->getUserData<BindlessContext>(
                     mx::HW::USER_DATA_BINDING_CONTEXT);
-                    
+
             if (!context) {
                 TF_RUNTIME_ERROR("MaterialX: Failed to get BindlessContext");
                 return;
             }
-            
+
             get_data_code = context->get_data_code();
             material_data = context->get_material_data();
             material_data_handle->write_data(&material_data);
-            
-            spdlog::info("MaterialX: Shader generation complete for '{}'", material_name);
+
+            spdlog::info(
+                "MaterialX: Shader generation complete for '{}'",
+                material_name);
         }
         catch (const std::exception& e) {
-            TF_RUNTIME_ERROR("MaterialX: Exception during shader generation for '%s': %s", material_name.c_str(), e.what());
+            TF_RUNTIME_ERROR(
+                "MaterialX: Exception during shader generation for '%s': %s",
+                material_name.c_str(),
+                e.what());
             return;
         }
     }

@@ -1,4 +1,6 @@
 
+#include <spdlog/spdlog.h>
+
 #include "../source/renderTLAS.h"
 #include "GPUContext/raytracing_context.hpp"
 #include "nodes/core/def/node_def.hpp"
@@ -7,7 +9,7 @@
 #include "render_node_base.h"
 #include "shaders/shaders/utils/HitObject.h"
 #include "utils/math.h"
-#include <spdlog/spdlog.h>
+
 // A traditional path tracing node
 
 NODE_DEF_OPEN_SCOPE
@@ -41,7 +43,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
         "FALCOR_MATERIAL_INSTANCE_SIZE",
         std::to_string(c_FalcorMaterialInstanceSize));
 
-    auto &materials = global_payload.get_materials();
+    auto& materials = global_payload.get_materials();
 
     std::unordered_map<unsigned, std::string> callable_shaders;
 
@@ -62,22 +64,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
 
     auto raytrace_compiled = resource_allocator.create(program_desc);
     MARK_DESTROY_NVRHI_RESOURCE(raytrace_compiled);
-    
-    // Force output error to console and log
-    if (!raytrace_compiled->get_error_string().empty()) {
-        std::string error_msg = raytrace_compiled->get_error_string();
-        printf("\n========== SHADER COMPILATION ERROR ==========\n");
-        printf("Failed to create path_tracing shader:\n%s\n", error_msg.c_str());
-        printf("==============================================\n\n");
-        std::cout << std::flush;
-        spdlog::error("Failed to create shader raytrace_compiled: {}", error_msg);
-        return false;
-    }
-    
-    printf("[PATH_TRACING] Shader compiled successfully, %zu materials, %zu callables\n", 
-           materials.size(), callable_shaders.size());
-    std::cout << std::flush;
-    // Function content omitted
+    CHECK_PROGRAM_ERROR(raytrace_compiled);
 
     auto m_CommandList = resource_allocator.create(CommandListDesc{});
     MARK_DESTROY_NVRHI_RESOURCE(m_CommandList);
@@ -96,9 +83,8 @@ NODE_EXECUTION_FUNCTION(path_tracing)
 
     auto random_seeds = params.get_input<nvrhi::BufferHandle>("Random Seeds");
 
-    program_vars["SceneBVH"] =
-        params.get_global_payload<RenderGlobalPayload &>()
-            .InstanceCollection->get_tlas();
+    program_vars["SceneBVH"] = params.get_global_payload<RenderGlobalPayload&>()
+                                   .InstanceCollection->get_tlas();
     program_vars["inPixelTarget"] =
         params.get_input<nvrhi::BufferHandle>("Pixel Target");
     program_vars["output"] = output;
@@ -138,27 +124,24 @@ NODE_EXECUTION_FUNCTION(path_tracing)
         instance_collection->material_pool.get_device_buffer();
     program_vars["materialHeaderBuffer"] =
         instance_collection->material_header_pool.get_device_buffer();
-    
+
     // Bind light buffer - only include lights with valid paths
     auto& all_lights = global_payload.get_lights();
     std::vector<Hd_USTC_CG_Light*> valid_lights;
-    
+
     for (auto* light : all_lights) {
         // Only include lights with non-empty paths (not fallback lights)
         if (light && !light->GetId().IsEmpty()) {
             valid_lights.push_back(light);
         }
     }
-    
+
     uint32_t lightCount = static_cast<uint32_t>(valid_lights.size());
-    
-    printf("[PATH_TRACING] Total lights: %zu, Valid lights: %u\n", all_lights.size(), lightCount);
-    fflush(stdout);
 
     instance_collection->light_pool.compress();
     program_vars["lightBuffer"] =
         instance_collection->light_pool.get_device_buffer();
-    
+
     // Pass light count
     auto lightCountBuffer = create_constant_buffer(params, lightCount);
     MARK_DESTROY_NVRHI_RESOURCE(lightCountBuffer);
@@ -180,12 +163,15 @@ NODE_EXECUTION_FUNCTION(path_tracing)
     RaytracingContext context(resource_allocator, program_vars);
 
     context.announce_raygeneration("RayGen");
-    context.announce_hitgroup("ClosestHit", "", "", 0);  // Primary ray hit group at index 0
-    context.announce_hitgroup("ShadowHit", "", "", 1);   // Shadow ray hit group at index 1
-    context.announce_miss("Miss", 0);       // Primary ray miss shader at index 0
-    context.announce_miss("ShadowMiss", 1); // Shadow ray miss shader at index 1
+    context.announce_hitgroup(
+        "ClosestHit", "", "", 0);  // Primary ray hit group at index 0
+    context.announce_hitgroup(
+        "ShadowHit", "", "", 1);       // Shadow ray hit group at index 1
+    context.announce_miss("Miss", 0);  // Primary ray miss shader at index 0
+    context.announce_miss(
+        "ShadowMiss", 1);  // Shadow ray miss shader at index 1
 
-    for (auto &callable : callable_shaders) {
+    for (auto& callable : callable_shaders) {
         context.announce_callable(callable.second, callable.first);
     }
 

@@ -454,31 +454,72 @@ void ClosestHit(
 [shader("miss")]
 void Miss(inout RayPayload payload)
 {
-    // Enhanced environment lighting with realistic sky model
     float3 rayDir = WorldRayDirection();
+    float3 envColor = float3(0, 0, 0);
+    
+    // Check if we have a dome light
+    bool hasDomeLight = false;
+    LightData domeLight;
+    
+    for (uint i = 0; i < lightCount; i++) {
+        LightData light = lightBuffer[i];
+        if (light.type == uint(LightType::Dome)) {
+            hasDomeLight = true;
+            domeLight = light;
+            break;
+        }
+    }
+    
+    if (hasDomeLight) {
+        // Apply dome light transformation to ray direction
+        // Transform ray direction from world space to dome light local space
+        float3 localDir = mul(float4(rayDir, 0.0), domeLight.transMat).xyz;
+        localDir = normalize(localDir);
+        
+        if (domeLight.textureIndex >= 0) {
+            // Sample environment texture using spherical coordinates
+            // Convert direction to spherical coordinates (latitude-longitude mapping)
+            float phi = atan2(localDir.z, localDir.x);
+            float theta = acos(clamp(localDir.y, -1.0, 1.0));
+            
+            // Convert to UV coordinates [0,1]
+            float u = (phi + 3.14159265359) / (2.0 * 3.14159265359);
+            float v = theta / 3.14159265359;
+            
+            // Sample from bindless texture array
+            // Use trilinear filtering (sampler index 1 = clamp + linear)
+            float4 texColor = t_BindlessTextures[domeLight.textureIndex].SampleLevel(samplers[1], float2(u, v), 0);
+            envColor = texColor.rgb * domeLight.intensity;
+        }
+        else {
+            // No texture, use solid color intensity
+            envColor = domeLight.intensity;
+        }
+    }
+    else {
+        // Fallback: Enhanced environment lighting with realistic sky model
+        float3 horizonColor = float3(0.8, 0.9, 1.0);
+        float3 zenithColor = float3(0.2, 0.4, 0.8);
+        float3 sunsetColor = float3(0.9, 0.5, 0.2);
 
-    // Sky gradient parameters
-    float3 horizonColor = float3(0.8, 0.9, 1.0);
-    float3 zenithColor = float3(0.2, 0.4, 0.8);
-    float3 sunsetColor = float3(0.9, 0.5, 0.2);
+        // Calculate sky color based on ray direction
+        float skyBlend = pow(max(0.0, rayDir.z + 0.1), 0.8);
+        float3 skyColor = lerp(horizonColor, zenithColor, skyBlend);
 
-    // Calculate sky color based on ray direction
-    float skyBlend = pow(max(0.0, rayDir.z + 0.1), 0.8);
-    float3 skyColor = lerp(horizonColor, zenithColor, skyBlend);
+        // Add sun and sunset glow
+        float3 sunDir = normalize(float3(0.5, 0.5, 0.5));
+        float sunDot = max(0.0, dot(rayDir, sunDir));
+        float sunIntensity = pow(sunDot, 128.0) * 0.1;
+        float sunsetIntensity = pow(sunDot, 8.0) * (1.0 - rayDir.z * 0.5);
 
-    // Add sun and sunset glow
-    float3 sunDir = normalize(float3(0.5, 0.5, 0.5));
-    float sunDot = max(0.0, dot(rayDir, sunDir));
-    float sunIntensity = pow(sunDot, 128.0) * 0.1;
-    float sunsetIntensity = pow(sunDot, 8.0) * (1.0 - rayDir.z * 0.5);
+        skyColor += float3(1.0, 0.9, 0.7) * sunIntensity;
+        skyColor += sunsetColor * sunsetIntensity * (1.0 - skyBlend) * 0.4;
 
-    skyColor += float3(1.0, 0.9, 0.7) * sunIntensity;
-    skyColor += sunsetColor * sunsetIntensity * (1.0 - skyBlend) * 0.4;
+        envColor = skyColor * 0.0; // Fallback disabled by default
+    }
 
     // Add contribution to path
-    // skyColor = 0.5f;
-    payload.color += payload.throughput * skyColor * 0.0;
-
+    payload.color += payload.throughput * envColor;
     payload.terminated = true;
 }
 
