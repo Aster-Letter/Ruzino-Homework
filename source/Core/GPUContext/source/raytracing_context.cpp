@@ -250,7 +250,11 @@ void RaytracingContext::finish_announcing_shader_names()
 
     // create the pipeline
     nvrhi::rt::PipelineDesc pipeline_desc;
-    pipeline_desc.maxPayloadSize = 16 * sizeof(float);
+    // CallableData size calculation:
+    // - Basic fields: ~80 bytes
+    // - VertexInfo: ~112 bytes
+    // Total: ~192 bytes + padding = 256 bytes for safety
+    pipeline_desc.maxPayloadSize = 64 * sizeof(float);  // 256 bytes
     pipeline_desc.globalBindingLayouts = vars_.get_binding_layout();
     pipeline_desc.maxRecursionDepth = 31;
     pipeline_desc.maxAttributeSize = 4 * sizeof(float);
