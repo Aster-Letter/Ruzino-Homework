@@ -146,12 +146,44 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
         std::make_unique<EagerNodeTreeExecutorRender>();
 
     node_system = create_dynamic_loading_system();
-    node_system->load_configuration("render_nodes.json");
+    
+    // Try multiple possible locations for render_nodes.json
+    std::vector<std::string> search_paths = {
+        "render_nodes.json",  // Current directory
+        "./render_nodes.json",
+        "../render_nodes.json",
+        "../../Binaries/Debug/render_nodes.json",
+        "../../Binaries/Release/render_nodes.json"
+    };
+    
+    bool config_loaded = false;
+    for (const auto& path : search_paths) {
+        if (std::filesystem::exists(path)) {
+            try {
+                node_system->load_configuration(path);
+                config_loaded = true;
+                spdlog::info("Loaded render_nodes.json from: {}", std::filesystem::absolute(path).string());
+                break;
+            } catch (const std::exception& e) {
+                spdlog::warn("Failed to load config from {}: {}", path, e.what());
+            }
+        }
+    }
+    
+    if (!config_loaded) {
+        spdlog::warn("Could not find render_nodes.json in search paths, node system may be empty");
+    }
+    
     auto plugin_path = std::filesystem::path("./renderer_plugins");
     if (std::filesystem::exists(plugin_path)) {
         for (auto& p : std::filesystem::directory_iterator(plugin_path)) {
             if (p.path().extension() == ".json") {
-                node_system->load_configuration(p.path().string());
+                try {
+                    node_system->load_configuration(p.path().string());
+                    spdlog::info("Loaded plugin config: {}", p.path().string());
+                } catch (const std::exception& e) {
+                    spdlog::warn("Failed to load plugin config {}: {}", p.path().string(), e.what());
+                }
             }
         }
     }

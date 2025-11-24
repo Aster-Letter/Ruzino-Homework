@@ -7,8 +7,8 @@ target_compile_definitions(shaders_interface INTERFACE RENDERER_SHADER_DIR="${CM
 USTC_CG_ADD_LIB(
 	hd_USTC_CG
 	SHARED
-	PUBLIC_LIBS spdlog::spdlog GPUContext usdMtlx MCore
-	PRIVATE_LIBS usd usdVol RHI hdx nodes_system shaders_interface usdImaging usdVol usdVolImaging hioOpenVDB
+	PUBLIC_LIBS spdlog::spdlog GPUContext usdMtlx MCore usdImaging usdImagingGL
+	PRIVATE_LIBS usd usdVol RHI hdx nodes_system shaders_interface usdVol usdVolImaging hioOpenVDB
 	COMPILE_DEFS
 		NOMINMAX USTC_CG_DIRECT_VK_DISPLAY
 	USD_RESOURCE_DIRS resources nodes/shaders
@@ -26,6 +26,7 @@ target_include_directories(hd_USTC_CG PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source)
 add_nodes(
 	TARGET_NAME render_nodes 
 	SRC_DIRS nodes
+	CONVERSION_DIRS nodes/conversion
 	DEP_LIBS usd RHI hd_USTC_CG usdImaging shaders_interface
 	COMPILE_DEFS NOMINMAX 
 	EXTRA_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/source
