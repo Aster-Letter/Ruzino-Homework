@@ -70,13 +70,13 @@ class ResourceAllocator {
         return;                                       \
     }
 
-#define RESOLVE_DESTROY(RESOURCE)                       \
-    PAYLOAD_NAME(RESOURCE) payload { handle, mAge, 0 }; \
-    resolveCacheDestroy(                                \
-        handle,                                         \
-        CACHE_SIZE(RESOURCE),                           \
-        payload,                                        \
-        CACHE_NAME(RESOURCE),                           \
+#define RESOLVE_DESTROY(RESOURCE)                      \
+    PAYLOAD_NAME(RESOURCE) payload{ handle, mAge, 0 }; \
+    resolveCacheDestroy(                               \
+        handle,                                        \
+        CACHE_SIZE(RESOURCE),                          \
+        payload,                                       \
+        CACHE_NAME(RESOURCE),                          \
         INUSE_NAME(RESOURCE));
 
    public:
@@ -94,13 +94,16 @@ class ResourceAllocator {
         }
     }
 
-#define CLEAR_CACHE(RESOURCE)                    \
-    assert(!INUSE_NAME(RESOURCE).size());        \
-    for (auto it = CACHE_NAME(RESOURCE).begin(); \
-         it != CACHE_NAME(RESOURCE).end();       \
-         it++) {                                 \
-        it->second.handle = nullptr;             \
-    }                                            \
+#define CLEAR_CACHE(RESOURCE)                                             \
+    if (INUSE_NAME(RESOURCE).size()) {                                    \
+        fprintf(stderr, "ERROR: Resource leak detected in " #RESOURCE " (%zu resources in use)\n", INUSE_NAME(RESOURCE).size()); \
+        fflush(stderr);                                                   \
+    }                                                                     \
+    for (auto it = CACHE_NAME(RESOURCE).begin();                          \
+         it != CACHE_NAME(RESOURCE).end();                                \
+         it++) {                                                          \
+        it->second.handle = nullptr;                                      \
+    }                                                                     \
     CACHE_NAME(RESOURCE).clear();
 
     void terminate() noexcept { MACRO_MAP(CLEAR_CACHE, RESOURCE_LIST) }
@@ -191,7 +194,7 @@ class ResourceAllocator {
     struct PAYLOAD_NAME(RESOURCE) {                                   \
         RESOURCE##Handle handle;                                      \
         size_t age = 0;                                               \
-        size_t size = 0;                                            \
+        size_t size = 0;                                              \
     };                                                                \
     using RESOURCE##CacheContainer =                                  \
         AssociativeContainer<RESOURCE##Desc, RESOURCE##CachePayload>; \
@@ -284,7 +287,7 @@ class ResourceAllocator {
         return gpu_resource_size(key);
 #endif
 
-        return size_t{0};
+        return size_t{ 0 };
     }
 
     template<typename RESOURCE>

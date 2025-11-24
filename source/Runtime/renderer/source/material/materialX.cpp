@@ -31,6 +31,10 @@ Hd_USTC_CG_MaterialX::Hd_USTC_CG_MaterialX(SdfPath const& id)
 {
     std::call_once(shader_gen_initialized_, []() {
         mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
+        
+        // Add current working directory to search path for libraries
+        searchPath.append(mx::FilePath(std::filesystem::current_path().string()));
+        
         searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
 
         loadLibraries({ "libraries" }, searchPath, libraries);
