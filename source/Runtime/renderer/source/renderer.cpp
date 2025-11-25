@@ -106,8 +106,6 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
 
     for (size_t i = 0; i < _aovBindings.size(); ++i) {
         std::string present_name;
-        nvrhi::TextureHandle texture = nullptr;
-        std::string found_node_ui_name;  // Track which node provided the texture
 
         if (_aovBindings[i].aovName == HdAovTokens->depth) {
             present_name = "present_depth";
@@ -117,46 +115,54 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
             present_name = "present_color";
         }
 
+        // Find ALL present nodes of this type and store each one with data
         for (auto&& node : node_system->get_node_tree()->nodes) {
-            auto try_fetch_info = [&node, node_system]<typename T>(
-                                      const char* id_name, T& obj) {
-                if (std::string(node->typeinfo->id_name) == id_name) {
-                    assert(node->get_inputs().size() == 1);
-                    auto output_socket = node->get_inputs()[0];
-                    entt::meta_any data;
-                    node_system->get_node_tree_executor()
-                        ->sync_node_to_external_storage(output_socket, data);
-                    if (data)
-                        obj = data.cast<T>();
-                }
-            };
-            try_fetch_info(present_name.c_str(), texture);
-            if (texture) {
-                found_node_ui_name = node->ui_name;  // Save node name when found
-                break;
+            if (std::string(node->typeinfo->id_name) != present_name) {
+                continue;  // Skip non-matching nodes
             }
-        }
-        if (texture) {
-            auto rb = static_cast<Hd_USTC_CG_RenderBuffer*>(
-                _aovBindings[i].renderBuffer);
-#ifdef USTC_CG_DIRECT_VK_DISPLAY
-            // Store texture with node's UI name for later retrieval
-            std::string texture_name = found_node_ui_name.empty() ? 
-                present_name : found_node_ui_name;
+            
+            // Try to fetch texture from this node
+            assert(node->get_inputs().size() == 1);
+            auto output_socket = node->get_inputs()[0];
+            entt::meta_any data;
+            node_system->get_node_tree_executor()
+                ->sync_node_to_external_storage(output_socket, data);
+            
+            if (!data) {
+                continue;  // Skip nodes with no data
+            }
+            
+            nvrhi::TextureHandle texture = data.cast<nvrhi::TextureHandle>();
+            if (!texture) {
+                continue;  // Skip invalid textures
+            }
+            
+            // Store texture with node's UI name
+            std::string texture_name = node->ui_name.empty() ? 
+                present_name : node->ui_name;
             render_param->presented_textures[texture_name] = texture;
+            
+            spdlog::info("Stored texture with name: '{}'", texture_name);
             
             // Keep backward compatibility: first texture becomes default
             if (render_param->default_texture_name.empty()) {
                 render_param->default_texture_name = texture_name;
+                spdlog::info("Set default texture to: '{}'", texture_name);
             }
+            
+            // Update render buffer
+            auto rb = static_cast<Hd_USTC_CG_RenderBuffer*>(
+                _aovBindings[i].renderBuffer);
+#ifdef USTC_CG_DIRECT_VK_DISPLAY
+            // Already stored above
 #else
             rb->Present(texture);
 #endif
             rb->SetConverged(true);
         }
 
-        else if (render_param->default_texture_name.empty()) {
-            // Create empty texture if nothing was presented
+        // Create empty texture if nothing was presented
+        if (render_param->default_texture_name.empty()) {
             auto empty_tex = create_empty_texture(
                 GfVec2i{ 16, 16 }, nvrhi::Format::RGBA32_FLOAT);
             render_param->presented_textures["_empty"] = empty_tex;

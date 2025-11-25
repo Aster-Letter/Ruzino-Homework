@@ -149,7 +149,8 @@ print()
 # Create HydraRenderer with material-bound USD scene
 print(f"Loading USD stage: {output_usd}")
 try:
-    hydra = renderer.HydraRenderer(str(output_usd), width=512, height=512)
+    # Use same resolution as BRDF analyzer
+    hydra = renderer.HydraRenderer(str(output_usd), width=RESOLUTION, height=RESOLUTION)
     print("✓ HydraRenderer created successfully")
 except Exception as e:
     print(f"✗ Failed to create HydraRenderer: {e}")
@@ -157,8 +158,31 @@ except Exception as e:
     traceback.print_exc()
     exit(1)
 
-# Render a frame to initialize materials
-print("Rendering frame to initialize materials...")
+# Get node system (already initialized by HydraRenderer)
+node_system = hydra.get_node_system()
+
+# Load render nodes configuration if not already loaded
+config_path = binary_dir / "render_nodes.json"
+if config_path.exists():
+    print(f"Loading render nodes configuration from: {config_path}")
+    try:
+        node_system.load_configuration(str(config_path))
+        print("✓ Configuration loaded successfully")
+    except Exception as e:
+        print(f"✗ Failed to load configuration: {e}")
+        exit(1)
+else:
+    print(f"✗ Configuration file not found: {config_path}")
+    exit(1)
+
+tree = node_system.get_node_tree()
+executor = node_system.get_node_tree_executor()
+
+print(f"Available node types: {tree.get_all_node_types() if hasattr(tree, 'get_all_node_types') else 'N/A'}")
+print(f"Current node count: {len(tree.nodes) if hasattr(tree, 'nodes') else 'N/A'}")
+
+# Render a frame first to initialize materials
+print("Rendering initialization frame...")
 try:
     hydra.render()
     print("✓ Frame rendered, materials should be loaded")
@@ -166,19 +190,6 @@ except Exception as e:
     print(f"✗ Failed to render: {e}")
 
 print()
-
-# Build analysis graph
-node_system = hydra.get_node_system()
-config_path = binary_dir / "render_nodes.json"
-print(f"Loading configuration from: {config_path}")
-print(f"Config file exists: {config_path.exists()}")
-node_system.load_configuration(str(config_path))
-node_system.init()
-
-tree = node_system.get_node_tree()
-executor = node_system.get_node_tree_executor()
-
-print(f"Available node types: {tree.get_all_node_types() if hasattr(tree, 'get_all_node_types') else 'N/A'}")
 
 # Create BRDF analyzer node
 try:
@@ -189,7 +200,7 @@ except Exception as e:
     exit(1)
 analyzer.ui_name = "BRDFAnalyzer"
 
-# Create present nodes for each output
+# Create present nodes for all three outputs
 present_eval = tree.add_node("present_color")
 present_eval.ui_name = "PresentEval"
 present_pdf = tree.add_node("present_color")
@@ -202,8 +213,15 @@ tree.add_link(analyzer.get_output_socket("BRDF Eval"), present_eval.get_input_so
 tree.add_link(analyzer.get_output_socket("PDF"), present_pdf.get_input_socket("Color"))
 tree.add_link(analyzer.get_output_socket("Sample Distribution"), present_sample.get_input_socket("Color"))
 
-# Set analysis parameters
-incident_dir_x, incident_dir_y, incident_dir_z = 0.0, 0.0, 1.0  # Normal incidence
+# Set analysis parameters (common for all three analyses)
+incident_dir_x, incident_dir_y, incident_dir_z = 0.0, 1.0, 1.0  # Normal incidence
+
+# Normalize incident direction
+incident_dir_length = np.sqrt(incident_dir_x**2 + incident_dir_y**2 + incident_dir_z**2)
+if incident_dir_length > 0:
+    incident_dir_x /= incident_dir_length
+    incident_dir_y /= incident_dir_length
+    incident_dir_z /= incident_dir_length
 uv_x, uv_y = 0.5, 0.5
 
 inputs = {
@@ -223,54 +241,64 @@ print(f"  Resolution: {RESOLUTION}x{RESOLUTION}")
 print(f"  Number of samples: {NUM_SAMPLES}")
 print()
 
-# Execute analysis for BRDF Eval
-print("1/3 Computing BRDF Eval distribution...")
-executor.reset_allocator()
-executor.prepare_tree(tree, present_eval)
-set_node_inputs(executor, inputs)
-executor.execute_tree(tree)
+# Execute analysis (all three at once)
+print("Computing BRDF analysis (Eval + PDF + Sample Distribution)...")
+try:
+    executor.reset_allocator()
+    # Use present_eval as root, but it will execute the whole tree
+    executor.prepare_tree(tree, present_eval)
+    set_node_inputs(executor, inputs)
+    hydra.render()
+    print("✓ Rendering complete")
+except Exception as e:
+    print(f"✗ Failed during rendering: {e}")
+    import traceback
+    traceback.print_exc()
+    exit(1)
 
-brdf_eval_data = hydra.get_output_texture("PresentEval")
-eval_array = np.array(brdf_eval_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
-print(f"✓ BRDF Eval: mean={eval_array[:,:,:3].mean():.6f}, max={eval_array[:,:,:3].max():.6f}")
-
-# Execute analysis for PDF
-print("2/3 Computing PDF distribution...")
-executor.reset_allocator()
-executor.prepare_tree(tree, present_pdf)
-set_node_inputs(executor, inputs)
-executor.execute_tree(tree)
-
-pdf_data = hydra.get_output_texture("PresentPDF")
-pdf_array = np.array(pdf_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
-print(f"✓ PDF: mean={pdf_array[:,:,:3].mean():.6f}, max={pdf_array[:,:,:3].max():.6f}")
-
-# Execute analysis for Sample Distribution
-print("3/3 Computing Sample Distribution...")
-executor.reset_allocator()
-executor.prepare_tree(tree, present_sample)
-set_node_inputs(executor, inputs)
-executor.execute_tree(tree)
-
-sample_data = hydra.get_output_texture("PresentSample")
-sample_array = np.array(sample_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
-print(f"✓ Sample Distribution: mean={sample_array[:,:,:3].mean():.6f}, max={sample_array[:,:,:3].max():.6f}")
+# Retrieve all three outputs
+print("\n Retrieving outputs...")
+try:
+    brdf_eval_data = hydra.get_output_texture("PresentEval")
+    eval_array = np.array(brdf_eval_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
+    print(f"✓ BRDF Eval: mean={eval_array[:,:,:3].mean():.6f}, max={eval_array[:,:,:3].max():.6f}")
+    
+    pdf_data = hydra.get_output_texture("PresentPDF")
+    pdf_array = np.array(pdf_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
+    print(f"✓ PDF: mean={pdf_array[:,:,:3].mean():.6f}, max={pdf_array[:,:,:3].max():.6f}")
+    
+    sample_data = hydra.get_output_texture("PresentSample")
+    sample_array = np.array(sample_data, dtype=np.float32).reshape(RESOLUTION, RESOLUTION, 4)
+    print(f"✓ Sample Distribution: mean={sample_array[:,:,:3].mean():.6f}, max={sample_array[:,:,:3].max():.6f}")
+except Exception as e:
+    print(f"✗ Failed to retrieve textures: {e}")
+    import traceback
+    traceback.print_exc()
+    exit(1)
 print()
 
 # Save images
 try:
     from PIL import Image
     
-    def save_texture(array, filename):
+    def save_texture(array, filename, log_scale=False):
         rgb = array[:, :, :3]
-        img_uint8 = (np.clip(rgb, 0, 1) * 255).astype(np.uint8)
+        
+        if log_scale:
+            # Use log scale for BRDF/PDF values
+            rgb_vis = np.log1p(np.clip(rgb, 0, None))  # log(1+x) to handle 0s
+            rgb_vis = rgb_vis / (rgb_vis.max() + 1e-8)  # Normalize to [0,1]
+        else:
+            rgb_vis = np.clip(rgb, 0, 1)
+        
+        img_uint8 = (rgb_vis * 255).astype(np.uint8)
         img_uint8 = np.flipud(img_uint8)
         Image.fromarray(img_uint8).save(filename)
         print(f"✓ Saved: {filename}")
     
-    save_texture(eval_array, "./brdf_eval.png")
-    save_texture(pdf_array, "./brdf_pdf.png")
-    save_texture(sample_array, "./brdf_sample_distribution.png")
+    save_texture(eval_array, "./brdf_eval.png", log_scale=True)
+    save_texture(pdf_array, "./brdf_pdf.png", log_scale=True)
+    save_texture(sample_array, "./brdf_sample_distribution.png", log_scale=False)
     
 except ImportError:
     print("✗ PIL not available, skipping image save")
@@ -279,3 +307,4 @@ print()
 print("="*70)
 print("✓ BRDF Analysis Complete!")
 print("="*70)
+

@@ -539,6 +539,8 @@ VtValue Hd_USTC_CG_RenderDelegate::GetRenderSetting(TfToken const& key) const
 #ifdef USTC_CG_DIRECT_VK_DISPLAY
     if (key == TfToken("VulkanColorAov")) {
         // Legacy: return default texture for backward compatibility
+        spdlog::info("GetRenderSetting: VulkanColorAov (default), default_name='{}'", 
+                     _renderParam->default_texture_name);
         if (!_renderParam->default_texture_name.empty()) {
             auto it = _renderParam->presented_textures.find(_renderParam->default_texture_name);
             if (it != _renderParam->presented_textures.end() && it->second) {
@@ -553,9 +555,19 @@ VtValue Hd_USTC_CG_RenderDelegate::GetRenderSetting(TfToken const& key) const
     std::string key_str = key.GetString();
     if (key_str.rfind("VulkanColorAov:", 0) == 0) {
         std::string texture_name = key_str.substr(15);  // Skip "VulkanColorAov:"
+        spdlog::info("GetRenderSetting: VulkanColorAov with name '{}'", texture_name);
+        spdlog::info("  presented_textures.size() = {}", _renderParam->presented_textures.size());
         auto it = _renderParam->presented_textures.find(texture_name);
-        if (it != _renderParam->presented_textures.end() && it->second) {
-            return VtValue(reinterpret_cast<const void*>(&it->second));
+        if (it != _renderParam->presented_textures.end()) {
+            spdlog::info("  Found texture '{}' in map", texture_name);
+            if (it->second) {
+                spdlog::info("  Texture handle is valid");
+                return VtValue(reinterpret_cast<const void*>(&it->second));
+            } else {
+                spdlog::warn("  Texture handle is null");
+            }
+        } else {
+            spdlog::warn("  Texture '{}' not found in map", texture_name);
         }
     }
 #endif

@@ -152,19 +152,23 @@ public:
         if (name.empty()) {
             // Legacy: get default texture
             token_key = pxr::TfToken("VulkanColorAov");
+            spdlog::info("Getting default texture");
         } else {
             // New: get named texture
             token_key = pxr::TfToken("VulkanColorAov:" + name);
+            spdlog::info("Getting texture by name: '{}'", name);
         }
         
         auto hacked_handle = engine_->GetRendererSetting(token_key);
         if (!hacked_handle.IsHolding<const void*>()) {
             if (!name.empty()) {
+                spdlog::error("Failed to get texture '{}' - handle not holding void*", name);
                 throw std::runtime_error("Failed to get output texture '" + name + "'");
             }
             throw std::runtime_error("Failed to get output texture");
         }
         
+        spdlog::info("Got texture handle successfully");
         auto bare_pointer = hacked_handle.Get<const void*>();
         auto texture = *static_cast<nvrhi::ITexture**>(const_cast<void*>(bare_pointer));
         
