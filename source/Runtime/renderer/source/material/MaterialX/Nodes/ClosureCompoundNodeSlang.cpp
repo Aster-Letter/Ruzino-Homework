@@ -227,7 +227,7 @@ void ClosureCompoundNodeSlang::emitFunctionCall(
             
             // Begin function call to packStandardSurfaceMaterialParams
             shadergen.emitLineBegin(stage);
-            shadergen.emitString("StandardSurfaceMaterialParams params = packStandardSurfaceMaterialParams(", stage);
+            shadergen.emitString("PackedStandardSurfaceMaterialParams params = packStandardSurfaceMaterialParams(", stage);
             shadergen.emitLineEnd(stage, false);
             
             // Emit all parameters to the packing function

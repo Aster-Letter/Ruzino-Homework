@@ -389,15 +389,16 @@ void ClosestHit(
 
     CallShader(fetchData.shader_type_id, evalData);
 
-    // This commented part works for the correct id, but with callable it's wrong!
+    // This commented part works for the correct id, but with callable it's
+    // wrong!
     // // Read parameters from buffer
     // MaterialParams params_blob =
     //     materialParamsBuffer[fetchData.material_params_index];
-    // StandardSurfaceMaterialParams params;
+    // PackedStandardSurfaceMaterialParams params;
 
     // // Copy data from buffer (assuming MaterialParams can be reinterpreted)
     // // In practice, you might need proper unpacking
-    // params = reinterpret<StandardSurfaceMaterialParams>(params_blob);
+    // params = reinterpret<PackedStandardSurfaceMaterialParams>(params_blob);
 
     // payload.color = params.base_color;  // Temporary assignment
     // payload.terminated = true;
@@ -591,11 +592,15 @@ void eval_standard_surface(inout EvalCallableData data)
     // Read parameters from buffer
     MaterialParams params_blob =
         materialParamsBuffer[data.material_params_index];
-    StandardSurfaceMaterialParams params;
+    PackedStandardSurfaceMaterialParams pakced_params;
 
     // Copy data from buffer (assuming MaterialParams can be reinterpreted)
     // In practice, you might need proper unpacking
-    params = reinterpret<StandardSurfaceMaterialParams>(params_blob);
+    pakced_params =
+        reinterpret<PackedStandardSurfaceMaterialParams>(params_blob);
+
+    StandardSurfaceMaterialParams params =
+        unpackStandardSurfaceMaterialParams(pakced_params);
 
     VertexData vd;
     vd.normalWorld = data.vertexInfo.normalW;
@@ -757,7 +762,6 @@ void eval_standard_surface(inout EvalCallableData data)
         weight_result);
 
     data.throughput = weight_result.color;
-
 }
 
 // Preview Surface evaluation
