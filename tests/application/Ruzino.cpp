@@ -1,9 +1,12 @@
+#include <MaterialXCore/Document.h>
+#include <MaterialXFormat/XmlIo.h>
 #include <rzconsole/ConsoleInterpreter.h>
 #include <rzconsole/ConsoleObjects.h>
 #include <rzconsole/imgui_console.h>
 #include <rzconsole/spdlog_console_sink.h>
 #include <spdlog/spdlog.h>
 
+#include <any>
 #include <filesystem>
 #include <rzpython/interpreter.hpp>
 #include <rzpython/rzpython.hpp>
@@ -12,6 +15,9 @@
 #include "GCore/algorithms/intersection.h"
 #include "GCore/geom_payload.hpp"
 #include "GUI/window.h"
+#include "MCore/MaterialXDocumentViewer.hpp"
+#include "MCore/MaterialXNodeTree.hpp"
+#include "MCore/MaterialXNodeTreeWidget.h"
 #include "cmdparser.hpp"
 #include "nodes/system/node_system.hpp"
 #include "nodes/ui/imgui.hpp"
@@ -25,6 +31,65 @@
 
 
 using namespace USTC_CG;
+namespace mx = MaterialX;
+
+class MaterialXNodeSystem : public NodeSystem {
+   public:
+    MaterialXNodeSystem()
+    {
+        descriptor = std::make_shared<MaterialXNodeTreeDescriptor>();
+    }
+
+    // Factory method to create a MaterialX system with a default material
+    // document
+    static std::shared_ptr<MaterialXNodeSystem> create_with_default_material(
+        const std::string& material_name)
+    {
+        auto system = std::make_shared<MaterialXNodeSystem>();
+
+        // Create a minimal MaterialX document in memory using MaterialX API
+        mx::DocumentPtr doc = mx::createDocument();
+
+        // Create only a surface material node
+        mx::NodePtr materialNode =
+            doc->addNode("surfacematerial", material_name, "material");
+
+        // Create MaterialXNodeTree with the in-memory document
+        std::unique_ptr<NodeTree> tree = std::make_unique<MaterialXNodeTree>(
+            system->node_tree_descriptor(), doc);
+
+        system->init(std::move(tree));
+        system->set_node_tree_executor(create_node_tree_executor({}));
+
+        return system;
+    }
+
+    void set_node_tree_executor(
+        std::unique_ptr<NodeTreeExecutor> executor) override
+    {
+    }
+
+    bool load_configuration(const std::string& config) override
+    {
+        return true;
+    }
+
+    ~MaterialXNodeSystem() override
+    {
+    }
+
+    void execute(bool is_ui_execution, Node* required_node) const override
+    {
+    }
+
+    std::shared_ptr<NodeTreeDescriptor> node_tree_descriptor() override
+    {
+        return descriptor;
+    }
+
+   private:
+    std::shared_ptr<MaterialXNodeTreeDescriptor> descriptor;
+};
 
 class PythonConsoleWidgetFactory : public IWidgetFactory {
    public:
@@ -224,6 +289,79 @@ int main(int argc, char* argv[])
 
     // Add Python reference to window for console access
     python::reference("window", window.get());
+
+    // Storage for material editor systems to keep them alive
+    // Using a map to track systems by material path for better lifecycle management
+    static std::unordered_map<std::string, std::shared_ptr<MaterialXNodeSystem>> material_systems;
+
+    // Subscribe to material editor events
+    window->events().subscribe(
+        "material_editor_requested",
+        [&stage, &window](const std::string& material_path_str) {
+            spdlog::info(
+                "Material editor requested for: {}", material_path_str);
+
+            pxr::SdfPath material_path(material_path_str);
+            auto material_prim =
+                stage->get_usd_stage()->GetPrimAtPath(material_path);
+
+            if (!material_prim || !material_prim.IsA<pxr::UsdShadeMaterial>()) {
+                spdlog::error("Invalid material prim: {}", material_path_str);
+                return;
+            }
+
+            try {
+                // Check if system already exists for this material
+                std::shared_ptr<MaterialXNodeSystem> mtlx_system;
+                auto it = material_systems.find(material_path_str);
+
+                if (it != material_systems.end()) {
+                    // Reuse existing system
+                    mtlx_system = it->second;
+                    spdlog::info(
+                        "Reusing existing MaterialX system for: {}",
+                        material_path_str);
+                } else {
+                    // Create new system
+                    std::string safe_name = material_path.GetName();
+                    mtlx_system =
+                        MaterialXNodeSystem::create_with_default_material(
+                            safe_name);
+                    material_systems[material_path_str] = mtlx_system;
+                    spdlog::info(
+                        "Created new MaterialX system for: {}",
+                        material_path_str);
+                }
+
+                // Create widget
+                FileBasedNodeWidgetSettings widget_desc;
+                widget_desc.system = mtlx_system;
+                widget_desc.json_path = material_path_str + "_editor.json";
+
+                std::unique_ptr<IWidget> node_widget =
+                    std::make_unique<MaterialXNodeTreeWidget>(widget_desc);
+
+                window->register_widget(std::move(node_widget));
+                spdlog::info(
+                    "MaterialX editor opened for: {}", material_path_str);
+            }
+            catch (const std::exception& e) {
+                spdlog::error(
+                    "Failed to create MaterialX editor: {}", e.what());
+            }
+        });
+
+    // Subscribe to document viewer events
+    window->events().subscribe(
+        "material_doc_viewer_requested",
+        [&stage, &window](const std::string& material_path_str) {
+            spdlog::info(
+                "Material document viewer requested for: {}",
+                material_path_str);
+
+            // TODO: Implement document viewer creation
+            // This would create a MaterialXDocumentViewer widget
+        });
 
     window->register_function_after_frame([&stage,
                                            render_bare](Window* window) {

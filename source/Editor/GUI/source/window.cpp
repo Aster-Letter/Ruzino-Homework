@@ -1,6 +1,8 @@
 #include "GUI/window.h"
+#include "spdlog/spdlog.h"
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
+#include <any>
 #include <imgui.h>
 
 #include <RHI/rhi.hpp>
@@ -20,10 +22,25 @@ void WindowEventSystem::subscribe(const std::string& event_name, EventCallback c
     subscribers_[event_name].push_back(callback);
 }
 
+void WindowEventSystem::subscribe_any(const std::string& event_name, EventCallbackAny callback)
+{
+    subscribers_any_[event_name].push_back(callback);
+}
+
 void WindowEventSystem::emit(const std::string& event_name, const std::string& event_data)
 {
     auto it = subscribers_.find(event_name);
     if (it != subscribers_.end()) {
+        for (auto& callback : it->second) {
+            callback(event_data);
+        }
+    }
+}
+
+void WindowEventSystem::emit_any(const std::string& event_name, const std::any& event_data)
+{
+    auto it = subscribers_any_.find(event_name);
+    if (it != subscribers_any_.end()) {
         for (auto& callback : it->second) {
             callback(event_data);
         }
@@ -64,6 +81,7 @@ class DockingImguiRenderer final : public ImGui_Renderer {
     void buildUI() override;
 
     std::vector<std::unique_ptr<IWidget>> widgets_;
+    std::vector<std::unique_ptr<IWidget>> pending_widgets_;
     Window* window_;
     std::vector<std::function<void(Window*)>> callbacks_before_frame_;
     std::vector<std::function<void(Window*)>> callbacks_after_frame_;
@@ -212,16 +230,21 @@ void DockingImguiRenderer::register_openable_widget(
 
 void DockingImguiRenderer::register_widget(std::unique_ptr<IWidget> widget)
 {
+    if (!widget) {
+        return;
+    }
+    
     // If the widget with the "UniqueName" exists, replace it
     std::string unique_name = widget->GetWindowUniqueName();
     for (auto& w : widgets_) {
-        if (w->GetWindowUniqueName() == unique_name) {
+        if (w && w->GetWindowUniqueName() == unique_name) {
             w = std::move(widget);
             return;
         }
     }
 
-    widgets_.push_back(std::move(widget));
+    // Add to pending queue to avoid modifying widgets_ during iteration
+    pending_widgets_.push_back(std::move(widget));
 }
 
 void DockingImguiRenderer::drawMenuBar()
@@ -240,6 +263,16 @@ void DockingImguiRenderer::drawMenuBar()
 
 void DockingImguiRenderer::buildUI()
 {
+    // Process pending widgets before frame callbacks
+    if (!pending_widgets_.empty()) {
+        for (auto& widget : pending_widgets_) {
+            if (widget) {
+                widgets_.push_back(std::move(widget));
+            }
+        }
+        pending_widgets_.clear();
+    }
+    
     for (auto&& callback : callbacks_before_frame_) {
         callback(window_);
     }
@@ -273,6 +306,11 @@ void DockingImguiRenderer::buildUI()
         ImGuiDockNodeFlags_PassthruCentralNode);
     std::vector<IWidget*> widget_to_remove;
     for (auto& widget : widgets_) {
+        if (!widget) {
+            spdlog::warn("Empty widget encountered!");
+            continue;
+        }
+        
         if (widget->Begin()) {
             // Draw widget-specific menu bar if it has one
             if (widget->HasMenuBar()) {

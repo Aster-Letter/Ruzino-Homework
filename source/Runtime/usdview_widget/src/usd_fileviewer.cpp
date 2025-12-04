@@ -1,17 +1,18 @@
+#include <pxr/usd/usdGeom/pointInstancer.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
-
-#include "widgets/usdtree/usd_fileviewer.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <any>
 #include <cmath>
+#include <filesystem>
 #include <future>
 #include <map>
 #include <vector>
-#include <filesystem>
 
 #include "GUI/ImGuiFileDialog.h"
+#include "GUI/window.h"
 #include "imgui.h"
 #include "macro_map.h"
 #include "pxr/base/gf/matrix4f.h"
@@ -20,9 +21,14 @@
 #include "pxr/base/vt/visitValue.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
+#include "pxr/usd/usd/primRange.h"
 #include "pxr/usd/usd/property.h"
 #include "pxr/usd/usdGeom/xformOp.h"
+#include "pxr/usd/usdShade/material.h"
+#include "pxr/usd/usdShade/materialBindingAPI.h"
 #include "stage/stage.hpp"
+#include "widgets/usdtree/usd_fileviewer.h"
+
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
@@ -429,6 +435,11 @@ void UsdFileViewer::EditValue()
         ImGui::Text("Type: %s", prim.GetTypeName().GetText());
         ImGui::Text("Active: %s", prim.IsActive() ? "Yes" : "No");
         ImGui::Separator();
+
+        // Show material binding UI for geometry prims
+        if (is_geometry_prim(prim)) {
+            show_material_binding_ui(prim);
+        }
     }
 
     // Transform controls in a collapsible section
@@ -733,31 +744,45 @@ void UsdFileViewer::EditValue()
                         else if (v.IsHolding<std::string>())
                         {
                             std::string value = v.Get<std::string>();
-                            
-                            // Special handling for shader_path attribute - show as dropdown
+
+                            // Special handling for shader_path attribute - show
+                            // as dropdown
                             if (attrName == "shader_path") {
                                 // Scan for available dome light shaders
                                 std::vector<std::string> shaderFiles;
-                                shaderFiles.push_back(""); // Empty option
-                                
-                                std::filesystem::path shaderDir = "../../source/Runtime/renderer/nodes/shaders/shaders/callables";
+                                shaderFiles.push_back("");  // Empty option
+
+                                std::filesystem::path shaderDir =
+                                    "../../source/Runtime/renderer/nodes/"
+                                    "shaders/shaders/callables";
                                 if (std::filesystem::exists(shaderDir)) {
                                     try {
-                                        for (const auto& entry : std::filesystem::directory_iterator(shaderDir)) {
+                                        for (const auto& entry : std::
+                                                 filesystem::directory_iterator(
+                                                     shaderDir)) {
                                             if (entry.is_regular_file()) {
-                                                std::string filename = entry.path().filename().string();
-                                                if (filename.find("eval_dome_light") != std::string::npos && 
-                                                    entry.path().extension() == ".slang") {
+                                                std::string filename =
+                                                    entry.path()
+                                                        .filename()
+                                                        .string();
+                                                if (filename.find(
+                                                        "eval_dome_light") !=
+                                                        std::string::npos &&
+                                                    entry.path().extension() ==
+                                                        ".slang") {
                                                     // Store relative path
-                                                    shaderFiles.push_back("shaders/callables/" + filename);
+                                                    shaderFiles.push_back(
+                                                        "shaders/callables/" +
+                                                        filename);
                                                 }
                                             }
                                         }
-                                    } catch (...) {
+                                    }
+                                    catch (...) {
                                         // Ignore filesystem errors
                                     }
                                 }
-                                
+
                                 // Find current selection index
                                 int currentIdx = 0;
                                 for (int i = 0; i < shaderFiles.size(); i++) {
@@ -766,26 +791,41 @@ void UsdFileViewer::EditValue()
                                         break;
                                     }
                                 }
-                                
-                                // If current value is not in list and not empty, add it
+
+                                // If current value is not in list and not
+                                // empty, add it
                                 if (currentIdx == 0 && !value.empty()) {
                                     shaderFiles.push_back(value + " (custom)");
                                     currentIdx = shaderFiles.size() - 1;
                                 }
-                                
-                                const char* previewText = currentIdx == 0 ? "(none)" : 
-                                    (currentIdx < shaderFiles.size() ? shaderFiles[currentIdx].c_str() : value.c_str());
-                                
+
+                                const char* previewText =
+                                    currentIdx == 0
+                                        ? "(none)"
+                                        : (currentIdx < shaderFiles.size()
+                                               ? shaderFiles[currentIdx].c_str()
+                                               : value.c_str());
+
                                 if (ImGui::BeginCombo("##value", previewText)) {
-                                    for (int i = 0; i < shaderFiles.size(); i++) {
+                                    for (int i = 0; i < shaderFiles.size();
+                                         i++) {
                                         bool isSelected = (currentIdx == i);
-                                        const char* label = i == 0 ? "(none)" : shaderFiles[i].c_str();
-                                        if (ImGui::Selectable(label, isSelected)) {
-                                            // Remove " (custom)" suffix if present
-                                            std::string selectedPath = shaderFiles[i];
-                                            size_t customPos = selectedPath.find(" (custom)");
-                                            if (customPos != std::string::npos) {
-                                                selectedPath = selectedPath.substr(0, customPos);
+                                        const char* label =
+                                            i == 0 ? "(none)"
+                                                   : shaderFiles[i].c_str();
+                                        if (ImGui::Selectable(
+                                                label, isSelected)) {
+                                            // Remove " (custom)" suffix if
+                                            // present
+                                            std::string selectedPath =
+                                                shaderFiles[i];
+                                            size_t customPos =
+                                                selectedPath.find(" (custom)");
+                                            if (customPos !=
+                                                std::string::npos) {
+                                                selectedPath =
+                                                    selectedPath.substr(
+                                                        0, customPos);
                                             }
                                             attr.Set(selectedPath);
                                         }
@@ -795,12 +835,15 @@ void UsdFileViewer::EditValue()
                                     }
                                     ImGui::EndCombo();
                                 }
-                            } else {
+                            }
+                            else {
                                 // Normal string input
                                 char buffer[512];
-                                strncpy_s(buffer, value.c_str(), sizeof(buffer) - 1);
+                                strncpy_s(
+                                    buffer, value.c_str(), sizeof(buffer) - 1);
                                 buffer[sizeof(buffer) - 1] = '\0';
-                                if (ImGui::InputText("##value", buffer, sizeof(buffer))) {
+                                if (ImGui::InputText(
+                                        "##value", buffer, sizeof(buffer))) {
                                     attr.Set(std::string(buffer));
                                 }
                             }
@@ -810,9 +853,11 @@ void UsdFileViewer::EditValue()
                             SdfAssetPath assetPath = v.Get<SdfAssetPath>();
                             std::string pathStr = assetPath.GetAssetPath();
                             char buffer[512];
-                            strncpy_s(buffer, pathStr.c_str(), sizeof(buffer) - 1);
+                            strncpy_s(
+                                buffer, pathStr.c_str(), sizeof(buffer) - 1);
                             buffer[sizeof(buffer) - 1] = '\0';
-                            if (ImGui::InputText("##value", buffer, sizeof(buffer))) {
+                            if (ImGui::InputText(
+                                    "##value", buffer, sizeof(buffer))) {
                                 attr.Set(SdfAssetPath(std::string(buffer)));
                             }
                         }
@@ -821,9 +866,11 @@ void UsdFileViewer::EditValue()
                             TfToken token = v.Get<TfToken>();
                             std::string tokenStr = token.GetString();
                             char buffer[512];
-                            strncpy_s(buffer, tokenStr.c_str(), sizeof(buffer) - 1);
+                            strncpy_s(
+                                buffer, tokenStr.c_str(), sizeof(buffer) - 1);
                             buffer[sizeof(buffer) - 1] = '\0';
-                            if (ImGui::InputText("##value", buffer, sizeof(buffer))) {
+                            if (ImGui::InputText(
+                                    "##value", buffer, sizeof(buffer))) {
                                 attr.Set(TfToken(std::string(buffer)));
                             }
                         }
@@ -957,12 +1004,26 @@ void UsdFileViewer::show_right_click_menu()
         if (ImGui::BeginMenu("Create Material")) {
             if (ImGui::MenuItem("Material")) {
                 stage->create_material(selected);
+                materials_cache_dirty = true;
             }
             if (ImGui::MenuItem("Scratch Material")) {
                 auto material = stage->create_material(selected);
+                materials_cache_dirty = true;
             }
 
             ImGui::EndMenu();
+        }
+
+        // Material-specific operations
+        auto prim = stage->get_usd_stage()->GetPrimAtPath(selected);
+        if (prim && is_material_prim(prim)) {
+            ImGui::Separator();
+            if (ImGui::MenuItem("Edit MaterialX Node Graph")) {
+                open_material_editor(selected);
+            }
+            if (ImGui::MenuItem("View MaterialX Document")) {
+                open_material_document_viewer(selected);
+            }
         }
 
         if (selected != pxr::SdfPath("/")) {
@@ -1061,6 +1122,116 @@ UsdFileViewer::UsdFileViewer(Stage* stage) : stage(stage)
 
 UsdFileViewer::~UsdFileViewer()
 {
+}
+
+bool UsdFileViewer::is_material_prim(const pxr::UsdPrim& prim)
+{
+    return prim.IsA<pxr::UsdShadeMaterial>();
+}
+
+bool UsdFileViewer::is_geometry_prim(const pxr::UsdPrim& prim)
+{
+    return prim.IsA<pxr::UsdGeomMesh>() || prim.IsA<pxr::UsdGeomSphere>() ||
+           prim.IsA<pxr::UsdGeomCube>() || prim.IsA<pxr::UsdGeomCylinder>() ||
+           prim.IsA<pxr::UsdGeomPointInstancer>();
+}
+
+void UsdFileViewer::collect_all_materials()
+{
+    if (!materials_cache_dirty) {
+        return;
+    }
+
+    all_materials_cache.clear();
+    auto stage_ref = stage->get_usd_stage();
+
+    for (auto prim : stage_ref->Traverse()) {
+        if (is_material_prim(prim)) {
+            all_materials_cache.push_back(prim.GetPath());
+        }
+    }
+
+    materials_cache_dirty = false;
+}
+
+void UsdFileViewer::open_material_editor(const pxr::SdfPath& material_path)
+{
+    // Trigger window callback to create the actual widget
+    // Note: We don't call stage->create_editor_at_path() for materials
+    // because materials don't need geometry editing
+    if (window) {
+        window->events().emit(
+            "material_editor_requested", material_path.GetString());
+    }
+}
+
+void UsdFileViewer::open_material_document_viewer(
+    const pxr::SdfPath& material_path)
+{
+    // Emit event to create document viewer
+    if (window) {
+        window->events().emit(
+            "material_doc_viewer_requested", material_path.GetString());
+    }
+}
+
+void UsdFileViewer::show_material_binding_ui(pxr::UsdPrim& prim)
+{
+    using namespace pxr;
+
+    ImGui::Separator();
+    ImGui::Text("Material Binding");
+
+    // Get current bound material
+    UsdShadeMaterialBindingAPI bindingAPI(prim);
+    auto boundMaterial = bindingAPI.GetDirectBinding().GetMaterial();
+    std::string current_material = "None";
+
+    if (boundMaterial) {
+        current_material = boundMaterial.GetPrim().GetPath().GetString();
+    }
+
+    // Collect all available materials
+    collect_all_materials();
+
+    // Create combo box for material selection
+    if (ImGui::BeginCombo("Material", current_material.c_str())) {
+        // "None" option to unbind
+        if (ImGui::Selectable("None", current_material == "None")) {
+            bindingAPI.UnbindAllBindings();
+        }
+
+        // List all available materials
+        for (const auto& mat_path : all_materials_cache) {
+            bool is_selected = (current_material == mat_path.GetString());
+            if (ImGui::Selectable(mat_path.GetString().c_str(), is_selected)) {
+                // Bind the selected material
+                auto material_prim =
+                    stage->get_usd_stage()->GetPrimAtPath(mat_path);
+                if (material_prim) {
+                    UsdShadeMaterial material(material_prim);
+                    bindingAPI.Bind(material);
+                    spdlog::info(
+                        "Bound material {} to {}",
+                        mat_path.GetString(),
+                        prim.GetPath().GetString());
+                }
+            }
+
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+
+        ImGui::EndCombo();
+    }
+
+    // Show bound material info
+    if (boundMaterial) {
+        ImGui::Text(
+            "Bound Material: %s",
+            boundMaterial.GetPrim().GetPath().GetString().c_str());
+    }
 }
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

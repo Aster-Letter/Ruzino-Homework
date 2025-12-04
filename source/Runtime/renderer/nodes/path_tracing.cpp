@@ -190,6 +190,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
                 spdlog::warn(
                     "Null material found in path tracing node, {}",
                     material.first.GetText());
+                return false;
                 continue;
             }
             auto location = material.second->GetMaterialLocation();

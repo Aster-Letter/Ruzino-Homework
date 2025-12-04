@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -19,12 +20,17 @@ class DockingImguiRenderer;
 class GUI_API WindowEventSystem {
    public:
     using EventCallback = std::function<void(const std::string& event_data)>;
+    using EventCallbackAny = std::function<void(const std::any& event_data)>;
     
     void subscribe(const std::string& event_name, EventCallback callback);
+    void subscribe_any(const std::string& event_name, EventCallbackAny callback);
+    
     void emit(const std::string& event_name, const std::string& event_data = "");
+    void emit_any(const std::string& event_name, const std::any& event_data);
     
    private:
     std::unordered_map<std::string, std::vector<EventCallback>> subscribers_;
+    std::unordered_map<std::string, std::vector<EventCallbackAny>> subscribers_any_;
 };
 
 // Represents a window in a GUI application, providing basic functionalities

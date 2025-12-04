@@ -7,16 +7,21 @@
 #include "MCore/MaterialXNodeTree.hpp"
 
 #include "foo_socket_types.inl"
+#include <spdlog/spdlog.h>
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
 void MaterialXNodeTree::saveDocument(mx::FilePath filePath)
 {
+    spdlog::info("[MaterialXNodeTree::saveDocument] Called with filePath = {}", filePath.asString());
+    spdlog::info("[MaterialXNodeTree::saveDocument] _graphDoc = {}", (void*)_graphDoc.get());
+    
     if (filePath.getExtension() != mx::MTLX_EXTENSION) {
         filePath.addExtension(mx::MTLX_EXTENSION);
     }
 
     mx::DocumentPtr writeDoc = _graphDoc;
+    spdlog::info("[MaterialXNodeTree::saveDocument] writeDoc = {}", (void*)writeDoc.get());
 
     mx::XmlWriteOptions writeOptions;
     writeOptions.elementPredicate = getElementPredicate();
