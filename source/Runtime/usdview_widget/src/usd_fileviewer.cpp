@@ -1,7 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include "widgets/usdtree/usd_fileviewer.h"
-#include "macro_map.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -12,6 +12,7 @@
 
 #include "GUI/ImGuiFileDialog.h"
 #include "imgui.h"
+#include "macro_map.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/rotation.h"
 #include "pxr/base/vt/typeHeaders.h"
@@ -21,177 +22,225 @@
 #include "pxr/usd/usd/property.h"
 #include "pxr/usd/usdGeom/xformOp.h"
 #include "stage/stage.hpp"
+
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
 // Macro for creating drag float component controls (X/Y/Z)
-#define DRAG_FLOAT_COMPONENT(label, var, index, modified_flag) \
-    ImGui::Text(label ":"); ImGui::SameLine(); \
+#define DRAG_FLOAT_COMPONENT(label, var, index, modified_flag)               \
+    ImGui::Text(label ":");                                                  \
+    ImGui::SameLine();                                                       \
     if (ImGui::DragFloat("##" label, &var, 0.1f, -1000.f, 1000.f, "%.2f")) { \
-        modified_flag = true; \
-    } \
+        modified_flag = true;                                                \
+    }                                                                        \
     ImGui::SameLine();
 
 // Macro for creating rotation component controls with custom range
-#define DRAG_ROT_COMPONENT(label, var, index, eulerVec, modified_flag, min_val, max_val) \
-    ImGui::Text(label ":"); ImGui::SameLine(); \
-    if (ImGui::DragFloat("##rot_" label, &var, 1.0f, min_val, max_val, "%.1f°")) { \
-        eulerVec[index] = var; \
-        modified_flag = true; \
-    } \
+#define DRAG_ROT_COMPONENT(                                           \
+    label, var, index, eulerVec, modified_flag, min_val, max_val)     \
+    ImGui::Text(label ":");                                           \
+    ImGui::SameLine();                                                \
+    if (ImGui::DragFloat(                                             \
+            "##rot_" label, &var, 1.0f, min_val, max_val, "%.1f°")) { \
+        eulerVec[index] = var;                                        \
+        modified_flag = true;                                         \
+    }                                                                 \
     ImGui::SameLine();
 
 // Macro for creating scale component controls
 #define DRAG_SCALE_COMPONENT(label, var, scaleVec, index, modified_flag) \
-    ImGui::Text(label ":"); ImGui::SameLine(); \
-    if (ImGui::DragFloat("##scale_" label, &var, 0.01f, 0.001f, 100.f, "%.3f")) { \
-        scaleVec[index] = var; \
-        modified_flag = true; \
-    } \
+    ImGui::Text(label ":");                                              \
+    ImGui::SameLine();                                                   \
+    if (ImGui::DragFloat(                                                \
+            "##scale_" label, &var, 0.01f, 0.001f, 100.f, "%.3f")) {     \
+        scaleVec[index] = var;                                           \
+        modified_flag = true;                                            \
+    }                                                                    \
     ImGui::SameLine();
 
 // Macro for simple scalar attribute handling
-#define HANDLE_SCALAR_ATTR(Type, ImGuiFunc, ...) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
+#define HANDLE_SCALAR_ATTR(Type, ImGuiFunc, ...)         \
+    else if (v.IsHolding<Type>())                        \
+    {                                                    \
+        Type value = v.Get<Type>();                      \
         if (ImGuiFunc("##value", &value, __VA_ARGS__)) { \
-            attr.Set(value); \
-        } \
+            attr.Set(value);                             \
+        }                                                \
     }
 
 // Macro for DragScalar types
-#define HANDLE_DRAGSCALAR_ATTR(Type, DataType) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
+#define HANDLE_DRAGSCALAR_ATTR(Type, DataType)                      \
+    else if (v.IsHolding<Type>())                                   \
+    {                                                               \
+        Type value = v.Get<Type>();                                 \
         if (ImGui::DragScalar("##value", DataType, &value, 1.0f)) { \
-            attr.Set(value); \
-        } \
+            attr.Set(value);                                        \
+        }                                                           \
     }
 
 // Macro for vector attribute handling with optional color editing
-#define HANDLE_VEC_ATTR(Type, dim) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
+#define HANDLE_VEC_ATTR(Type, dim)                                   \
+    else if (v.IsHolding<Type>())                                    \
+    {                                                                \
+        Type value = v.Get<Type>();                                  \
         if (ImGui::DragFloat##dim("##value", value.data(), 0.01f)) { \
-            attr.Set(value); \
-        } \
+            attr.Set(value);                                         \
+        }                                                            \
     }
 
 // Macro for vector attribute with color support
-#define HANDLE_VEC_ATTR_COLOR(Type, dim) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
-        if (attrName.find("color") != std::string::npos || \
-            attrName.find("Color") != std::string::npos) { \
-            if (ImGui::ColorEdit##dim("##value", value.data())) { \
-                attr.Set(value); \
-            } \
-        } \
-        else { \
+#define HANDLE_VEC_ATTR_COLOR(Type, dim)                                 \
+    else if (v.IsHolding<Type>())                                        \
+    {                                                                    \
+        Type value = v.Get<Type>();                                      \
+        if (attrName.find("color") != std::string::npos ||               \
+            attrName.find("Color") != std::string::npos) {               \
+            if (ImGui::ColorEdit##dim("##value", value.data())) {        \
+                attr.Set(value);                                         \
+            }                                                            \
+        }                                                                \
+        else {                                                           \
             if (ImGui::DragFloat##dim("##value", value.data(), 0.01f)) { \
-                attr.Set(value); \
-            } \
-        } \
+                attr.Set(value);                                         \
+            }                                                            \
+        }                                                                \
     }
 
 // Macro for double vector attribute handling with float conversion
-#define HANDLE_VECD_ATTR(Type, dim) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
-        float tmp[dim]; \
-        for (int i = 0; i < dim; ++i) tmp[i] = static_cast<float>(value[i]); \
+#define HANDLE_VECD_ATTR(Type, dim)                         \
+    else if (v.IsHolding<Type>())                           \
+    {                                                       \
+        Type value = v.Get<Type>();                         \
+        float tmp[dim];                                     \
+        for (int i = 0; i < dim; ++i)                       \
+            tmp[i] = static_cast<float>(value[i]);          \
         if (ImGui::DragFloat##dim("##value", tmp, 0.01f)) { \
-            for (int i = 0; i < dim; ++i) value[i] = static_cast<double>(tmp[i]); \
-            attr.Set(value); \
-        } \
+            for (int i = 0; i < dim; ++i)                   \
+                value[i] = static_cast<double>(tmp[i]);     \
+            attr.Set(value);                                \
+        }                                                   \
     }
 
 // Macro for double vector attribute with color support
-#define HANDLE_VECD_ATTR_COLOR(Type, dim) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
-        float tmp[dim]; \
-        for (int i = 0; i < dim; ++i) tmp[i] = static_cast<float>(value[i]); \
-        bool changed = false; \
-        if (attrName.find("color") != std::string::npos || \
-            attrName.find("Color") != std::string::npos) { \
-            changed = ImGui::ColorEdit##dim("##value", tmp); \
-        } \
-        else { \
+#define HANDLE_VECD_ATTR_COLOR(Type, dim)                           \
+    else if (v.IsHolding<Type>())                                   \
+    {                                                               \
+        Type value = v.Get<Type>();                                 \
+        float tmp[dim];                                             \
+        for (int i = 0; i < dim; ++i)                               \
+            tmp[i] = static_cast<float>(value[i]);                  \
+        bool changed = false;                                       \
+        if (attrName.find("color") != std::string::npos ||          \
+            attrName.find("Color") != std::string::npos) {          \
+            changed = ImGui::ColorEdit##dim("##value", tmp);        \
+        }                                                           \
+        else {                                                      \
             changed = ImGui::DragFloat##dim("##value", tmp, 0.01f); \
-        } \
-        if (changed) { \
-            for (int i = 0; i < dim; ++i) value[i] = static_cast<double>(tmp[i]); \
-            attr.Set(value); \
-        } \
+        }                                                           \
+        if (changed) {                                              \
+            for (int i = 0; i < dim; ++i)                           \
+                value[i] = static_cast<double>(tmp[i]);             \
+            attr.Set(value);                                        \
+        }                                                           \
     }
 
 // Macro for integer vector attribute handling
-#define HANDLE_VECI_ATTR(Type, dim) \
-    else if (v.IsHolding<Type>()) { \
-        Type value = v.Get<Type>(); \
+#define HANDLE_VECI_ATTR(Type, dim)                         \
+    else if (v.IsHolding<Type>())                           \
+    {                                                       \
+        Type value = v.Get<Type>();                         \
         if (ImGui::DragInt##dim("##value", value.data())) { \
-            attr.Set(value); \
-        } \
+            attr.Set(value);                                \
+        }                                                   \
     }
 
 // Macro for array preview display - scalar types
-#define PREVIEW_SCALAR_ARRAY(ArrType, format) \
-    else if (v.IsHolding<ArrType>()) { \
-        auto arr = v.Get<ArrType>(); \
-        for (size_t i = 0; i < previewCount; ++i) { \
-            ImGui::Text(format, i, arr[i]); \
-        } \
-        if (hasMore) { \
-            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+#define PREVIEW_SCALAR_ARRAY(ArrType, format)                               \
+    else if (v.IsHolding<ArrType>())                                        \
+    {                                                                       \
+        auto arr = v.Get<ArrType>();                                        \
+        for (size_t i = 0; i < previewCount; ++i) {                         \
+            ImGui::Text(format, i, arr[i]);                                 \
+        }                                                                   \
+        if (hasMore) {                                                      \
+            ImGui::TextDisabled(                                            \
+                "... (%zu elements omitted) ...", arraySize - 6);           \
             for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
-                ImGui::Text(format, i, arr[i]); \
-            } \
-        } \
+                ImGui::Text(format, i, arr[i]);                             \
+            }                                                               \
+        }                                                                   \
     }
 
 // Macro for array preview display - Vec2 types
-#define PREVIEW_VEC2_ARRAY(ArrType) \
-    else if (v.IsHolding<ArrType>()) { \
-        auto arr = v.Get<ArrType>(); \
-        for (size_t i = 0; i < previewCount; ++i) { \
-            ImGui::Text("[%zu]: (%.3f, %.3f)", i, arr[i][0], arr[i][1]); \
-        } \
-        if (hasMore) { \
-            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
-            for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
+#define PREVIEW_VEC2_ARRAY(ArrType)                                          \
+    else if (v.IsHolding<ArrType>())                                         \
+    {                                                                        \
+        auto arr = v.Get<ArrType>();                                         \
+        for (size_t i = 0; i < previewCount; ++i) {                          \
+            ImGui::Text("[%zu]: (%.3f, %.3f)", i, arr[i][0], arr[i][1]);     \
+        }                                                                    \
+        if (hasMore) {                                                       \
+            ImGui::TextDisabled(                                             \
+                "... (%zu elements omitted) ...", arraySize - 6);            \
+            for (size_t i = arraySize - previewCount; i < arraySize; ++i) {  \
                 ImGui::Text("[%zu]: (%.3f, %.3f)", i, arr[i][0], arr[i][1]); \
-            } \
-        } \
+            }                                                                \
+        }                                                                    \
     }
 
 // Macro for array preview display - Vec3 types
-#define PREVIEW_VEC3_ARRAY(ArrType) \
-    else if (v.IsHolding<ArrType>()) { \
-        auto arr = v.Get<ArrType>(); \
-        for (size_t i = 0; i < previewCount; ++i) { \
-            ImGui::Text("[%zu]: (%.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2]); \
-        } \
-        if (hasMore) { \
-            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+#define PREVIEW_VEC3_ARRAY(ArrType)                                         \
+    else if (v.IsHolding<ArrType>())                                        \
+    {                                                                       \
+        auto arr = v.Get<ArrType>();                                        \
+        for (size_t i = 0; i < previewCount; ++i) {                         \
+            ImGui::Text(                                                    \
+                "[%zu]: (%.3f, %.3f, %.3f)",                                \
+                i,                                                          \
+                arr[i][0],                                                  \
+                arr[i][1],                                                  \
+                arr[i][2]);                                                 \
+        }                                                                   \
+        if (hasMore) {                                                      \
+            ImGui::TextDisabled(                                            \
+                "... (%zu elements omitted) ...", arraySize - 6);           \
             for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
-                ImGui::Text("[%zu]: (%.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2]); \
-            } \
-        } \
+                ImGui::Text(                                                \
+                    "[%zu]: (%.3f, %.3f, %.3f)",                            \
+                    i,                                                      \
+                    arr[i][0],                                              \
+                    arr[i][1],                                              \
+                    arr[i][2]);                                             \
+            }                                                               \
+        }                                                                   \
     }
 
 // Macro for array preview display - Vec4 types
-#define PREVIEW_VEC4_ARRAY(ArrType) \
-    else if (v.IsHolding<ArrType>()) { \
-        auto arr = v.Get<ArrType>(); \
-        for (size_t i = 0; i < previewCount; ++i) { \
-            ImGui::Text("[%zu]: (%.3f, %.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2], arr[i][3]); \
-        } \
-        if (hasMore) { \
-            ImGui::TextDisabled("... (%zu elements omitted) ...", arraySize - 6); \
+#define PREVIEW_VEC4_ARRAY(ArrType)                                         \
+    else if (v.IsHolding<ArrType>())                                        \
+    {                                                                       \
+        auto arr = v.Get<ArrType>();                                        \
+        for (size_t i = 0; i < previewCount; ++i) {                         \
+            ImGui::Text(                                                    \
+                "[%zu]: (%.3f, %.3f, %.3f, %.3f)",                          \
+                i,                                                          \
+                arr[i][0],                                                  \
+                arr[i][1],                                                  \
+                arr[i][2],                                                  \
+                arr[i][3]);                                                 \
+        }                                                                   \
+        if (hasMore) {                                                      \
+            ImGui::TextDisabled(                                            \
+                "... (%zu elements omitted) ...", arraySize - 6);           \
             for (size_t i = arraySize - previewCount; i < arraySize; ++i) { \
-                ImGui::Text("[%zu]: (%.3f, %.3f, %.3f, %.3f)", i, arr[i][0], arr[i][1], arr[i][2], arr[i][3]); \
-            } \
-        } \
+                ImGui::Text(                                                \
+                    "[%zu]: (%.3f, %.3f, %.3f, %.3f)",                      \
+                    i,                                                      \
+                    arr[i][0],                                              \
+                    arr[i][1],                                              \
+                    arr[i][2],                                              \
+                    arr[i][3]);                                             \
+            }                                                               \
+        }                                                                   \
     }
 void UsdFileViewer::ShowFileTree()
 {
@@ -407,7 +456,8 @@ void UsdFileViewer::EditValue()
                 // Decompose matrix into translation, rotation, scale
                 GfVec3d translation = mat.ExtractTranslation();
 
-                // Check if we need to recompute transform values (new prim selected or first time)
+                // Check if we need to recompute transform values (new prim
+                // selected or first time)
                 GfVec3d scaleVec;
                 GfVec3d eulerXYZ;
                 if (!has_cached_transform ||
@@ -466,22 +516,23 @@ void UsdFileViewer::EditValue()
                                        static_cast<float>(translation[2]) };
 
                 float availWidth = ImGui::GetContentRegionAvail().x;
-                float itemWidth = (availWidth - 120.0f) / 3.0f;  // 120 for labels and spacing
-                
+                float itemWidth =
+                    (availWidth - 120.0f) / 3.0f;  // 120 for labels and spacing
+
                 ImGui::PushItemWidth(itemWidth);
                 bool transModified = false;
                 DRAG_FLOAT_COMPONENT("X", trans_tmp[0], 0, transModified)
                 DRAG_FLOAT_COMPONENT("Y", trans_tmp[1], 1, transModified)
                 DRAG_FLOAT_COMPONENT("Z", trans_tmp[2], 2, transModified)
                 ImGui::PopItemWidth();
-                
+
                 if (transModified) {
                     translation[0] = trans_tmp[0];
                     translation[1] = trans_tmp[1];
                     translation[2] = trans_tmp[2];
                     modified = true;
                 }
-                
+
                 ImGui::Unindent();
 
                 ImGui::Spacing();
@@ -496,9 +547,12 @@ void UsdFileViewer::EditValue()
                 ImGui::PushItemWidth(itemWidth);
                 bool rotModified = false;
 
-                DRAG_ROT_COMPONENT("X", rot_tmp[0], 0, eulerXYZ, rotModified, -180.f, 180.f)
-                DRAG_ROT_COMPONENT("Y", rot_tmp[1], 1, eulerXYZ, rotModified, -89.9f, 89.9f)
-                DRAG_ROT_COMPONENT("Z", rot_tmp[2], 2, eulerXYZ, rotModified, -180.f, 180.f)
+                DRAG_ROT_COMPONENT(
+                    "X", rot_tmp[0], 0, eulerXYZ, rotModified, -180.f, 180.f)
+                DRAG_ROT_COMPONENT(
+                    "Y", rot_tmp[1], 1, eulerXYZ, rotModified, -89.9f, 89.9f)
+                DRAG_ROT_COMPONENT(
+                    "Z", rot_tmp[2], 2, eulerXYZ, rotModified, -180.f, 180.f)
                 ImGui::PopItemWidth();
                 ImGui::Unindent();
 
@@ -513,14 +567,14 @@ void UsdFileViewer::EditValue()
                 // Scale
                 ImGui::Text("Scale");
                 ImGui::Indent();
-                
+
                 // Use separate variables to avoid cross-contamination
                 float scale_x = static_cast<float>(scaleVec[0]);
                 float scale_y = static_cast<float>(scaleVec[1]);
                 float scale_z = static_cast<float>(scaleVec[2]);
 
                 bool scaleModified = false;
-                
+
                 ImGui::PushItemWidth(itemWidth);
                 DRAG_SCALE_COMPONENT("X", scale_x, scaleVec, 0, scaleModified)
                 DRAG_SCALE_COMPONENT("Y", scale_y, scaleVec, 1, scaleModified)
@@ -533,13 +587,13 @@ void UsdFileViewer::EditValue()
                     scaleVec[0] = scaleVec[1] = scaleVec[2] = uniformScale;
                     scaleModified = true;
                 }
-                
+
                 if (scaleModified) {
                     modified = true;
                     // Update cache with new scale values
                     cached_scale = scaleVec;
                 }
-                
+
                 ImGui::Unindent();
 
                 if (modified) {
@@ -650,11 +704,19 @@ void UsdFileViewer::EditValue()
 
                         if (v.IsHolding<double>()) {
                             double value = v.Get<double>();
-                            if (ImGui::DragScalar("##value", ImGuiDataType_Double, &value, 0.01, nullptr, nullptr, "%.3f")) {
+                            if (ImGui::DragScalar(
+                                    "##value",
+                                    ImGuiDataType_Double,
+                                    &value,
+                                    0.01,
+                                    nullptr,
+                                    nullptr,
+                                    "%.3f")) {
                                 attr.Set(value);
                             }
                         }
-                        HANDLE_SCALAR_ATTR(float, ImGui::DragFloat, 0.01f, 0.0f, 0.0f, "%.3f")
+                        HANDLE_SCALAR_ATTR(
+                            float, ImGui::DragFloat, 0.01f, 0.0f, 0.0f, "%.3f")
                         HANDLE_SCALAR_ATTR(int, ImGui::DragInt, 1.0f)
                         HANDLE_DRAGSCALAR_ATTR(unsigned int, ImGuiDataType_U32)
                         HANDLE_DRAGSCALAR_ATTR(int64_t, ImGuiDataType_S64)
@@ -667,7 +729,8 @@ void UsdFileViewer::EditValue()
                         HANDLE_VECD_ATTR(GfVec2d, 2)
                         HANDLE_VECD_ATTR_COLOR(GfVec3d, 3)
                         HANDLE_VECD_ATTR_COLOR(GfVec4d, 4)
-                        else {
+                        else
+                        {
                             // Read-only display for unsupported types
                             if (v.IsArrayValued()) {
                                 // For arrays, show type and size
@@ -684,9 +747,12 @@ void UsdFileViewer::EditValue()
 
                                 ImGui::Indent();
 
-                                if (false) {}  // Start the else-if chain
-                                PREVIEW_SCALAR_ARRAY(VtArray<float>, "[%zu]: %.3f")
-                                PREVIEW_SCALAR_ARRAY(VtArray<double>, "[%zu]: %.3f")
+                                if (false) {
+                                }  // Start the else-if chain
+                                PREVIEW_SCALAR_ARRAY(
+                                    VtArray<float>, "[%zu]: %.3f")
+                                PREVIEW_SCALAR_ARRAY(
+                                    VtArray<double>, "[%zu]: %.3f")
                                 PREVIEW_SCALAR_ARRAY(VtArray<int>, "[%zu]: %d")
                                 PREVIEW_VEC2_ARRAY(VtArray<GfVec2f>)
                                 PREVIEW_VEC2_ARRAY(VtArray<GfVec2d>)
@@ -694,7 +760,8 @@ void UsdFileViewer::EditValue()
                                 PREVIEW_VEC3_ARRAY(VtArray<GfVec3d>)
                                 PREVIEW_VEC4_ARRAY(VtArray<GfVec4f>)
                                 PREVIEW_VEC4_ARRAY(VtArray<GfVec4d>)
-                                else {
+                                else
+                                {
                                     // Unknown array type
                                     ImGui::TextDisabled(
                                         "(preview not available)");
