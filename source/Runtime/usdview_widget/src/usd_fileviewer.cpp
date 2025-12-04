@@ -9,6 +9,7 @@
 #include <future>
 #include <map>
 #include <vector>
+#include <filesystem>
 
 #include "GUI/ImGuiFileDialog.h"
 #include "imgui.h"
@@ -732,11 +733,76 @@ void UsdFileViewer::EditValue()
                         else if (v.IsHolding<std::string>())
                         {
                             std::string value = v.Get<std::string>();
-                            char buffer[512];
-                            strncpy_s(buffer, value.c_str(), sizeof(buffer) - 1);
-                            buffer[sizeof(buffer) - 1] = '\0';
-                            if (ImGui::InputText("##value", buffer, sizeof(buffer))) {
-                                attr.Set(std::string(buffer));
+                            
+                            // Special handling for shader_path attribute - show as dropdown
+                            if (attrName == "shader_path") {
+                                // Scan for available dome light shaders
+                                std::vector<std::string> shaderFiles;
+                                shaderFiles.push_back(""); // Empty option
+                                
+                                std::filesystem::path shaderDir = "../../source/Runtime/renderer/nodes/shaders/shaders/callables";
+                                if (std::filesystem::exists(shaderDir)) {
+                                    try {
+                                        for (const auto& entry : std::filesystem::directory_iterator(shaderDir)) {
+                                            if (entry.is_regular_file()) {
+                                                std::string filename = entry.path().filename().string();
+                                                if (filename.find("eval_dome_light") != std::string::npos && 
+                                                    entry.path().extension() == ".slang") {
+                                                    // Store relative path
+                                                    shaderFiles.push_back("shaders/callables/" + filename);
+                                                }
+                                            }
+                                        }
+                                    } catch (...) {
+                                        // Ignore filesystem errors
+                                    }
+                                }
+                                
+                                // Find current selection index
+                                int currentIdx = 0;
+                                for (int i = 0; i < shaderFiles.size(); i++) {
+                                    if (shaderFiles[i] == value) {
+                                        currentIdx = i;
+                                        break;
+                                    }
+                                }
+                                
+                                // If current value is not in list and not empty, add it
+                                if (currentIdx == 0 && !value.empty()) {
+                                    shaderFiles.push_back(value + " (custom)");
+                                    currentIdx = shaderFiles.size() - 1;
+                                }
+                                
+                                const char* previewText = currentIdx == 0 ? "(none)" : 
+                                    (currentIdx < shaderFiles.size() ? shaderFiles[currentIdx].c_str() : value.c_str());
+                                
+                                if (ImGui::BeginCombo("##value", previewText)) {
+                                    for (int i = 0; i < shaderFiles.size(); i++) {
+                                        bool isSelected = (currentIdx == i);
+                                        const char* label = i == 0 ? "(none)" : shaderFiles[i].c_str();
+                                        if (ImGui::Selectable(label, isSelected)) {
+                                            // Remove " (custom)" suffix if present
+                                            std::string selectedPath = shaderFiles[i];
+                                            size_t customPos = selectedPath.find(" (custom)");
+                                            if (customPos != std::string::npos) {
+                                                selectedPath = selectedPath.substr(0, customPos);
+                                            }
+                                            attr.Set(selectedPath);
+                                        }
+                                        if (isSelected) {
+                                            ImGui::SetItemDefaultFocus();
+                                        }
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                            } else {
+                                // Normal string input
+                                char buffer[512];
+                                strncpy_s(buffer, value.c_str(), sizeof(buffer) - 1);
+                                buffer[sizeof(buffer) - 1] = '\0';
+                                if (ImGui::InputText("##value", buffer, sizeof(buffer))) {
+                                    attr.Set(std::string(buffer));
+                                }
                             }
                         }
                         else if (v.IsHolding<SdfAssetPath>())
