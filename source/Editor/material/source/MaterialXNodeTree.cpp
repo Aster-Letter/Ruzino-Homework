@@ -6,22 +6,30 @@
 
 #include "MCore/MaterialXNodeTree.hpp"
 
-#include "foo_socket_types.inl"
 #include <spdlog/spdlog.h>
+
+#include "foo_socket_types.inl"
+
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
 void MaterialXNodeTree::saveDocument(mx::FilePath filePath)
 {
-    spdlog::info("[MaterialXNodeTree::saveDocument] Called with filePath = {}", filePath.asString());
-    spdlog::info("[MaterialXNodeTree::saveDocument] _graphDoc = {}", (void*)_graphDoc.get());
-    
+    spdlog::info(
+        "[MaterialXNodeTree::saveDocument] Called with filePath = {}",
+        filePath.asString());
+    spdlog::info(
+        "[MaterialXNodeTree::saveDocument] _graphDoc = {}",
+        (void*)_graphDoc.get());
+
     if (filePath.getExtension() != mx::MTLX_EXTENSION) {
         filePath.addExtension(mx::MTLX_EXTENSION);
     }
 
     mx::DocumentPtr writeDoc = _graphDoc;
-    spdlog::info("[MaterialXNodeTree::saveDocument] writeDoc = {}", (void*)writeDoc.get());
+    spdlog::info(
+        "[MaterialXNodeTree::saveDocument] writeDoc = {}",
+        (void*)writeDoc.get());
 
     mx::XmlWriteOptions writeOptions;
     writeOptions.elementPredicate = getElementPredicate();
@@ -316,12 +324,13 @@ void MaterialXNodeTree::setUiNodeInfo(
     const std::string& type,
     const std::string& category)
 {
-    // Always set up sockets for MaterialX nodes since each instance may have different inputs/outputs
-    // Clear existing declarations to ensure fresh setup for this specific node instance
+    // Always set up sockets for MaterialX nodes since each instance may have
+    // different inputs/outputs Clear existing declarations to ensure fresh
+    // setup for this specific node instance
     node->typeinfo->static_declaration.items.clear();
     node->typeinfo->static_declaration.inputs.clear();
     node->typeinfo->static_declaration.outputs.clear();
-    
+
     // Lambda to create and add a socket declaration.
     auto createSocketDeclaration = [&](const std::string& socketName,
                                        const std::string& socketType,
@@ -624,7 +633,8 @@ void MaterialXNodeTree::addNode(
 
         setUiNodeInfo(newNode, type, category);
 
-        // Note: refresh_node() is already called inside setUiNodeInfo(), no need to call it again
+        // Note: refresh_node() is already called inside setUiNodeInfo(), no
+        // need to call it again
     }
 }
 
@@ -693,29 +703,33 @@ NodeLink* MaterialXNodeTree::add_link(
     // First, find the sockets to check if we need to remove an existing link
     auto startPin = find_pin(startPinId);
     auto endPin = find_pin(endPinId);
-    
+
     if (!startPin || !endPin) {
         return nullptr;
     }
-    
+
     // Determine which is input and which is output
     auto from_sock = (startPin->in_out == PinKind::Output) ? startPin : endPin;
     auto to_sock = (startPin->in_out == PinKind::Input) ? startPin : endPin;
-    
-    // If the accepting node already has a link, remove it BEFORE adding new link
+
+    // If the accepting node already has a link, remove it BEFORE adding new
+    // link
     if (to_sock->directly_linked_links.size() > 0) {
         assert(to_sock->directly_linked_links.size() == 1);
-        delete_link(to_sock->directly_linked_links[0]->ID, false);  // Don't refresh topology yet
+        delete_link(
+            to_sock->directly_linked_links[0]->ID,
+            false);  // Don't refresh topology yet
     }
-    
+
     // Now add the new link
-    auto link = NodeTree::add_link(startPinId, endPinId, false);  // Don't refresh topology yet
-    
+    auto link = NodeTree::add_link(
+        startPinId, endPinId, false);  // Don't refresh topology yet
+
     // Check if link was successfully created
     if (!link) {
         return nullptr;
     }
-    
+
     auto inputPinId = to_sock->ID;
     auto outputPinId = from_sock->ID;
 
@@ -726,7 +740,6 @@ NodeLink* MaterialXNodeTree::add_link(
     auto uiDownNode = downNode;
 
     {
-
         if (getMaterialXNode(uiDownNode) || getMaterialXNodeGraph(uiDownNode)) {
             mx::InputPtr connectingInput = nullptr;
             for (UiPinPtr pin : uiDownNode->get_inputs()) {
@@ -840,7 +853,7 @@ NodeLink* MaterialXNodeTree::add_link(
     }
 
     SetDirty();
-    
+
     // Refresh topology if requested
     if (refresh_topology) {
         ensure_topology_cache();
@@ -848,7 +861,6 @@ NodeLink* MaterialXNodeTree::add_link(
 
     return link;
 }
-
 
 mx::ElementPredicate MaterialXNodeTree::getElementPredicate() const
 {
