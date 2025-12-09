@@ -1,5 +1,6 @@
 import callable_data;
 #include "utils/random.slangh"
+import utils.Spectrum;
 
 // Procedural sky dome light callable
 // Generates a physically-based sky with sun instead of using a texture
@@ -28,5 +29,5 @@ void eval_dome_light_procedural_sky(inout DomeLightCallableData data)
     skyColor += sunColor * (sunDisk * 50.0 + sunGlow);
     
     // Apply intensity scaling
-    data.envColor = skyColor * data.intensity;
+    data.envColor = RGBSpectrum(skyColor * data.intensity);
 }

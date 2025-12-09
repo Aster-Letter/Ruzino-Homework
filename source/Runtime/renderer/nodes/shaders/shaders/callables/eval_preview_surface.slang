@@ -2,6 +2,7 @@ import callable_data;
 import Scene.MaterialParams;
 import Scene.MaterialParamsBuffer;
 import Scene.UsdPreviewSurface;
+import utils.Spectrum;
 
 // Preview Surface evaluation
 [shader("callable")]
@@ -47,7 +48,7 @@ void eval_preview_surface(inout EvalCallableData data)
         params.occlusion,
         bsdf_result);
 
-    data.color = float4(bsdf_result.color, 1.0);
+    data.color = RGBSpectrum(bsdf_result.color);
 
     // Sample the BSDF for next direction
     data.sampledDir = sample_preview_surface(
@@ -96,5 +97,5 @@ void eval_preview_surface(inout EvalCallableData data)
         params.occlusion,
         weight_result);
 
-    data.throughput = weight_result.color;
+    data.throughput = RGBSpectrum(weight_result.color);
 }

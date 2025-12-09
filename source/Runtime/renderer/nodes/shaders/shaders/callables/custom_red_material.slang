@@ -2,6 +2,7 @@ import callable_data;
 #include "utils/random.slangh"
 import utils.Math.ShadingFrame;
 import Utils.Math.MathHelpers;
+import utils.Spectrum;
 
 // Custom red material shader - EVAL callable
 // This is a simple diffuse red material
@@ -14,7 +15,7 @@ void eval_custom_red_material(inout EvalCallableData data)
     
     // Lambertian BRDF evaluation
     float NdotL = max(0.0, dot(data.vertexInfo.normalW, data.L));
-    data.color = float4(baseColor * NdotL / 3.14159265359, 1.0);
+    data.color = RGBSpectrum(baseColor * NdotL / 3.14159265359);
     
     // Sample next direction using cosine-weighted hemisphere sampling
     data.sampledDir = sample_cosine_hemisphere_concentric(
@@ -30,5 +31,5 @@ void eval_custom_red_material(inout EvalCallableData data)
     
     // Lambertian BRDF for throughput: albedo / pi * cos(theta)
     float NdotSampled = max(0.0, dot(data.vertexInfo.normalW, data.sampledDir));
-    data.throughput = baseColor * NdotSampled / 3.14159265359;
+    data.throughput = RGBSpectrum(baseColor * NdotSampled / 3.14159265359);
 }

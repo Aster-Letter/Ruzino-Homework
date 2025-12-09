@@ -1,4 +1,5 @@
 import Scene.SceneTypes;
+import utils.Spectrum;
 
 struct FetchCallableData {
     uint materialBlobID;
@@ -8,8 +9,8 @@ struct FetchCallableData {
 };
 
 struct EvalCallableData {
-    float4 color;
-    float3 throughput;
+    RGBSpectrum color;
+    RGBSpectrum throughput;
     float3 L;
     float3 V;
     float3 sampledDir;
@@ -23,7 +24,7 @@ struct EvalCallableData {
 struct DomeLightCallableData {
     float3 rayDirection;     // Ray direction in world space
     float3 localDirection;   // Ray direction in dome light local space
-    float3 envColor;         // Output environment color
+    RGBSpectrum envColor;    // Output environment color
     float3 intensity;        // Dome light intensity
     int textureIndex;        // Bindless texture index
     uint seed;               // Random seed for sampling

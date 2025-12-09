@@ -1,5 +1,6 @@
 import callable_data;
 import Scene.BindlessMaterial;
+import utils.Spectrum;
 
 // Default dome light evaluation callable
 // This provides the same behavior as the built-in dome light evaluation
@@ -31,5 +32,5 @@ void eval_dome_light_default(inout DomeLightCallableData data)
         envColor = data.intensity;
     }
     
-    data.envColor = envColor;
+    data.envColor = RGBSpectrum(envColor);
 }
