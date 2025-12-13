@@ -23,7 +23,8 @@ struct PathTracingConstants {
     uint lightCount;
     uint domeLightCallableIndex;  // Only valid when USE_DOME_LIGHT_CALLABLE
     uint materialFetchCallableBaseIndex;
-    uint opacityTestCallableIndex;  // Index for opacity test callable
+    uint materialOpacityCallableOffset;  // Offset to add to fetch index for
+                                         // opacity callables
 };
 
 ConstantBuffer<PathTracingConstants> ptConstants;
@@ -377,7 +378,7 @@ void ClosestHit(
         vertex.faceNormalW = -vertex.faceNormalW;
         eta_flipped = 1;
     }
-    
+
     // Create shading frame
     bool valid;
     ShadingFrame sf =
@@ -618,6 +619,7 @@ void ShadowHit(
     inout ShadowPayload payload,
     in BuiltInTriangleIntersectionAttributes attribs)
 {
+    payload.isVisible = true;
     // payload.isVisible = false;
     // return;
     // Limit recursion depth to prevent infinite loops
@@ -642,68 +644,60 @@ void ShadowHit(
 
     var material_header = materialHeaderBuffer[material_id];
 
-    // Step 1: Fetch material parameters
-    FetchCallableData fetchData;
-    fetchData.vertexInfo = vertex;
-    fetchData.materialBlobID = material_header.material_blob_id;
-    fetchData.material_params_index = DispatchRaysIndex().x;
-    fetchData.vertexInfo = vertex;
+    // Optimized opacity fetch: Call the opacity-specific callable
+    // This avoids full material parameter buffer access
+    FetchCallableData opacityFetchData;
+    opacityFetchData.vertexInfo = vertex;
+    opacityFetchData.materialBlobID = material_header.material_blob_id;
+    opacityFetchData.material_params_index =
+        0;  // Will be filled with opacity value
+    opacityFetchData.shader_type_id = 0;
 
+    // Call opacity fetch callable (uses fetch_shader_opacity internally)
     CallShader(
         ptConstants.materialFetchCallableBaseIndex +
-            material_header.material_type_id,
-        fetchData);
+            material_header.material_type_id +
+            ptConstants.materialOpacityCallableOffset,
+        opacityFetchData);
 
-    // Step 2: Check if this is a UsdPreviewSurface material (shader_type_id ==
-    // 1)
-    if (fetchData.shader_type_id == 1) {
-        // Test opacity using callable
-        OpacityTestCallableData opacityData;
-        opacityData.materialBlobID = material_header.material_blob_id;
-        opacityData.material_params_index = fetchData.material_params_index;
-        opacityData.isOpaque = true;
-        opacityData.vertexInfo = vertex;
-        opacityData.seed = payload.seed;
+    // Extract opacity from material_params_index (reinterpreted as float)
+    float opacity = asfloat(opacityFetchData.material_params_index);
+    // Simple stochastic opacity test
+    float opacity_threshold = random_float(payload.seed);
 
-        // Call opacity test callable
-        CallShader(ptConstants.opacityTestCallableIndex, opacityData);
+    if (opacity < 0.25) {
+        // Material is transparent, continue tracing shadow ray
+        float3 rayOrigin = vertex.posW + WorldRayDirection() * 0.001;
+        float remainingDist = payload.rayTMax - RayTCurrent();
 
-        payload.seed = opacityData.seed;
+        if (remainingDist > 0.001) {
+            RayDesc continuationRay;
+            continuationRay.Origin = rayOrigin;
+            continuationRay.Direction = WorldRayDirection();
+            continuationRay.TMin = 0.001;
+            continuationRay.TMax = remainingDist;
 
-        if (!opacityData.isOpaque) {
-            // Material is transparent, continue tracing shadow ray
-            float3 rayOrigin = vertex.posW + WorldRayDirection() * 0.001;
-            float remainingDist = payload.rayTMax - RayTCurrent();
+            ShadowPayload continuationPayload;
+            continuationPayload.isVisible = true;
+            continuationPayload.rayTMax = remainingDist;
+            continuationPayload.recursionDepth = payload.recursionDepth + 1;
+            continuationPayload.seed = payload.seed;
 
-            if (remainingDist > 0.001) {
-                RayDesc continuationRay;
-                continuationRay.Origin = rayOrigin;
-                continuationRay.Direction = WorldRayDirection();
-                continuationRay.TMin = 0.001;
-                continuationRay.TMax = remainingDist;
-
-                ShadowPayload continuationPayload;
-                continuationPayload.isVisible = true;
-                continuationPayload.rayTMax = remainingDist;
-                continuationPayload.recursionDepth = payload.recursionDepth + 1;
-                continuationPayload.seed = payload.seed;
-
-                TraceRay(
-                    SceneBVH,
-                    RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
-                    0xFF,
-                    1,  // Shadow hit group index
-                    0,
-                    1,  // Shadow miss shader index
-                    continuationRay,
-                    continuationPayload);
-                payload.seed = continuationPayload.seed;
-                payload.isVisible = continuationPayload.isVisible;
-                return;
-            }
+            TraceRay(
+                SceneBVH,
+                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                0xFF,
+                1,  // Shadow hit group index
+                0,
+                1,  // Shadow miss shader index
+                continuationRay,
+                continuationPayload);
+            payload.seed = continuationPayload.seed;
+            payload.isVisible = continuationPayload.isVisible;
+            return;
         }
     }
-    // If we reach here, the surface is opaque or not a preview surface
+    // If we reach here, the surface is opaque
     payload.isVisible = false;
 }
 

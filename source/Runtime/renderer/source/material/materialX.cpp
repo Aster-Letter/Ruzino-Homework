@@ -189,15 +189,107 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
             "MaterialX: Processing shader source ({} bytes)",
             eval_shader_source.size());
 
-        // Replace the data loading placeholder with actual data code
+        // Replace all data loading placeholders with actual data code
         constexpr char DATA_PLACEHOLDER[] = "$BindlessDataLoading";
-        size_t pos = eval_shader_source.find(DATA_PLACEHOLDER);
-        if (pos != std::string::npos) {
+        size_t pos = 0;
+        while ((pos = eval_shader_source.find(DATA_PLACEHOLDER, pos)) != std::string::npos) {
             eval_shader_source.replace(
                 pos, strlen(DATA_PLACEHOLDER), get_data_code);
+            pos += get_data_code.length();
         }
 
-        try {
+        // Extract opacity computation from fetch_shader_data and inject into fetch_shader_opacity
+        constexpr char OPACITY_PLACEHOLDER[] = "$OpacityComputation";
+        size_t opacity_placeholder_pos = eval_shader_source.find(OPACITY_PLACEHOLDER);
+        
+        if (opacity_placeholder_pos != std::string::npos) {
+            // Find fetch_shader_data function
+            size_t data_func_pos = eval_shader_source.find("void fetch_shader_data(");
+            if (data_func_pos != std::string::npos) {
+                size_t data_func_start = eval_shader_source.find("{", data_func_pos);
+                size_t data_func_end = eval_shader_source.find("\nvoid ", data_func_start);
+                
+                if (data_func_end == std::string::npos) {
+                    data_func_end = eval_shader_source.length();
+                }
+                
+                std::string data_func_body = eval_shader_source.substr(
+                    data_func_start, data_func_end - data_func_start);
+                
+                // Find params.opacity = assignment
+                size_t opacity_assignment = data_func_body.find("params.opacity = ");
+                
+                std::string opacity_computation;
+                if (opacity_assignment != std::string::npos) {
+                    // Find the standalone ";" separator line that marks the end of declarations
+                    // and the start of computation code
+                    size_t separator_pos = std::string::npos;
+                    size_t search_start = 0;
+                    
+                    // Look for ";\n" pattern where the semicolon is alone on its line
+                    while (true) {
+                        size_t semicolon = data_func_body.find(";\n", search_start);
+                        if (semicolon == std::string::npos || semicolon >= opacity_assignment) break;
+                        
+                        // Find the start of this line
+                        size_t line_start = data_func_body.rfind('\n', semicolon);
+                        if (line_start == std::string::npos) line_start = 0;
+                        else line_start++;
+                        
+                        // Check if the line contains only whitespace before the semicolon
+                        bool only_whitespace = true;
+                        for (size_t i = line_start; i < semicolon; i++) {
+                            if (data_func_body[i] != ' ' && data_func_body[i] != '\t') {
+                                only_whitespace = false;
+                                break;
+                            }
+                        }
+                        
+                        if (only_whitespace) {
+                            separator_pos = semicolon + 2; // Position after ";\n"
+                            break;
+                        }
+                        
+                        search_start = semicolon + 1;
+                    }
+                    
+                    if (separator_pos == std::string::npos) {
+                        // No separator found - this means opacity is directly from a parameter
+                        // Extract just the opacity value from params.opacity assignment
+                        size_t opacity_line_end = data_func_body.find(";", opacity_assignment);
+                        std::string opacity_line = data_func_body.substr(
+                            opacity_assignment, opacity_line_end - opacity_assignment);
+                        size_t eq_pos = opacity_line.find("= ");
+                        std::string opacity_expr = opacity_line.substr(eq_pos + 2);
+                        opacity_computation = "    float opacity_value = " + opacity_expr + ";\n";
+                    } else {
+                        // Found separator - extract all computation code up to params.opacity
+                        size_t opacity_line_end = data_func_body.find(";", opacity_assignment);
+                        std::string opacity_line = data_func_body.substr(
+                            opacity_assignment, opacity_line_end - opacity_assignment);
+                        size_t eq_pos = opacity_line.find("= ");
+                        std::string opacity_var = opacity_line.substr(eq_pos + 2);
+                        
+                        // Extract computation code from separator to before params.opacity
+                        size_t computation_end = data_func_body.rfind("\n", opacity_assignment);
+                        opacity_computation = data_func_body.substr(
+                            separator_pos, computation_end - separator_pos);
+                        
+                        // Add final assignment
+                        opacity_computation += "\n    float opacity_value = " + opacity_var + ";\n";
+                    }
+                } else {
+                    // No opacity assignment found
+                    opacity_computation = "    float opacity_value = 1.0;  // No opacity in material graph\n";
+                }
+                
+                // Replace the placeholder
+                eval_shader_source.replace(
+                    opacity_placeholder_pos, strlen(OPACITY_PLACEHOLDER), opacity_computation);
+            }
+        }
+
+        try{
             std::filesystem::create_directories("generated_shaders");
             std::ofstream out("generated_shaders/" + material_name + ".slang");
             if (out.is_open()) {

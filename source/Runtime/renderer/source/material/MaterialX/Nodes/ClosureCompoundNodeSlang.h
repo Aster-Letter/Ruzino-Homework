@@ -27,6 +27,12 @@ class HD_USTC_CG_API ClosureCompoundNodeSlang : public CompoundNode {
         const ShaderNode& node,
         GenContext& context,
         ShaderStage& stage) const override;
+
+   protected:
+    void emitOpacityFetchFunction(
+        const ShaderNode& node,
+        GenContext& context,
+        ShaderStage& stage) const;
 };
 
 MATERIALX_NAMESPACE_END

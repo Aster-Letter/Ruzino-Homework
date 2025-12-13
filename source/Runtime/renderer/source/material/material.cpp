@@ -102,6 +102,18 @@ void fetch_shader_data(
     shader_type_id = 2; // Fallback shader type id
     out1 = float4(1.0, 1.0, 1.0, 1.0);
 }
+
+void fetch_shader_opacity(
+    inout uint material_params_index,
+    inout uint shader_type_id,
+    in MaterialDataBlob data,
+    in VertexInfo vertexInfo
+    )
+{
+    shader_type_id = 2; // Fallback shader type id
+    // Fallback: fully opaque
+    material_params_index = asuint(1.0f);
+}
 )";
 
 std::string Hd_USTC_CG_Material::slang_source_code_template = R"(
@@ -112,7 +124,7 @@ import utils.Math.ShadingFrame;
 
 struct FetchCallableData {
     uint materialBlobID;
-    uint material_params_index; // Index into material parameters buffer, set by data fetch callable
+    uint material_params_index; // Index into material parameters buffer, set by data fetch callable. Or you can reinterpret it as opacity.
     uint shader_type_id;
     VertexInfo vertexInfo;
 };
@@ -123,6 +135,13 @@ void $getColor(inout FetchCallableData data)
     float4 placeholder_color = float4(1.0); 
     MaterialDataBlob blob_data = materialBlobBuffer[data.materialBlobID];
     fetch_shader_data(placeholder_color, data.material_params_index, data.shader_type_id, blob_data, data.vertexInfo);
+}
+
+[shader("callable")]
+void $getOpacity(inout FetchCallableData data)
+{
+    MaterialDataBlob blob_data = materialBlobBuffer[data.materialBlobID];
+    fetch_shader_opacity(data.material_params_index, data.shader_type_id, blob_data, data.vertexInfo);
 }
 
 )";
@@ -146,12 +165,20 @@ void Hd_USTC_CG_Material::ensure_shader_ready(const ShaderFactory& factory)
 
     // Replace the callable function name with the material name in all code
     constexpr char FUNC_PLACEHOLDER[] = "$getColor";
+    constexpr char OPACITY_PLACEHOLDER[] = "$getOpacity";
 
-    // Replace in local_slang_source_code
+    // Replace $getColor with material_name
     auto pos = slang_source_code_main.find(FUNC_PLACEHOLDER);
     if (pos != std::string::npos) {
         slang_source_code_main.replace(
             pos, strlen(FUNC_PLACEHOLDER), material_name);
+    }
+    
+    // Replace $getOpacity with material_name_opacity
+    pos = slang_source_code_main.find(OPACITY_PLACEHOLDER);
+    if (pos != std::string::npos) {
+        slang_source_code_main.replace(
+            pos, strlen(OPACITY_PLACEHOLDER), material_name + "_opacity");
     }
 
     // No longer appending eval code - that's in shared callables
