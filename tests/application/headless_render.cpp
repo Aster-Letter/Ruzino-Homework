@@ -18,7 +18,6 @@
 #include "stage/stage.hpp"
 #include "usd_nodejson.hpp"
 
-
 // USD includes
 #include "pxr/usd/usd/primRange.h"
 #include "pxr/usd/usd/stage.h"
@@ -446,15 +445,20 @@ int main(int argc, char* argv[])
             auto sample_start = std::chrono::high_resolution_clock::now();
 
             renderer->Render(root, render_params);
-            renderer->StopRenderer();
             RHI::get_device()->waitForIdle();
             RHI::get_device()->runGarbageCollection();
+            renderer->StopRenderer();
 
             auto sample_end = std::chrono::high_resolution_clock::now();
             auto sample_duration =
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     sample_end - sample_start)
                     .count();
+
+            // Print timing for each sample
+            std::cout << "Sample " << (sample + 1) << "/" << spp
+                      << " completed in " << sample_duration << "ms ("
+                      << (sample_duration / 1000.0) << "s)" << std::endl;
 
             // Start timing after first sample completes
             if (!timing_started && sample == 0) {
@@ -464,10 +468,6 @@ int main(int argc, char* argv[])
             else if (sample > 0) {
                 total_sample_time += sample_duration;
                 timed_samples++;
-            }
-
-            if (verbose) {
-                std::cout << " (" << sample_duration << "ms)" << std::endl;
             }
         }
 
