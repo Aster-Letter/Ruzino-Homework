@@ -44,6 +44,12 @@ import pbrlib.genslang.mx_layer_bsdf;
 
 import pbrlib.genslang.mx_multiply_bsdf_color3;
 
+bool is_close(float3 a, float3 b)
+{
+    const float EPSILON = 1e-5;
+    return all(abs(a - b) < float3(EPSILON, EPSILON, EPSILON));
+}
+
 void NG_standard_surface_surfaceshader_100(
     VertexData vd,
     float3 L,
@@ -93,6 +99,15 @@ void NG_standard_surface_surfaceshader_100(
     float3 tangent,
     out surfaceshader out1)
 {
+    if (is_close(normalize(L), normalize(-V))) {
+        out1 = surfaceshader(float3(1.0f), float3(1.0));
+        return;
+    }
+    if (opacity.r < 0.25f) {
+        out1 = surfaceshader(float3(0.0f), float3(1.0));
+        return;
+    }
+
     // Fast path: Check if all parameters are effectively zero (simple diffuse
     // case)
     const float epsilon = 1e-5;
@@ -742,6 +757,11 @@ float3 sample_standard_surface(
     inout uint seed,
     out float pdf)
 {
+    if (opacity.r < 0.25f) {
+        pdf = 1.0f;
+        V = normalize(V);
+        return -V;
+    }
     // Fix normal orientation if view direction and shading normal are on
     // opposite sides This can happen when normal map causes large perturbations
     float3 shading_normal = normal;

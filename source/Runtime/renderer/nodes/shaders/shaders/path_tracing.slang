@@ -353,7 +353,7 @@ void ClosestHit(
     in BuiltInTriangleIntersectionAttributes attribs)
 {
     // Check if maximum depth is reached
-    if (payload.depth >= 12) {
+    if (payload.depth >= 20) {
         payload.throughput = Spectrum(float3(1, 0, 0));
         payload.color = Spectrum(0.0);
         payload.terminated = true;
@@ -472,7 +472,7 @@ void ClosestHit(
 
     payload.throughput = mul(payload.throughput, div(evalData.throughput, pdf));
     // Russian Roulette path termination after depth 5
-    if (payload.depth >= 5) {
+    if (payload.depth >= 3) {
         float3 thr = payload.throughput.toFloat3();
         float rrProbability = min(0.95, max(thr.x, max(thr.y, thr.z)));
         if (random_float(evalData.seed) > rrProbability) {
@@ -667,14 +667,14 @@ void ShadowHit(
 
     if (opacity < 0.25) {
         // Material is transparent, continue tracing shadow ray
-        float3 rayOrigin = vertex.posW + WorldRayDirection() * 0.001;
+        float3 rayOrigin = vertex.posW + WorldRayDirection() * 0.0001;
         float remainingDist = payload.rayTMax - RayTCurrent();
 
-        if (remainingDist > 0.001) {
+        if (remainingDist > 0.0001) {
             RayDesc continuationRay;
             continuationRay.Origin = rayOrigin;
             continuationRay.Direction = WorldRayDirection();
-            continuationRay.TMin = 0.001;
+            continuationRay.TMin = 0.0001;
             continuationRay.TMax = remainingDist;
 
             ShadowPayload continuationPayload;

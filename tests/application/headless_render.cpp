@@ -436,11 +436,10 @@ int main(int argc, char* argv[])
                   << std::endl;
 
         // Start timing (will be set after first sample)
-        std::chrono::high_resolution_clock::time_point render_start;
-        bool timing_started = false;
+        auto render_start = std::chrono::high_resolution_clock::now();
         long long total_sample_time = 0;
         int timed_samples = 0;
-
+        
         for (int sample = 0; sample < spp; ++sample) {
             auto sample_start = std::chrono::high_resolution_clock::now();
 
@@ -455,21 +454,58 @@ int main(int argc, char* argv[])
                     sample_end - sample_start)
                     .count();
 
-            // Print timing for each sample
-            std::cout << "Sample " << (sample + 1) << "/" << spp
-                      << " completed in " << sample_duration << "ms ("
-                      << (sample_duration / 1000.0) << "s)" << std::endl;
-
-            // Start timing after first sample completes
-            if (!timing_started && sample == 0) {
+            // Skip first sample for timing (shader compilation, etc.)
+            if (sample == 0) {
                 render_start = std::chrono::high_resolution_clock::now();
-                timing_started = true;
+                std::cout << "Sample 1/" << spp << " completed in "
+                          << (sample_duration / 1000.0) << "s (warmup)" << std::endl;
+                continue;
             }
-            else if (sample > 0) {
-                total_sample_time += sample_duration;
-                timed_samples++;
+
+            total_sample_time += sample_duration;
+            timed_samples++;
+
+            // Calculate progress and ETA (based on samples after warmup)
+            int progress_percent = ((sample + 1) * 100) / spp;
+            double avg_time_per_sample = (double)total_sample_time / timed_samples;
+            int remaining_samples = spp - (sample + 1);
+            double eta_seconds = (avg_time_per_sample * remaining_samples) / 1000.0;
+
+            // Create progress bar
+            const int bar_width = 40;
+            int filled = (bar_width * (sample + 1)) / spp;
+            std::string bar(bar_width, ' ');
+            for (int i = 0; i < filled; ++i) {
+                bar[i] = '=';
             }
+            if (filled < bar_width) {
+                bar[filled] = '>';
+            }
+
+            // Format ETA
+            int eta_minutes = (int)(eta_seconds / 60);
+            int eta_secs = (int)(eta_seconds) % 60;
+            
+            // Print progress bar with ETA
+            std::cout << "\r[" << bar << "] " << progress_percent << "% "
+                      << "(" << (sample + 1) << "/" << spp << ") "
+                      << "Sample: " << (sample_duration / 1000.0) << "s "
+                      << "Avg: " << (avg_time_per_sample / 1000.0) << "s ";
+            
+            if (remaining_samples > 0) {
+                std::cout << "ETA: ";
+                if (eta_minutes > 0) {
+                    std::cout << eta_minutes << "m " << eta_secs << "s";
+                } else {
+                    std::cout << eta_secs << "s";
+                }
+            } else {
+                std::cout << "Complete!";
+            }
+            
+            std::cout << std::flush;
         }
+        std::cout << std::endl;
 
         auto render_end = std::chrono::high_resolution_clock::now();
         auto total_duration =
@@ -478,11 +514,9 @@ int main(int argc, char* argv[])
                 .count();
 
         std::cout << "Render complete. Total time: "
-                  << (total_duration / 1000.0) << "s";
-        if (spp > 1) {
-            std::cout << " (excluding first sample)";
-            double avg_sample_time = (double)total_sample_time / timed_samples;
-            std::cout << ", Avg per sample: " << (avg_sample_time / 1000.0)
+                  << (total_duration / 1000.0) << "s (excluding warmup)";
+        if (timed_samples > 0) {
+            std::cout << ", Avg per sample: " << (total_sample_time / (double)timed_samples / 1000.0)
                       << "s";
         }
         std::cout << std::endl;

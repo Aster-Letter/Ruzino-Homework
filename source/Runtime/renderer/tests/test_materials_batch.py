@@ -214,7 +214,7 @@ def bind_material_to_shader_ball(
 
 
 def render_scene(
-    usd_file, output_image, width=3000, height=3000, samples=4096, verbose=False
+    usd_file, output_image, width=3000, height=3000, samples=64, verbose=False
 ):
     """Render a USD scene using headless_render.exe"""
     render_exe = binary_dir / "headless_render.exe"
@@ -227,15 +227,16 @@ def render_scene(
 
     cmd = [
         str(render_exe),
-        usd_file_rel,
-        render_nodes_rel,
-        output_image_rel,
-        str(width),
-        str(height),
-        str(samples),
+        f"--usd={usd_file_rel}",
+        f"--json={render_nodes_rel}",
+        f"--output={output_image_rel}",
+        f"--width={width}",
+        f"--height={height}",
+        f"--spp={samples}",
     ]
 
     if verbose:
+        cmd.append("--verbose")
         print(f"  Command: {' '.join(cmd)}")
         print(f"  Working directory: {binary_dir}")
 

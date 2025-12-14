@@ -37,9 +37,8 @@ void ClosureCompoundNodeSlang::emitFunctionDefinition(
             _functionName.find("UsdPreviewSurface") != string::npos;
 
         if (isStandardSurface || isUsdPreviewSurface) {
-            // Simplified approach: Just emit placeholders and function
-            // structure MaterialX generation will handle the actual code
-
+            // Emit a minimal opacity fetch function
+            // The actual texture sampling code will be injected by materialX.cpp
             shadergen.emitLineBreak(stage);
             shadergen.emitComment(
                 "Opacity fetch function - computes opacity from material graph",
@@ -51,8 +50,17 @@ void ClosureCompoundNodeSlang::emitFunctionDefinition(
             shadergen.emitLine("    in MaterialDataBlob data,", stage, false);
             shadergen.emitLine("    in VertexInfo vertexInfo)", stage, false);
             shadergen.emitLine("{", stage, false);
+
+            // Emit bindless data loading placeholder
             shadergen.emitLine("$BindlessDataLoading", stage, false);
+            
+            // Emit placeholder for texture sampling code (will be copied from fetch_shader_data)
+            shadergen.emitLine("$TextureSamplingForOpacity", stage, false);
+
+            // Emit opacity computation placeholder (will be filled by
+            // materialX.cpp)
             shadergen.emitLine("$OpacityComputation", stage, false);
+
             shadergen.emitLine(
                 "    shader_type_id = " +
                     std::to_string(isUsdPreviewSurface ? 1 : 0) + ";",
@@ -62,9 +70,9 @@ void ClosureCompoundNodeSlang::emitFunctionDefinition(
                 "    material_params_index = asuint(opacity_value);",
                 stage,
                 false);
+
             shadergen.emitLine("}", stage, false);
             shadergen.emitLineBreak(stage);
-
             return;
         }
         throw std::runtime_error(

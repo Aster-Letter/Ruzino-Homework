@@ -199,6 +199,75 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
             pos += get_data_code.length();
         }
 
+        // Extract texture sampling code from fetch_shader_data for opacity function
+        constexpr char TEXTURE_SAMPLING_PLACEHOLDER[] = "$TextureSamplingForOpacity";
+        size_t texture_sampling_pos = eval_shader_source.find(TEXTURE_SAMPLING_PLACEHOLDER);
+        
+        if (texture_sampling_pos != std::string::npos) {
+            // Find fetch_shader_data function
+            size_t data_func_pos = eval_shader_source.find("void fetch_shader_data(");
+            if (data_func_pos != std::string::npos) {
+                size_t data_func_start = eval_shader_source.find("{", data_func_pos);
+                size_t data_func_end = eval_shader_source.find("\nvoid ", data_func_start);
+                
+                if (data_func_end == std::string::npos) {
+                    data_func_end = eval_shader_source.length();
+                }
+                
+                std::string data_func_body = eval_shader_source.substr(
+                    data_func_start, data_func_end - data_func_start);
+                
+                // Find the standalone ";" separator that marks end of bindless loading
+                size_t separator_pos = std::string::npos;
+                size_t search_start = 0;
+                
+                while (true) {
+                    size_t semicolon = data_func_body.find(";\n", search_start);
+                    if (semicolon == std::string::npos) break;
+                    
+                    size_t line_start = data_func_body.rfind('\n', semicolon);
+                    if (line_start == std::string::npos) line_start = 0;
+                    else line_start++;
+                    
+                    bool only_whitespace = true;
+                    for (size_t i = line_start; i < semicolon; i++) {
+                        if (data_func_body[i] != ' ' && data_func_body[i] != '\t') {
+                            only_whitespace = false;
+                            break;
+                        }
+                    }
+                    
+                    if (only_whitespace) {
+                        separator_pos = semicolon + 2;
+                        break;
+                    }
+                    
+                    search_start = semicolon + 1;
+                }
+                
+                if (separator_pos != std::string::npos) {
+                    // Find the start of material params assignment (e.g., "PackedStandardSurfaceMaterialParams params")
+                    size_t params_start = data_func_body.find("PackedStandardSurfaceMaterialParams params");
+                    if (params_start == std::string::npos) {
+                        params_start = data_func_body.find("PreviewSurfaceMaterialParams params");
+                    }
+                    
+                    if (params_start != std::string::npos) {
+                        // Extract texture sampling code between separator and params assignment
+                        size_t texture_code_end = data_func_body.rfind('\n', params_start);
+                        std::string texture_sampling_code = data_func_body.substr(
+                            separator_pos, texture_code_end - separator_pos);
+                        
+                        // Replace the placeholder
+                        eval_shader_source.replace(
+                            texture_sampling_pos,
+                            strlen(TEXTURE_SAMPLING_PLACEHOLDER),
+                            texture_sampling_code);
+                    }
+                }
+            }
+        }
+
         // Extract opacity computation from fetch_shader_data and inject into
         // fetch_shader_opacity
         constexpr char OPACITY_PLACEHOLDER[] = "$OpacityComputation";

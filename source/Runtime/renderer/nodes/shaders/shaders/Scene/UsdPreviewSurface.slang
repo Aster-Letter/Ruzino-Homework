@@ -82,7 +82,7 @@ import pbrlib.genslang.mx_layer_bsdf;
 
 bool is_close(float3 a, float3 b)
 {
-    const float EPSILON = 1e-6;
+    const float EPSILON = 1e-5;
     return all(abs(a - b) < float3(EPSILON, EPSILON, EPSILON));
 }
 
@@ -108,7 +108,7 @@ void IMP_UsdPreviewSurface_surfaceshader(
     float occlusion,
     out surfaceshader out1)
 {
-    if (is_close(L, -V)) {
+    if (is_close(normalize(L), normalize(-V))) {
         out1 = surfaceshader(float3(1.0f), float3(1.0));
         return;
     }
