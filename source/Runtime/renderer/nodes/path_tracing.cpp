@@ -251,7 +251,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
                     shader_path.string(),
                     next_eval_index);
                 
-                // Generate a simple fetch callable wrapper that just sets shader_type_id
+                // Generate fetch callable wrapper and opacity wrapper
                 std::string fetch_wrapper = R"(
 import callable_data;
 import Scene.BindlessMaterial;
@@ -261,6 +261,14 @@ void fetch_)" + material.second->GetMaterialName() + R"((inout FetchCallableData
 {
     // Custom shader material - no data to fetch, just set shader_type_id
     data.shader_type_id = )" + std::to_string(next_eval_index) + R"(;
+}
+
+[shader("callable")]
+void fetch_)" + material.second->GetMaterialName() + R"(_opacity(inout FetchCallableData data)
+{
+    // Custom shader material - assume fully opaque
+    data.shader_type_id = )" + std::to_string(next_eval_index) + R"(;
+    data.material_params_index = asuint(1.0f);
 }
 )";
                 program_desc.add_source_code(fetch_wrapper);
@@ -480,7 +488,9 @@ void fetch_)" + material.second->GetMaterialName() + R"((inout FetchCallableData
         // These are placed after all fetch callables
         int base_opacity_index = base_fetch_index + num_materials;
         for (auto& callable : storage.callable_shaders) {
-            std::string opacity_name = callable.second + "_opacity";
+            std::string opacity_name = storage.custom_shader_eval_indices.count(callable.first) > 0
+                ? "fetch_" + callable.second + "_opacity"  // Custom shader opacity wrapper
+                : callable.second + "_opacity";  // MaterialX opacity callable
             context.announce_callable(
                 opacity_name, base_opacity_index + callable.first, nullptr);
             spdlog::info(
