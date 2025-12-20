@@ -353,7 +353,7 @@ void ClosestHit(
     in BuiltInTriangleIntersectionAttributes attribs)
 {
     // Check if maximum depth is reached
-    if (payload.depth >= 20) {
+    if (payload.depth >= 12) {
         payload.throughput = Spectrum(float3(1, 0, 0));
         payload.color = Spectrum(0.0);
         payload.terminated = true;
@@ -439,6 +439,19 @@ void ClosestHit(
         return;
     }
 
+    // Validate throughput before continuing
+    if (any(isnan(evalData.throughput.toFloat3()))) {
+        payload.color = Spectrum(float3(0, 1, 0));
+        payload.terminated = true;
+        return;
+    }
+
+    if (any(isinf(evalData.throughput.toFloat3()))) {
+        payload.color = Spectrum(float3(0, 0, 1));
+        payload.terminated = true;
+        return;
+    }
+
     // payload.seed = evalData.seed;
     // payload.color = div(evalData.throughput, evalData.pdf);
     // payload.throughput = Spectrum(float3(0.0f));
@@ -460,18 +473,7 @@ void ClosestHit(
     float3 ray_dir = evalData.sampledDir;
     bool isTransmission = dot(ray_dir, vertex.faceNormalW) < 0.0;
 
-    // Validate throughput before continuing
-    if (any(isnan(evalData.throughput.toFloat3()))) {
-        payload.color = Spectrum(float3(1, 0, 1));
-        payload.terminated = true;
-        return;
-    }
 
-    if (any(isinf(evalData.throughput.toFloat3()))) {
-        payload.color = Spectrum(float3(0, 0, 1));
-        payload.terminated = true;
-        return;
-    }
 
     payload.throughput = mul(payload.throughput, div(evalData.throughput, pdf));
     // Russian Roulette path termination after depth 5
@@ -610,7 +612,7 @@ void Miss(inout RayPayload payload)
 
     if (any(isnan(payload.color.toFloat3()))) {
         payload.color =
-            Spectrum(float3(1, 0, 1));  // Magenta for debugging NaN/Inf
+            Spectrum(float3(0, 1, 1));  // Magenta for debugging NaN/Inf
         payload.terminated = true;
     }
 

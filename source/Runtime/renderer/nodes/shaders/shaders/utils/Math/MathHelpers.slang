@@ -275,6 +275,73 @@ float2 sample_disk(float2 u)
 }
 
 /**
+ * Uniform sampling within a unit equilateral triangle for aperture shapes.
+ * The triangle has vertices at:
+ *   v0 = (0, 1)
+ *   v1 = (-sqrt(3)/2, -0.5)
+ *   v2 = (sqrt(3)/2, -0.5)
+ * @param[in] u Uniform random number in [0,1)^2.
+ * @return Sampled point within the triangle.
+ */
+float2 sample_triangle_aperture(float2 u)
+{
+    float su0 = sqrt(u.x);
+    float b0 = 1.0f - su0;
+    float b1 = u.y * su0;
+    
+    // Triangle vertices (equilateral triangle centered at origin)
+    float2 v0 = float2(0.0f, 1.0f);
+    float2 v1 = float2(-0.866025404f, -0.5f);  // -sqrt(3)/2, -0.5
+    float2 v2 = float2(0.866025404f, -0.5f);   // sqrt(3)/2, -0.5
+    
+    return b0 * v0 + b1 * v1 + (1.0f - b0 - b1) * v2;
+}
+
+/**
+ * Uniform sampling within a five-pointed star for aperture shapes.
+ * The star is decomposed into triangles and sampled accordingly.
+ * @param[in] u Uniform random number in [0,1)^2.
+ * @return Sampled point within the five-pointed star.
+ */
+float2 sample_star_aperture(float2 u)
+{
+    // Five-pointed star vertices (outer points)
+    const float angle = M_2PI / 5.0f;
+    const float innerRadius = 0.382f; // Golden ratio based inner radius
+    
+    // Select which of the 5 triangles to sample from
+    int triangleIndex = int(u.x * 5.0f);
+    float u0 = u.x * 5.0f - float(triangleIndex);
+    
+    // Each triangle is formed by center, outer vertex, and next outer vertex
+    float theta1 = float(triangleIndex) * angle - M_PI * 0.5f;
+    float theta2 = float(triangleIndex + 1) * angle - M_PI * 0.5f;
+    
+    float2 center = float2(0.0f, 0.0f);
+    float2 v1 = float2(cos(theta1), sin(theta1));
+    float2 v2 = float2(cos(theta2), sin(theta2));
+    
+    // Check if point should be in inner triangle (between two outer points and inner vertex)
+    float innerTheta = theta1 + angle * 0.5f;
+    float2 innerVertex = float2(cos(innerTheta), sin(innerTheta)) * innerRadius;
+    
+    // Sample the triangle
+    float su0 = sqrt(u0);
+    float b0 = 1.0f - su0;
+    float b1 = u.y * su0;
+    float b2 = 1.0f - b0 - b1;
+    
+    // Alternate between outer triangles and inner triangles
+    if (u.y < 0.5f) {
+        // Outer triangle: center -> v1 -> innerVertex
+        return b0 * center + b1 * v1 + b2 * innerVertex;
+    } else {
+        // Outer triangle: center -> innerVertex -> v2
+        return b0 * center + b1 * innerVertex + b2 * v2;
+    }
+}
+
+/**
  * Uniform sampling of direction within a cone
  * @param[in] u Uniform random number in [0,1)^2.
  * @param[in] cosTheta Cosine of the cone half-angle
