@@ -1055,13 +1055,32 @@ void UsdFileViewer::EditValue()
 void UsdFileViewer::select_file()
 {
     auto instance = IGFD::FileDialog::Instance();
+    
+    // Open the dialog on first call
+    static bool dialog_opened = false;
+    if (!dialog_opened) {
+        IGFD::FileDialogConfig config;
+        config.path = "../../Assets";
+        instance->OpenDialog(
+            "SelectFile",
+            "Choose USD File",
+            "USD Files{.usd,.usda,.usdc,.usdz}",
+            config);
+        dialog_opened = true;
+    }
+    
     if (instance->Display("SelectFile")) {
-        auto selected = instance->GetFilePathName();
-        spdlog::info(selected.c_str());
+        if (instance->IsOk()) {
+            auto selected = instance->GetFilePathName();
+            spdlog::info("Selected file for import: {}", selected);
 
+            stage->import_usd_as_payload(selected, selecting_file_base);
+        }
+        
+        // Dialog closed
+        instance->Close();
         is_selecting_file = false;
-
-        stage->import_usd_as_payload(selected, selecting_file_base);
+        dialog_opened = false;
     }
 }
 

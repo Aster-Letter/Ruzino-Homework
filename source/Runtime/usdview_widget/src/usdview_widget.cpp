@@ -569,6 +569,10 @@ void UsdviewEngine::set_renderer_setting(
 
 void UsdviewEngine::finish_render()
 {
+    if (!renderer_) {
+        return;
+    }
+    
     renderer_->StopRenderer();
     auto hacked_handle =
         renderer_->GetRendererSetting(pxr::TfToken("VulkanColorAov"));

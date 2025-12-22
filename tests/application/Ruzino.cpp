@@ -290,9 +290,10 @@ int main(int argc, char* argv[])
     auto usd_file_viewer = std::make_unique<UsdFileViewer>(stage.get());
     auto render = std::make_unique<UsdviewEngine>(stage.get());
 
-    auto render_bare = render.get();
+    // Use shared_ptr to track render widget lifecycle
+    std::shared_ptr<UsdviewEngine*> render_bare_ptr = std::make_shared<UsdviewEngine*>(render.get());
 
-    render->SetCallBack([](Window* window, IWidget* render_widget) {
+    render->SetCallBack([render_bare_ptr](Window* window, IWidget* render_widget) {
         auto node_system = static_cast<const std::shared_ptr<NodeSystem>*>(
             dynamic_cast<UsdviewEngine*>(render_widget)
                 ->emit_create_renderer_ui_control());
@@ -328,7 +329,7 @@ int main(int argc, char* argv[])
         instance->OpenDialog(
             "OpenStageDialog", 
             "Open USD Stage", 
-            ".usd,.usda,.usdc,.usdz", 
+            "USD Files{.usd,.usda,.usdc,.usdz}", 
             config);
     });
 
@@ -343,19 +344,57 @@ int main(int argc, char* argv[])
         instance->OpenDialog(
             "SaveStageDialog", 
             "Save USD Stage As", 
-            ".usd,.usda,.usdc,.usdz", 
+            "USD Files{.usd,.usda,.usdc,.usdz}", 
             config);
     });
 
     // Subscribe to file dialog result events
-    window->events().subscribe("file_open_selected", [&stage](const std::string& file_path) {
+    window->events().subscribe("file_open_selected", [&stage, &window](const std::string& file_path) {
         if (stage->OpenStage(file_path)) {
             spdlog::info("Successfully opened stage: {}", file_path);
+            // Trigger widget recreation
+            window->events().emit("stage_reloaded");
         }
     });
 
     window->events().subscribe("file_save_as_selected", [&stage](const std::string& file_path) {
         stage->SaveAs(file_path);
+    });
+    
+    // Subscribe to stage reload event to recreate widgets
+    window->events().subscribe("stage_reloaded", [&stage, &window, render_bare_ptr](const std::string&) {
+        spdlog::info("Stage reloaded, recreating widgets...");
+        
+        // Invalidate old render pointer to prevent use-after-free
+        *render_bare_ptr = nullptr;
+        
+        // Simply recreate widgets - the old ones will be replaced because they have the same unique name
+        auto usd_file_viewer = std::make_unique<UsdFileViewer>(stage.get());
+        auto render = std::make_unique<UsdviewEngine>(stage.get());
+        
+        // Update the shared pointer to point to new widget
+        *render_bare_ptr = render.get();
+        
+        render->SetCallBack([render_bare_ptr](Window* window, IWidget* render_widget) {
+            auto node_system = static_cast<const std::shared_ptr<NodeSystem>*>(
+                dynamic_cast<UsdviewEngine*>(render_widget)
+                    ->emit_create_renderer_ui_control());
+            if (node_system) {
+                FileBasedNodeWidgetSettings desc;
+                desc.system = *node_system;
+                desc.json_path = "../../Assets/render_nodes_save.json";
+
+                std::unique_ptr<IWidget> node_widget =
+                    std::move(create_node_imgui_widget(desc));
+
+                window->register_widget(std::move(node_widget));
+            }
+        });
+        
+        window->register_widget(std::move(render));
+        window->register_widget(std::move(usd_file_viewer));
+        
+        spdlog::info("Widgets recreated successfully");
     });
 
     // Subscribe to material editor events
@@ -646,7 +685,7 @@ int main(int argc, char* argv[])
         });
 
     window->register_function_after_frame([&stage,
-                                           render_bare](Window* window) {
+                                           render_bare_ptr](Window* window) {
         pxr::SdfPath json_path;
         if (stage->consume_editor_creation(json_path)) {
             auto system = create_dynamic_loading_system();
@@ -679,7 +718,7 @@ int main(int argc, char* argv[])
             std::unique_ptr<IWidget> node_widget =
                 std::move(create_node_imgui_widget(desc));
             node_widget->SetCallBack(
-                [&stage, json_path, system, render_bare](Window*, IWidget*) {
+                [&stage, json_path, system, render_bare_ptr](Window*, IWidget*) {
                     GeomPayload geom_global_params;
 #ifdef GEOM_USD_EXTENSION
                     geom_global_params.stage = stage->get_usd_stage();
@@ -689,7 +728,9 @@ int main(int argc, char* argv[])
                     geom_global_params.has_simulation = false;
 
                     // Pass pick event from UI to geometry payload
-                    geom_global_params.pick = render_bare->consume_pick_event();
+                    if (*render_bare_ptr) {
+                        geom_global_params.pick = (*render_bare_ptr)->consume_pick_event();
+                    }
 
                     system->set_global_params(geom_global_params);
                     if (geom_global_params.pick) {
@@ -702,7 +743,11 @@ int main(int argc, char* argv[])
     });
 
     window->register_function_after_frame(
-        [render_bare](Window* window) { render_bare->finish_render(); });
+        [render_bare_ptr](Window* window) { 
+            if (*render_bare_ptr) {
+                (*render_bare_ptr)->finish_render(); 
+            }
+        });
 
     window->register_function_after_frame(
         [&stage](Window* window) { stage->finish_tick(); });

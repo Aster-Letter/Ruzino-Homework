@@ -111,6 +111,8 @@ NODE_EXECUTION_FUNCTION(accumulate)
         program_vars["Accumulated"] = storage.accumulated;
 
         // Create and cache the spp constant buffer
+        if (storage.cached_spp_cb)
+            resource_allocator.destroy(storage.cached_spp_cb);
         storage.cached_spp_cb =
             create_constant_buffer(params, storage.current_spp);
         program_vars["CurrentSPP"] = storage.cached_spp_cb;

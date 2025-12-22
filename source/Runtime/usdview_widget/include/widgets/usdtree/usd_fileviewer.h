@@ -19,6 +19,11 @@ class USDVIEW_WIDGET_API UsdFileViewer : public IWidget {
 
     bool BuildUI() override;
 
+    std::string GetWindowUniqueName() override
+    {
+        return "UsdFileViewer##Singleton";
+    }
+
    protected:
     bool Begin() override
     {
