@@ -23,6 +23,7 @@
 //
 #include "instancer.h"
 
+#include "gpu_compute.h"
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/quaternion.h"
@@ -186,11 +187,6 @@ VtMatrix4fArray Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
         return transforms;
     }
 
-    // The transforms taking nesting into account are computed by:
-    // parentTransforms = parentInstancer->ComputeInstanceTransforms(GetId())
-    // foreach (parentXf : parentTransforms, xf : transforms) {
-    //     parentXf * xf
-    // }
     VtMatrix4fArray parentTransforms =
         static_cast<Hd_USTC_CG_Instancer*>(parentInstancer)
             ->ComputeInstanceTransforms(GetId());
@@ -204,4 +200,81 @@ VtMatrix4fArray Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
     }
     return final;
 }
+
+void Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
+    SdfPath const& prototypeId,
+    DeviceMemoryPool<GeometryInstanceData>::MemoryHandle instance_buffer,
+    DeviceMemoryPool<nvrhi::rt::InstanceDesc>::MemoryHandle rt_instance_buffer,
+    uint64_t BLAS_address,
+    const pxr::GfMatrix4f& prototype_transform,
+    unsigned material_id,
+    unsigned geometry_id)
+{
+    // GPU-based instance transform computation
+    // This function will be called to fill the instance buffers on the GPU
+    // instead of doing it on the CPU
+
+    GfMatrix4f instancerTransform =
+        GfMatrix4f(GetDelegate()->GetInstancerTransform(GetId()));
+    VtIntArray instanceIndices =
+        GetDelegate()->GetInstanceIndices(GetId(), prototypeId);
+
+    const GfVec3f* translations = nullptr;
+    const GfVec3f* scales = nullptr;
+    const GfMatrix4d* instanceTransforms = nullptr;
+    
+    // For rotations, we need to convert from half to float
+    VtArray<GfQuatf> rotationsFloat;
+    const GfQuatf* rotations = nullptr;
+
+    // Get primvar data pointers
+    if (_primvarMap.count(HdInstancerTokens->instanceTranslations) > 0) {
+        translations = static_cast<const GfVec3f*>(
+            _primvarMap[HdInstancerTokens->instanceTranslations]->GetData());
+    }
+
+    if (_primvarMap.count(HdInstancerTokens->instanceRotations) > 0) {
+        const GfQuath* rotationsHalf = static_cast<const GfQuath*>(
+            _primvarMap[HdInstancerTokens->instanceRotations]->GetData());
+        
+        // Convert half precision to float
+        size_t count = instanceIndices.size();
+        rotationsFloat.resize(count);
+        for (size_t i = 0; i < count; ++i) {
+            const GfQuath& qh = rotationsHalf[instanceIndices[i]];
+            rotationsFloat[i] = GfQuatf(
+                qh.GetReal(),
+                qh.GetImaginary()[0],
+                qh.GetImaginary()[1],
+                qh.GetImaginary()[2]);
+        }
+        rotations = rotationsFloat.data();
+    }
+
+    if (_primvarMap.count(HdInstancerTokens->instanceScales) > 0) {
+        scales = static_cast<const GfVec3f*>(
+            _primvarMap[HdInstancerTokens->instanceScales]->GetData());
+    }
+
+    if (_primvarMap.count(HdInstancerTokens->instanceTransforms) > 0) {
+        instanceTransforms = static_cast<const GfMatrix4d*>(
+            _primvarMap[HdInstancerTokens->instanceTransforms]->GetData());
+    }
+
+    // Call the GPU assembler to compute instance transforms on GPU
+    GPUSceneAssember::fill_instances(
+        instancerTransform,
+        instanceIndices,
+        translations,
+        rotations,
+        scales,
+        instanceTransforms,
+        instance_buffer,
+        rt_instance_buffer,
+        BLAS_address,
+        prototype_transform,
+        material_id,
+        geometry_id);
+}
+
 USTC_CG_NAMESPACE_CLOSE_SCOPE

@@ -28,16 +28,17 @@
 #include <corecrt_math_defines.h>
 #include <pxr/imaging/hd/field.h>
 #include <pxr/usdImaging/usdVolImaging/tokens.h>
+#include <spdlog/spdlog.h>
 
 #include <iostream>
 
-#include <spdlog/spdlog.h>
 #include "RHI/Hgi/desc_conversion.hpp"
 #include "RHI/rhi.hpp"
 #include "config.h"
 #include "geometries/field.h"
 #include "geometries/mesh.h"
 #include "geometries/volume.h"
+#include "gpu_compute.h"
 #include "hd_USTC_CG/render_global_payload.hpp"
 #include "instancer.h"
 #include "light.h"
@@ -121,14 +122,16 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
     _settingDescriptors[2] = {
         "Ambient Occlusion Samples",
         Hd_USTC_CG_RenderSettingsTokens->ambientOcclusionSamples,
-        VtValue(static_cast<int>(
-            Hd_USTC_CG_Config::GetInstance().ambientOcclusionSamples))
+        VtValue(
+            static_cast<int>(
+                Hd_USTC_CG_Config::GetInstance().ambientOcclusionSamples))
     };
     _settingDescriptors[3] = {
         "Samples To Convergence",
         HdRenderSettingsTokens->convergedSamplesPerPixel,
-        VtValue(static_cast<int>(
-            Hd_USTC_CG_Config::GetInstance().samplesToConvergence))
+        VtValue(
+            static_cast<int>(
+                Hd_USTC_CG_Config::GetInstance().samplesToConvergence))
     };
 
     _settingDescriptors[4] = { "Render Mode",
@@ -146,7 +149,7 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
         std::make_unique<EagerNodeTreeExecutorRender>();
 
     node_system = create_dynamic_loading_system();
-    
+
     // Try multiple possible locations for render_nodes.json
     std::vector<std::string> search_paths = {
         "render_nodes.json",  // Current directory
@@ -155,25 +158,31 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
         "../../Binaries/Debug/render_nodes.json",
         "../../Binaries/Release/render_nodes.json"
     };
-    
+
     bool config_loaded = false;
     for (const auto& path : search_paths) {
         if (std::filesystem::exists(path)) {
             try {
                 node_system->load_configuration(path);
                 config_loaded = true;
-                spdlog::info("Loaded render_nodes.json from: {}", std::filesystem::absolute(path).string());
+                spdlog::info(
+                    "Loaded render_nodes.json from: {}",
+                    std::filesystem::absolute(path).string());
                 break;
-            } catch (const std::exception& e) {
-                spdlog::warn("Failed to load config from {}: {}", path, e.what());
+            }
+            catch (const std::exception& e) {
+                spdlog::warn(
+                    "Failed to load config from {}: {}", path, e.what());
             }
         }
     }
-    
+
     if (!config_loaded) {
-        spdlog::warn("Could not find render_nodes.json in search paths, node system may be empty");
+        spdlog::warn(
+            "Could not find render_nodes.json in search paths, node system may "
+            "be empty");
     }
-    
+
     auto plugin_path = std::filesystem::path("./renderer_plugins");
     if (std::filesystem::exists(plugin_path)) {
         for (auto& p : std::filesystem::directory_iterator(plugin_path)) {
@@ -181,8 +190,12 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
                 try {
                     node_system->load_configuration(p.path().string());
                     spdlog::info("Loaded plugin config: {}", p.path().string());
-                } catch (const std::exception& e) {
-                    spdlog::warn("Failed to load plugin config {}: {}", p.path().string(), e.what());
+                }
+                catch (const std::exception& e) {
+                    spdlog::warn(
+                        "Failed to load plugin config {}: {}",
+                        p.path().string(),
+                        e.what());
                 }
             }
         }
@@ -198,6 +211,11 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
         &_renderThread, &_sceneVersion, node_system.get(), &materials);
 
     _renderer = std::make_shared<Hd_USTC_CG_Renderer>(_renderParam.get());
+
+    // Initialize GPU Scene Assembler resource allocator
+    GPUSceneAssember::initialize_instance();
+
+    spdlog::info("GPU Scene Assembler initialized");
 
     // Set the background render thread's rendering entrypoint to
     // Hd_USTC_CG_Renderer::Render.
@@ -243,6 +261,10 @@ HdAovDescriptor Hd_USTC_CG_RenderDelegate::GetDefaultAovDescriptor(
 
 Hd_USTC_CG_RenderDelegate::~Hd_USTC_CG_RenderDelegate()
 {
+    // Clean up GPU Scene Assembler before destroying other resources
+    GPUSceneAssember::destroy_instance();
+    spdlog::info("GPU Scene Assembler destroyed");
+
     node_system->get_node_tree_executor()->finalize(
         node_system->get_node_tree());
     // for (auto&& node : _renderParam->node_tree->nodes) {
@@ -335,14 +357,16 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
     else if (typeId == HdPrimTypeTokens->material) {
         // Check if this is a shader-based material by looking for shader_path
         // Note: At creation time we don't have access to sceneDelegate,
-        // so we'll create MaterialX by default and let Sync handle shader detection
-        // For now, we'll just create MaterialX which can fall back to shader if needed
+        // so we'll create MaterialX by default and let Sync handle shader
+        // detection For now, we'll just create MaterialX which can fall back to
+        // shader if needed
         auto material = new Hd_USTC_CG_MaterialX(sprimId);
         spdlog::info("=== Created material: {} ===", sprimId.GetText());
         materials[sprimId] = material;
 
         assert(materials[sprimId] != nullptr);
-        spdlog::info("Material stored in map, total materials: {}", materials.size());
+        spdlog::info(
+            "Material stored in map, total materials: {}", materials.size());
 
         return material;
     }
@@ -381,7 +405,8 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
         lights.push_back(light);
         return light;
     }
-    else if (typeId == TfToken("drawTarget") || typeId == TfToken("imageShader")) {
+    else if (
+        typeId == TfToken("drawTarget") || typeId == TfToken("imageShader")) {
         // MaterialX specific types - create a minimal fallback
         spdlog::info("Creating Sprim of type: {}", typeId.GetText());
         return new HdExtComputation(sprimId);
@@ -438,7 +463,8 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
     else if (typeId == HdPrimTypeTokens->domeLight) {
         return new Hd_USTC_CG_Dome_Light(SdfPath::EmptyPath(), typeId);
     }
-    else if (typeId == TfToken("drawTarget") || typeId == TfToken("imageShader")) {
+    else if (
+        typeId == TfToken("drawTarget") || typeId == TfToken("imageShader")) {
         // MaterialX specific types - create a minimal fallback
         return new HdExtComputation(SdfPath::EmptyPath());
     }
@@ -544,26 +570,30 @@ VtValue Hd_USTC_CG_RenderDelegate::GetRenderSetting(TfToken const& key) const
     if (key == TfToken("VulkanColorAov")) {
         // Legacy: return default texture for backward compatibility
         if (!_renderParam->default_texture_name.empty()) {
-            auto it = _renderParam->presented_textures.find(_renderParam->default_texture_name);
+            auto it = _renderParam->presented_textures.find(
+                _renderParam->default_texture_name);
             if (it != _renderParam->presented_textures.end() && it->second) {
                 // Safe: map element addresses are stable until erase/rehash
                 return VtValue(reinterpret_cast<const void*>(&it->second));
             }
         }
     }
-    
+
     // New: support querying named textures
     // Format: "VulkanColorAov:<texture_name>"
     std::string key_str = key.GetString();
     if (key_str.rfind("VulkanColorAov:", 0) == 0) {
-        std::string texture_name = key_str.substr(15);  // Skip "VulkanColorAov:"
+        std::string texture_name =
+            key_str.substr(15);  // Skip "VulkanColorAov:"
         auto it = _renderParam->presented_textures.find(texture_name);
         if (it != _renderParam->presented_textures.end()) {
             if (it->second) {
                 return VtValue(reinterpret_cast<const void*>(&it->second));
-            } else {
             }
-        } else {
+            else {
+            }
+        }
+        else {
             spdlog::warn("  Texture '{}' not found in map", texture_name);
         }
     }

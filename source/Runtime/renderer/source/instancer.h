@@ -24,12 +24,17 @@
 #ifndef PXR_IMAGING_PLUGIN_HD_EMBREE_INSTANCER_H
 #define PXR_IMAGING_PLUGIN_HD_EMBREE_INSTANCER_H
 #include "api.h"
+#include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/tf/hashmap.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 #include "pxr/pxr.h"
 
+// Include slang types for GeometryInstanceData
+#include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
+#include "internal/memory/DeviceMemoryPool.hpp"
+#include "nvrhi/nvrhi.h"
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
@@ -66,6 +71,17 @@ class Hd_USTC_CG_Instancer : public HdInstancer {
     ///   \param prototypeId The prototype to compute transforms for.
     ///   \return One transform per instance, to apply when drawing.
     VtMatrix4fArray ComputeInstanceTransforms(SdfPath const& prototypeId);
+
+    // GPU version
+    void ComputeInstanceTransforms(
+        SdfPath const& prototypeId,
+        DeviceMemoryPool<GeometryInstanceData>::MemoryHandle instance_buffer,
+        DeviceMemoryPool<nvrhi::rt::InstanceDesc>::MemoryHandle
+            rt_instance_buffer,
+        uint64_t BLAS_address,
+        const pxr::GfMatrix4f& prototype_transform,
+        unsigned material_id,
+        unsigned geometry_id);
 
     /// Updates cached primvar data from the scene delegate.
     ///   \param sceneDelegate The scene delegate for this prim.

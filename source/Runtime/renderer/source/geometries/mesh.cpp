@@ -337,29 +337,6 @@ void Hd_USTC_CG_Mesh::updateTLAS(
     HdInstancer::_SyncInstancerAndParents(
         sceneDelegate->GetRenderIndex(), GetInstancerId());
 
-    VtMatrix4fArray transforms;
-    if (!GetInstancerId().IsEmpty()) {
-        // Retrieve instance transforms from the instancer.
-        HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
-        HdInstancer* instancer = renderIndex.GetInstancer(GetInstancerId());
-        transforms = static_cast<Hd_USTC_CG_Instancer*>(instancer)
-                         ->ComputeInstanceTransforms(GetId());
-    }
-    else {
-        // If there's no instancer, add a single instance with transform
-        // I.
-        transforms.push_back(GfMatrix4f(1.0f));
-    }
-
-    auto& rt_instance_pool = render_param->InstanceCollection->rt_instance_pool;
-    std::vector<nvrhi::rt::InstanceDesc> instances;
-    instances.resize(transforms.size());
-
-    rt_instanceBuffer = rt_instance_pool.allocate(instances.size());
-
-    instanceBuffer = render_param->InstanceCollection->instance_pool.allocate(
-        transforms.size());
-
     auto material_id = GetMaterialId();
 
     // Check if mesh has GeomSubset materials
@@ -395,45 +372,59 @@ void Hd_USTC_CG_Mesh::updateTLAS(
             id.GetText());
     }
 
-    std::vector<GeometryInstanceData> instance_data_array(transforms.size());
-
-    for (int i = 0; i < transforms.size(); ++i) {
-        // transforms[i] already contains the full instance transform from the
-        // instancer For instanced geometry, apply: instanceTransform *
-        // prototypeTransform
-        GfMatrix4f mat = transforms[i] * transform;
-        GfMatrix4f mat_transposed = mat.GetTranspose();
-
-        nvrhi::rt::InstanceDesc instanceDesc;
-        instanceDesc.blasDeviceAddress = BLAS->getDeviceAddress();
-        instanceDesc.instanceMask = 1;
-        instanceDesc.flags =
-            nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
-
-        memcpy(
-            instanceDesc.transform,
-            mat_transposed.data(),
-            sizeof(nvrhi::rt::AffineTransform));
-
-        instanceDesc.instanceID = instanceBuffer->index() + i;
-        instances[i] = instanceDesc;
-
-        instance_data_array[i].geometryID = mesh_desc_buffer->index();
-        if (material) {
-            material->ensure_material_data_handle(render_param);
-            instance_data_array[i].materialID = material->GetMaterialLocation();
-        }
-        else {
-            instance_data_array[i].materialID = -1;
-        }
-        memcpy(
-            &instance_data_array[i].transform,
-            mat.data(),
-            sizeof(pxr::GfMatrix4f));
+    size_t instance_count = 1;
+    
+    // Determine instance count
+    if (!GetInstancerId().IsEmpty()) {
+        HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+        HdInstancer* instancer = renderIndex.GetInstancer(GetInstancerId());
+        VtIntArray instanceIndices = 
+            sceneDelegate->GetInstanceIndices(GetInstancerId(), GetId());
+        instance_count = instanceIndices.size();
     }
 
-    instanceBuffer->write_data(instance_data_array.data());
-    rt_instanceBuffer->write_data(instances.data());
+    auto& rt_instance_pool = render_param->InstanceCollection->rt_instance_pool;
+    
+    rt_instanceBuffer = rt_instance_pool.allocate(instance_count);
+    instanceBuffer = render_param->InstanceCollection->instance_pool.allocate(
+        instance_count);
+
+    if (!GetInstancerId().IsEmpty()) {
+        // GPU path: Let instancer compute transforms on GPU
+        HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+        HdInstancer* instancer = renderIndex.GetInstancer(GetInstancerId());
+        static_cast<Hd_USTC_CG_Instancer*>(instancer)
+            ->ComputeInstanceTransforms(
+                GetId(),
+                instanceBuffer,
+                rt_instanceBuffer,
+                BLAS->getDeviceAddress(),
+                transform,
+                material ? material->GetMaterialLocation() : -1,
+                mesh_desc_buffer->index());
+    }
+    else {
+        // CPU path: Single instance, no instancer
+        GeometryInstanceData instance_data;
+        instance_data.geometryID = mesh_desc_buffer->index();
+        instance_data.materialID = material ? material->GetMaterialLocation() : -1;
+        memcpy(&instance_data.transform, transform.data(), sizeof(pxr::GfMatrix4f));
+        instance_data.flags = 0;
+        
+        instanceBuffer->write_data(&instance_data);
+
+        nvrhi::rt::InstanceDesc rt_instance;
+        rt_instance.blasDeviceAddress = BLAS->getDeviceAddress();
+        rt_instance.instanceMask = 1;
+        rt_instance.flags = nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
+        
+        GfMatrix4f mat_transposed = transform.GetTranspose();
+        memcpy(rt_instance.transform, mat_transposed.data(), sizeof(nvrhi::rt::AffineTransform));
+        rt_instance.instanceID = instanceBuffer->index();
+        
+        rt_instanceBuffer->write_data(&rt_instance);
+    }
+    
     render_param->InstanceCollection->set_require_rebuild_tlas();
 
     draw_indirect =
@@ -441,7 +432,7 @@ void Hd_USTC_CG_Mesh::updateTLAS(
     nvrhi::DrawIndirectArguments args;
 
     args.vertexCount = triangulatedIndices.size() * 3;
-    args.instanceCount = instances.size();
+    args.instanceCount = instance_count;
     args.startVertexLocation = 0;
     args.startInstanceLocation = instanceBuffer->index();
 

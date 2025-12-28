@@ -33,7 +33,7 @@ struct RenderGlobalPayload {
     {
         shader_factory.set_search_path(RENDERER_SHADER_DIR);
         shader_factory.add_search_path("usd/hd_USTC_CG/resources/libraries");
-        resource_allocator.device = nvrhi_device;
+        resource_allocator.device = RHI::get_device();
         resource_allocator.shader_factory = &shader_factory;
     }
 
