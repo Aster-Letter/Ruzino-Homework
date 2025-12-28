@@ -411,6 +411,11 @@ void Hd_USTC_CG_Mesh::updateTLAS(
                 transform,
                 material ? material->GetMaterialLocation() : -1,
                 mesh_desc_buffer->index());
+
+        std::vector<nvrhi::rt::InstanceDesc> dump_instance(instance_count);
+        rt_instanceBuffer->read_data(dump_instance.data());
+        std::vector<GeometryInstanceData> dump_geom_instance(instance_count);
+        instanceBuffer->read_data(dump_geom_instance.data());
     }
     else {
         // CPU path: Single instance, no instancer

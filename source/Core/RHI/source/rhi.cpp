@@ -72,6 +72,7 @@ int init(bool with_window, bool use_dx12)
     };
 
     params.swapChainFormat = nvrhi::Format::RGBA8_UNORM;
+    params.featureLevel = D3D_FEATURE_LEVEL_12_2;
 #ifdef _DEBUG
     // params.enableNvrhiValidationLayer = true;
     params.enableDebugRuntime = true;
