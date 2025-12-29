@@ -157,8 +157,9 @@ void Hd_USTC_CG_Mesh::create_gpu_resources(Hd_USTC_CG_RenderParam* render_param)
 {
     auto device = RHI::get_device();
 
-    auto copy_commandlist =
-        device->createCommandList({ .enableImmediateExecution = false });
+    if (!copy_commandlist)
+        copy_commandlist =
+            device->createCommandList({ .enableImmediateExecution = false });
 
     auto descriptor_table =
         render_param->InstanceCollection->get_buffer_descriptor_table();
@@ -298,7 +299,6 @@ void Hd_USTC_CG_Mesh::create_gpu_resources(Hd_USTC_CG_RenderParam* render_param)
         m_CommandList->close();
         device->executeCommandList(m_CommandList);
         device->waitForIdle();
-        device->runGarbageCollection();
 
         descriptor_handle = descriptor_table->CreateDescriptorHandle(
             nvrhi::BindingSetItem::RawBuffer_SRV(0, vertexBuffer));
@@ -394,9 +394,14 @@ void Hd_USTC_CG_Mesh::updateTLAS(
 
     auto& rt_instance_pool = render_param->InstanceCollection->rt_instance_pool;
 
-    rt_instanceBuffer = rt_instance_pool.allocate(instance_count);
-    instanceBuffer = render_param->InstanceCollection->instance_pool.allocate(
-        instance_count);
+    if (!rt_instanceBuffer || rt_instanceBuffer->count() != instance_count)
+        rt_instanceBuffer = rt_instance_pool.allocate(instance_count);
+    if (!instanceBuffer || instanceBuffer->count() != instance_count)
+        instanceBuffer =
+            render_param->InstanceCollection->instance_pool.allocate(
+                instance_count);
+
+    material->ensure_material_data_handle(render_param);
 
     if (!GetInstancerId().IsEmpty()) {
         // GPU path: Let instancer compute transforms on GPU
@@ -411,32 +416,6 @@ void Hd_USTC_CG_Mesh::updateTLAS(
                 transform,
                 material ? material->GetMaterialLocation() : -1,
                 mesh_desc_buffer->index());
-
-        // Ensure GPU work is complete before reading back
-        auto device = RHI::get_device();
-        device->waitForIdle();
-
-        // Verify instance data (read ALL data, then log first few)
-        std::vector<nvrhi::rt::InstanceDesc> dump_instance(instance_count);
-        rt_instanceBuffer->read_data(dump_instance.data());
-        std::vector<GeometryInstanceData> dump_geom_instance(instance_count);
-        instanceBuffer->read_data(dump_geom_instance.data());
-
-        size_t verify_count = std::min(instance_count, size_t(3));
-        spdlog::info("=== Mesh {} GPU Instance Verification (first {} of {}) ===", 
-            id.GetText(), verify_count, instance_count);
-        for (size_t i = 0; i < verify_count; i++) {
-            auto& geom = dump_geom_instance[i];
-            auto& rt = dump_instance[i];
-            unsigned rt_id = rt.instanceID;
-            unsigned rt_mask = rt.instanceMask;
-            spdlog::info("  [{}] Geom: ID={}, Mat={} | RT: ID={}, Mask={}, BLAS=0x{:x}",
-                i, geom.geometryID, geom.materialID, rt_id, rt_mask, rt.blasDeviceAddress);
-            spdlog::info("      Geom Transform: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]",
-                geom.transform.data()[0], geom.transform.data()[1], geom.transform.data()[2], geom.transform.data()[3]);
-            spdlog::info("      RT Transform: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]",
-                rt.transform[0], rt.transform[1], rt.transform[2], rt.transform[3]);
-        }
     }
     else {
         // CPU path: Single instance, no instancer

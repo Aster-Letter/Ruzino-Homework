@@ -62,6 +62,7 @@ class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
    protected:
     nvrhi::BufferHandle vertexBuffer;
     DescriptorHandle descriptor_handle;
+    CommandListHandle copy_commandlist;
 
     DeviceMemoryPool<GeometryInstanceData>::MemoryHandle instanceBuffer;
     DeviceMemoryPool<nvrhi::rt::InstanceDesc>::MemoryHandle rt_instanceBuffer;

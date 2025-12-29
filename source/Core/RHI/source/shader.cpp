@@ -110,14 +110,18 @@ ProgramDesc& ProgramDesc::set_path(const std::string& path)
 {
     this->paths.clear();
     this->paths.push_back(path);
+#ifdef _DEBUG
     update_last_write_time(path);
+#endif
     return *this;
 }
 
 ProgramDesc& ProgramDesc::add_path(const std::string& path)
 {
     this->paths.push_back(path);
+#ifdef _DEBUG
     update_last_write_time(path);
+#endif
     return *this;
 }
 

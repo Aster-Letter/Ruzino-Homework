@@ -97,7 +97,7 @@ void GPUSceneAssember::fill_instances(
 
     ProgramHandle filler_program =
         get_instance().sa_resource_allocator.create(program_desc);
-    
+
     MARK_DESTROY_NVRHI_RESOURCE(filler_program);
 
     ProgramVars filler_program_vars(
@@ -113,7 +113,7 @@ void GPUSceneAssember::fill_instances(
             .setInitialState(nvrhi::ResourceStates::ShaderResource)
             .setKeepInitialState(true)
             .setDebugName("instance_indices");
-    auto index_buffer = device->createBuffer(index_desc);
+    auto index_buffer = get_instance().sa_resource_allocator.create(index_desc);
     MARK_DESTROY_NVRHI_RESOURCE(index_buffer);
 
     auto cmd = device->createCommandList();
@@ -133,13 +133,14 @@ void GPUSceneAssember::fill_instances(
                 .setInitialState(nvrhi::ResourceStates::ShaderResource)
                 .setKeepInitialState(true)
                 .setDebugName("translations");
-        translations_buffer = device->createBuffer(translations_desc);
-        MARK_DESTROY_NVRHI_RESOURCE(translations_buffer);
+        translations_buffer =
+            get_instance().sa_resource_allocator.create(translations_desc);
         cmd->writeBuffer(
             translations_buffer,
             translations,
             instance_indices.size() * sizeof(GfVec3f));
     }
+    MARK_DESTROY_NVRHI_RESOURCE(translations_buffer);
 
     nvrhi::BufferHandle rotations_buffer;
     if (rotations) {
@@ -150,13 +151,14 @@ void GPUSceneAssember::fill_instances(
                 .setInitialState(nvrhi::ResourceStates::ShaderResource)
                 .setKeepInitialState(true)
                 .setDebugName("rotations");
-        rotations_buffer = device->createBuffer(rotations_desc);
-        MARK_DESTROY_NVRHI_RESOURCE(rotations_buffer);
+        rotations_buffer =
+            get_instance().sa_resource_allocator.create(rotations_desc);
         cmd->writeBuffer(
             rotations_buffer,
             rotations,
             instance_indices.size() * sizeof(GfQuatf));
     }
+    MARK_DESTROY_NVRHI_RESOURCE(rotations_buffer);
 
     nvrhi::BufferHandle scales_buffer;
     if (scales) {
@@ -167,11 +169,12 @@ void GPUSceneAssember::fill_instances(
                 .setInitialState(nvrhi::ResourceStates::ShaderResource)
                 .setKeepInitialState(true)
                 .setDebugName("scales");
-        scales_buffer = device->createBuffer(scales_desc);
-        MARK_DESTROY_NVRHI_RESOURCE(scales_buffer);
+        scales_buffer =
+            get_instance().sa_resource_allocator.create(scales_desc);
         cmd->writeBuffer(
             scales_buffer, scales, instance_indices.size() * sizeof(GfVec3f));
     }
+    MARK_DESTROY_NVRHI_RESOURCE(scales_buffer);
 
     nvrhi::BufferHandle instance_transforms_buffer;
     if (instanceTransforms) {
@@ -183,13 +186,14 @@ void GPUSceneAssember::fill_instances(
                 .setKeepInitialState(true)
                 .setDebugName("instance_transforms");
         instance_transforms_buffer =
-            device->createBuffer(instance_transforms_desc);
-        MARK_DESTROY_NVRHI_RESOURCE(instance_transforms_buffer);
+            get_instance().sa_resource_allocator.create(
+                instance_transforms_desc);
         cmd->writeBuffer(
             instance_transforms_buffer,
             instanceTransforms,
             instance_indices.size() * sizeof(GfMatrix4d));
     }
+    MARK_DESTROY_NVRHI_RESOURCE(instance_transforms_buffer);
 
     cmd->close();
     device->executeCommandList(cmd);
@@ -221,7 +225,8 @@ void GPUSceneAssember::fill_instances(
             .setInitialState(nvrhi::ResourceStates::ConstantBuffer)
             .setKeepInitialState(true)
             .setDebugName("instance_params");
-    auto params_buffer = device->createBuffer(params_desc);
+    auto params_buffer =
+        get_instance().sa_resource_allocator.create(params_desc);
     MARK_DESTROY_NVRHI_RESOURCE(params_buffer);
 
     cmd = device->createCommandList();
