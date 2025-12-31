@@ -562,15 +562,6 @@ int main(int argc, char* argv[])
 
         // Render loop for each frame
         for (int frame = 0; frame < frames_to_render; ++frame) {
-            // Frame progress header
-            if (is_sequence) {
-                printf(
-                    "[Frame %d/%d] ",
-                    frame + 1,
-                    frames_to_render);
-                fflush(stdout);
-            }
-
             // Update stage for animation (skip first frame)
             if (is_sequence && frame > 0) {
                 stage->tick(delta_time);
@@ -644,14 +635,29 @@ int main(int argc, char* argv[])
                 int eta_secs = (int)(eta_seconds) % 60;
 
                 // Print progress bar with ETA using printf
-                printf(
-                    "\r[%s] %d%% (%d/%d) Sample: %.4fs Avg: %.4fs ",
-                    bar,
-                    progress_percent,
-                    sample + 1,
-                    spp,
-                    sample_duration / 1000.0,
-                    avg_time_per_sample / 1000.0);
+                // Include frame info in sequence mode
+                if (is_sequence) {
+                    printf(
+                        "\r[Frame %d/%d] [%s] %d%% (%d/%d) Sample: %.4fs Avg: %.4fs ",
+                        frame + 1,
+                        frames_to_render,
+                        bar,
+                        progress_percent,
+                        sample + 1,
+                        spp,
+                        sample_duration / 1000.0,
+                        avg_time_per_sample / 1000.0);
+                }
+                else {
+                    printf(
+                        "\r[%s] %d%% (%d/%d) Sample: %.4fs Avg: %.4fs ",
+                        bar,
+                        progress_percent,
+                        sample + 1,
+                        spp,
+                        sample_duration / 1000.0,
+                        avg_time_per_sample / 1000.0);
+                }
 
                 if (remaining_samples > 0) {
                     if (eta_minutes > 0) {
