@@ -153,20 +153,21 @@ std::string GenerateSequenceFilename(
 
     // Determine number of digits needed
     int num_digits = std::to_string(total_frames - 1).length();
-    if (num_digits < 4) num_digits = 4;  // Minimum 4 digits
+    if (num_digits < 4)
+        num_digits = 4;  // Minimum 4 digits
 
     // Extract extension
     size_t dot_pos = base_filename.find_last_of('.');
-    std::string name_part = (dot_pos != std::string::npos) 
-        ? base_filename.substr(0, dot_pos) 
-        : base_filename;
-    std::string ext_part = (dot_pos != std::string::npos) 
-        ? base_filename.substr(dot_pos) 
-        : ".png";
+    std::string name_part = (dot_pos != std::string::npos)
+                                ? base_filename.substr(0, dot_pos)
+                                : base_filename;
+    std::string ext_part =
+        (dot_pos != std::string::npos) ? base_filename.substr(dot_pos) : ".png";
 
     // Format frame number with leading zeros
     std::ostringstream oss;
-    oss << name_part << "_" << std::setfill('0') << std::setw(num_digits) << frame_number << ext_part;
+    oss << name_part << "_" << std::setfill('0') << std::setw(num_digits)
+        << frame_number << ext_part;
     return oss.str();
 }
 
@@ -183,9 +184,14 @@ bool SaveImageToFile(
         if (!std::filesystem::exists(parent_dir)) {
             try {
                 std::filesystem::create_directories(parent_dir);
-                spdlog::info("Created output directory: {}", parent_dir.string());
-            } catch (const std::exception& e) {
-                spdlog::error("Failed to create directory {}: {}", parent_dir.string(), e.what());
+                spdlog::info(
+                    "Created output directory: {}", parent_dir.string());
+            }
+            catch (const std::exception& e) {
+                spdlog::error(
+                    "Failed to create directory {}: {}",
+                    parent_dir.string(),
+                    e.what());
                 return false;
             }
         }
@@ -404,9 +410,17 @@ int main(int argc, char* argv[])
         "camera", 'c', "Camera prim path (e.g., /Camera)", false, "");
     parser.add("verbose", 'v', "Enable verbose logging");
     parser.add<int>(
-        "frames", 'f', "Number of frames to render (for animation sequences)", false, 0);
+        "frames",
+        'f',
+        "Number of frames to render (for animation sequences)",
+        false,
+        0);
     parser.add<float>(
-        "fps", 'r', "Frames per second (for animation delta time)", false, 60.0f);
+        "fps",
+        'r',
+        "Frames per second (for animation delta time)",
+        false,
+        60.0f);
 
     parser.parse_check(argc, argv);
 
@@ -526,10 +540,15 @@ int main(int argc, char* argv[])
         bool is_sequence = (num_frames > 0);
         int frames_to_render = is_sequence ? num_frames : 1;
 
-        printf("Starting %s render...\n", is_sequence ? "sequence" : "single frame");
+        printf(
+            "Starting %s render...\n",
+            is_sequence ? "sequence" : "single frame");
         if (is_sequence) {
-            printf("Total frames: %d, Delta time: %.4fs (%.0f fps)\n", 
-                   frames_to_render, delta_time, fps);
+            printf(
+                "Total frames: %d, Delta time: %.4fs (%.0f fps)\n",
+                frames_to_render,
+                delta_time,
+                fps);
         }
         printf("Samples per pixel: %d\n", spp);
         fflush(stdout);
@@ -538,17 +557,17 @@ int main(int argc, char* argv[])
         std::future<void> previous_save_task;
         bool has_previous_task = false;
 
+        // Track total time for multi-frame rendering
+        auto total_start_time = std::chrono::high_resolution_clock::now();
+
         // Render loop for each frame
         for (int frame = 0; frame < frames_to_render; ++frame) {
-            // Wait for previous frame's save to complete before starting new frame
-            if (has_previous_task) {
-                previous_save_task.wait();
-            }
-
             // Frame progress header
             if (is_sequence) {
-                printf("\n========== Frame %d/%d ==========\n", 
-                       frame + 1, frames_to_render);
+                printf(
+                    "[Frame %d/%d] ",
+                    frame + 1,
+                    frames_to_render);
                 fflush(stdout);
             }
 
@@ -586,7 +605,7 @@ int main(int argc, char* argv[])
                         .count();
 
                 // Skip first sample for timing (shader compilation, etc.)
-                if (sample == 0) {
+                if (sample == 0 && frame == 0) {
                     render_start = std::chrono::high_resolution_clock::now();
                     printf(
                         "Sample 1/%d completed in %.2fs (warmup)\n",
@@ -656,21 +675,23 @@ int main(int argc, char* argv[])
                     render_end - render_start)
                     .count();
 
-            printf(
-                "Render complete. Total time: %.2fs (excluding warmup)",
-                total_duration / 1000.0);
-            if (timed_samples > 0) {
+            if (!is_sequence) {
                 printf(
-                    ", Avg per sample: %.2fs",
-                    total_sample_time / (double)timed_samples / 1000.0);
+                    "Render complete. Total time: %.2fs (excluding warmup)",
+                    total_duration / 1000.0);
+                if (timed_samples > 0) {
+                    printf(
+                        ", Avg per sample: %.2fs",
+                        total_sample_time / (double)timed_samples / 1000.0);
+                }
+                printf("\n");
+                fflush(stdout);
             }
-            printf("\n");
-            fflush(stdout);
 
             // Read back texture data
             std::vector<uint8_t> texture_data;
-            bool success =
-                ReadTextureDirectly(renderer.get(), width, height, texture_data);
+            bool success = ReadTextureDirectly(
+                renderer.get(), width, height, texture_data);
 
             if (!success) {
                 success = ReadTextureCPU(
@@ -678,34 +699,34 @@ int main(int argc, char* argv[])
             }
 
             if (!success) {
-                throw std::runtime_error("Failed to read back rendered texture");
+                throw std::runtime_error(
+                    "Failed to read back rendered texture");
             }
 
             // Generate output filename for this frame
-            std::string frame_output = GenerateSequenceFilename(
-                output_image, frame, frames_to_render);
-
-            // Save the image asynchronously
-            printf("Queuing save for: %s\n", frame_output.c_str());
-            fflush(stdout);
+            std::string frame_output =
+                GenerateSequenceFilename(output_image, frame, frames_to_render);
 
             // Launch async save task (capture by value to avoid data races)
-            previous_save_task = std::async(std::launch::async, 
+            previous_save_task = std::async(
+                std::launch::async,
                 [frame_output, width, height, texture_data]() {
                     auto save_start = std::chrono::high_resolution_clock::now();
-                    
-                    if (!SaveImageToFile(frame_output, width, height, texture_data)) {
-                        fprintf(stderr, "Error: Failed to save image to %s\n", frame_output.c_str());
+
+                    if (!SaveImageToFile(
+                            frame_output, width, height, texture_data)) {
+                        fprintf(
+                            stderr,
+                            "Error: Failed to save image to %s\n",
+                            frame_output.c_str());
                     }
-                    
+
                     auto save_end = std::chrono::high_resolution_clock::now();
                     auto save_duration =
                         std::chrono::duration_cast<std::chrono::milliseconds>(
                             save_end - save_start)
                             .count();
-                    
-                    printf("[Async] Saved %s in %.2fs\n", 
-                           frame_output.c_str(), save_duration / 1000.0);
+
                     fflush(stdout);
                 });
             has_previous_task = true;
@@ -718,10 +739,20 @@ int main(int argc, char* argv[])
             previous_save_task.wait();
         }
 
+        auto total_end_time = std::chrono::high_resolution_clock::now();
+        auto total_duration =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                total_end_time - total_start_time)
+                .count();
+
         if (is_sequence) {
             printf("\n========================================\n");
             printf("Sequence render completed successfully!\n");
             printf("Total frames rendered: %d\n", frames_to_render);
+            printf(
+                "Total time: %.2fs (%.2fs per frame)\n",
+                total_duration / 1000.0,
+                total_duration / 1000.0 / frames_to_render);
             printf("========================================\n");
         }
         else {
