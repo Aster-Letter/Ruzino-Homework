@@ -406,7 +406,7 @@ int main(int argc, char* argv[])
     parser.add<int>(
         "frames", 'f', "Number of frames to render (for animation sequences)", false, 0);
     parser.add<float>(
-        "fps", 'r', "Frames per second (for animation delta time)", false, 30.0f);
+        "fps", 'r', "Frames per second (for animation delta time)", false, 60.0f);
 
     parser.parse_check(argc, argv);
 

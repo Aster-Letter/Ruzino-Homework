@@ -34,8 +34,14 @@ void main(int2 i_globalIdx: SV_DispatchThreadID)
     float3 vel = asfloat(velocities.Load3(i * 12));
     float3 pos_o = pos;
 
+    // Get particle mass for acceleration calculation
+    float mass = sph_constants.mV;
+    float rho_i = float(rho.Load(i * 4)) / INT_SCALE;
+    
     // Update velocity and position
-    vel += dt * (F_pres + F_visc + gravity);
+    // Apply forces: a = F/m, v += a*dt
+    float3 acceleration = (F_pres + F_visc) / mass + gravity;
+    vel += dt * acceleration;
     pos += dt * vel;
 
     // Simple boundary collision with axis-aligned box [-1,1]^3

@@ -283,7 +283,7 @@ int main(int argc, char* argv[])
 #else
 
     window->register_function_before_frame(
-        [&stage](Window* window) { stage->tick(1.0f / 30.f); });
+        [&stage](Window* window) { stage->tick(1.0f / 60.f); });
 #endif
     // Add a sphere
 

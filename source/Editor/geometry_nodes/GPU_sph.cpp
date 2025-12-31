@@ -9,17 +9,17 @@ NODE_DEF_OPEN_SCOPE
 
 // SPH Constants structure matching the shader
 struct SPHConstants {
-    float particleDiameter;
-    float smoothingRadius;
-    float gravity;
-    float restDensity;
-    float mV;
-    float constPress;
-    float constVisc;
-    float constSurf;
-    float dt;
-    int numParticles;
-    int numPairs;
+    float particleDiameter;     // d = 2r, full particle diameter
+    float smoothingRadius;      // h, kernel support radius (typically 2d - 4d)
+    float gravity;              // g, gravitational acceleration (m/s²)
+    float restDensity;          // ρ₀, rest density (kg/m³), e.g., 1000 for water
+    float mV;                   // Particle mass (kg), calculated as ρ₀ * volume
+    float constPress;           // k, pressure stiffness constant
+    float constVisc;            // μ, dynamic viscosity coefficient
+    float constSurf;            // σ, surface tension coefficient
+    float dt;                   // Δt, time step (s)
+    int numParticles;           // N, total number of particles
+    int numPairs;               // Number of neighbor pairs
 };
 
 struct SPHStorage {
@@ -71,18 +71,21 @@ NODE_DECLARATION_FUNCTION(gpu_sph)
 {
     b.add_input<Geometry>("Geometry");
     b.add_input<float>("Radius").default_val(0.02f).min(0.001f).max(0.1f);
-    b.add_input<int>("Substeps").default_val(1).min(1).max(10);
+    b.add_input<int>("Substeps").default_val(5).min(1).max(20);
     b.add_input<float>("Rest Density")
-        .default_val(1000.0f)
+        .default_val(1000.0f)   // Water density: 1000 kg/m³
         .min(100.0f)
         .max(10000.0f);
     b.add_input<float>("Pressure Constant")
-        .default_val(50000.0f)
+        .default_val(10000.0f)  // Adjusted for better stability
         .min(1000.0f)
         .max(100000.0f);
-    b.add_input<float>("Viscosity").default_val(0.001f).min(0.0001f).max(0.1f);
+    b.add_input<float>("Viscosity")
+        .default_val(0.1f)      // Increased for more viscous behavior
+        .min(0.001f)
+        .max(10.0f);            // Allow much higher viscosity
     b.add_input<float>("Surface Tension")
-        .default_val(0.05f)
+        .default_val(0.01f)     // Reduced surface tension
         .min(0.0f)
         .max(1.0f);
     b.add_input<float>("Gravity").default_val(-9.81f).min(-20.0f).max(0.0f);
@@ -335,16 +338,20 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
 
     // Setup SPH constants
     SPHConstants sph_constants;
-    sph_constants.particleDiameter = radius;
-    sph_constants.smoothingRadius = radius * 2;
+    sph_constants.particleDiameter = radius * 2.0f;  // Full diameter
+    sph_constants.smoothingRadius = radius * 4.0f;   // h = 2 * diameter for good support
     sph_constants.gravity = gravity;
     sph_constants.restDensity = rest_density;
     
-    // Calculate particle volume based on particle radius
-    // Using cubic arrangement: each particle occupies a cube of side = diameter
-    // This gives better results than spherical volume for SPH
-    float particle_volume = radius * radius * radius * 8.0f;  // (2r)^3
-    sph_constants.mV = particle_volume;
+    // Calculate particle mass based on rest density and particle volume
+    // SPH theory: mass = rest_density * particle_volume
+    // Using spherical volume: V = (4/3)πr³
+    float particle_volume = (4.0f / 3.0f) * 3.14159265f * radius * radius * radius;
+    float particle_mass = rest_density * particle_volume;
+    
+    // IMPORTANT: mV should store MASS, not mass*volume!
+    // The shader uses: ρᵢ = Σⱼ mⱼ * W(rᵢ - rⱼ, h)
+    sph_constants.mV = particle_mass;
     
     sph_constants.constPress = pressure_constant;
     sph_constants.constVisc = viscosity;
@@ -365,8 +372,10 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
     // Substep loop for better stability
     for (int substep = 0; substep < substeps; ++substep) {
         // CRITICAL: Rebuild neighbor pairs each substep with updated positions!
+        // Use smoothing radius (h) for neighbor search
+        float search_radius = sph_constants.smoothingRadius;
         auto contacts = FindNeighborsFromPositionBuffer(
-            storage.positions, num_particles, radius * 2, pair_count);
+            storage.positions, num_particles, search_radius, pair_count);
         
         if (!contacts || pair_count == 0) {
             spdlog::warn("No neighbors found in substep {}", substep);
