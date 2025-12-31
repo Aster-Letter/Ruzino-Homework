@@ -18,26 +18,24 @@
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
 // Custom Blob implementation to hold shader binary data loaded from cache
-class CustomBlob : public ISlangBlob
-{
-private:
+class CustomBlob : public ISlangBlob {
+   private:
     std::vector<char> data;
     std::atomic<uint32_t> refCount;
 
-public:
-    explicit CustomBlob(std::vector<char>&& buffer) 
-        : data(std::move(buffer)), refCount(1)
+   public:
+    explicit CustomBlob(std::vector<char>&& buffer)
+        : data(std::move(buffer)),
+          refCount(1)
     {
     }
 
     // ISlangUnknown interface
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(
-        SlangUUID const& uuid,
-        void** outObject) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
     {
-        if (uuid == ISlangUnknown::getTypeGuid() || 
-            uuid == ISlangBlob::getTypeGuid())
-        {
+        if (uuid == ISlangUnknown::getTypeGuid() ||
+            uuid == ISlangBlob::getTypeGuid()) {
             *outObject = static_cast<ISlangBlob*>(this);
             addRef();
             return SLANG_OK;
@@ -53,8 +51,7 @@ public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override
     {
         uint32_t newCount = --refCount;
-        if (newCount == 0)
-        {
+        if (newCount == 0) {
             delete this;
         }
         return newCount;
@@ -149,12 +146,13 @@ bool ProgramDesc::check_shader_updated() const
             std::filesystem::path(ShaderFactory::shader_search_path) / path;
         if (fs::exists(full_path)) {
             auto possibly_newer_lastWriteTime = fs::last_write_time(full_path);
-            auto current_time = possibly_newer_lastWriteTime.time_since_epoch().count();
-            
+            auto current_time =
+                possibly_newer_lastWriteTime.time_since_epoch().count();
+
             if (lastWriteTime == 0) {
                 return false;
             }
-            
+
             if (current_time > lastWriteTime) {
                 return true;
             }
@@ -182,32 +180,39 @@ void ProgramDesc::update_last_write_time(const std::string& path)
 size_t ProgramDesc::calculate_hash() const
 {
     size_t hash = 0;
-    
+
     // Hash shader type
-    hash ^= std::hash<int>{}(static_cast<int>(shaderType)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    
+    hash ^= std::hash<int>{}(static_cast<int>(shaderType)) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+
     // Hash entry name
-    hash ^= std::hash<std::string>{}(entry_name) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    
+    hash ^= std::hash<std::string>{}(entry_name) + 0x9e3779b9 + (hash << 6) +
+            (hash >> 2);
+
     // Hash all paths
     for (const auto& path : paths) {
-        hash ^= std::hash<std::string>{}(path) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= std::hash<std::string>{}(path) + 0x9e3779b9 + (hash << 6) +
+                (hash >> 2);
     }
-    
+
     // Hash all source codes
     for (const auto& code : source_code) {
-        hash ^= std::hash<std::string>{}(code) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= std::hash<std::string>{}(code) + 0x9e3779b9 + (hash << 6) +
+                (hash >> 2);
     }
-    
+
     // Hash macros
     for (const auto& macro : macros) {
-        hash ^= std::hash<std::string>{}(macro.name) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<std::string>{}(macro.definition) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= std::hash<std::string>{}(macro.name) + 0x9e3779b9 +
+                (hash << 6) + (hash >> 2);
+        hash ^= std::hash<std::string>{}(macro.definition) + 0x9e3779b9 +
+                (hash << 6) + (hash >> 2);
     }
-    
+
     // Hash last write time
-    hash ^= std::hash<long long>{}(lastWriteTime) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    
+    hash ^= std::hash<long long>{}(lastWriteTime) + 0x9e3779b9 + (hash << 6) +
+            (hash >> 2);
+
     return hash;
 }
 
@@ -669,7 +674,8 @@ void ShaderFactory::populate_vk_options(
 }
 
 void ShaderFactory::populate_dxc_options(
-    std::vector<slang::CompilerOptionEntry>& dxc_compiler_options)
+    std::vector<slang::CompilerOptionEntry>& dxc_compiler_options,
+    const char* nvapi_include_arg)
 {
     // Use DXC as the downstream compiler for DXIL generation
     dxc_compiler_options.push_back(
@@ -684,17 +690,34 @@ void ShaderFactory::populate_dxc_options(
                                       3 } });  // O3 optimization level
 
     // Enable debug info for shader profiling and debugging
-    // This adds the -Zi flag to DXC, providing full debug info including linetable
+    // This adds the -Zi flag to DXC, providing full debug info including
+    // linetable
     dxc_compiler_options.push_back(
         { slang::CompilerOptionName::DebugInformation,
-          slang::CompilerOptionValue{ slang::CompilerOptionValueKind::Int,
-                                      2 } });  // Full debug info (equivalent to -Zi)
+          slang::CompilerOptionValue{
+              slang::CompilerOptionValueKind::Int,
+              2 } });  // Full debug info (equivalent to -Zi)
 
     // Use IEEE strict mode for better precision
     dxc_compiler_options.push_back(
         { slang::CompilerOptionName::FloatingPointMode,
           slang::CompilerOptionValue{ slang::CompilerOptionValueKind::Int,
                                       1 } });  // IEEE strict
+
+    // Add NVAPI include path for DXC if provided
+    if (nvapi_include_arg != nullptr) {
+        // Use DownstreamArgs to pass -I flag to DXC
+        // stringValue0: downstream compiler name ("dxc" or empty for default)
+        // stringValue1: argument list
+        dxc_compiler_options.push_back(
+            { slang::CompilerOptionName::DownstreamArgs,
+              slang::CompilerOptionValue{
+                  slang::CompilerOptionValueKind::String,
+                  0,
+                  0,
+                  "",  // Empty string for default compiler (DXC)
+                  nvapi_include_arg } });
+    }
 }
 
 #define CHECK_REPORTED_ERROR()                                           \
@@ -732,11 +755,44 @@ void ShaderFactory::SlangCompile(
     std::vector<slang::CompilerOptionEntry> vk_compiler_options;
     std::vector<slang::CompilerOptionEntry> dxc_compiler_options;
 
+    // Calculate NVAPI path if needed
+    std::string nvapi_include_path;
+    std::string nvapi_include_arg;  // Must be kept alive for the entire compilation
+    if (nvapi_support && target == SLANG_DXIL) {
+        spdlog::info("Looking for NVAPI headers, shader_search_path = {}", shader_search_path);
+        
+        // Try multiple potential locations for nvapi headers
+        std::vector<std::filesystem::path> potential_nvapi_paths = {
+            // Runtime renderer resources
+            // shader_search_path is: .../renderer/nodes/shaders/
+            // we need: .../renderer/resources/nvapi
+            std::filesystem::path(shader_search_path).parent_path().parent_path().parent_path() / "resources" / "nvapi",
+            // External folder  
+            // shader_search_path is: .../source/Runtime/renderer/nodes/shaders/
+            // we need: .../external/nvapi  
+            std::filesystem::path(shader_search_path).parent_path().parent_path().parent_path().parent_path().parent_path().parent_path() / "external" / "nvapi"
+        };
+        
+        for (const auto& nvapi_path : potential_nvapi_paths) {
+            spdlog::info("Checking nvapi path: {}", nvapi_path.string());
+            if (std::filesystem::exists(nvapi_path / "nvHLSLExtns.h")) {
+                nvapi_include_path = nvapi_path.generic_string();
+                nvapi_include_arg = "-I" + nvapi_include_path;
+                spdlog::info("Found nvapi at {} for DXC", nvapi_path.string());
+                break;
+            }
+        }
+        
+        if (nvapi_include_path.empty()) {
+            spdlog::warn("NVAPI support requested but nvHLSLExtns.h not found in expected locations");
+        }
+    }
+
     if (target == SLANG_SPIRV) {
         populate_vk_options(vk_compiler_options);
     }
     else if (target == SLANG_DXIL) {
-        populate_dxc_options(dxc_compiler_options);
+        populate_dxc_options(dxc_compiler_options, nvapi_include_arg.empty() ? nullptr : nvapi_include_arg.c_str());
     }
 
     slang::TargetDesc desc;
@@ -770,16 +826,7 @@ void ShaderFactory::SlangCompile(
     std::vector<std::string> searchPaths = { shader_search_path };
     searchPaths.push_back("./");
     searchPaths.push_back(shader_search_path + "/shaders/");
-    
-    // Add NVAPI include path for Shader Execution Reordering (SER)
-    if (nvapi_support) {
-        // Build absolute path to nvapi directory
-        // shader_search_path is like: C:/Users/.../Ruzino/source/Runtime/renderer/nodes
-        // We need: C:/Users/.../Ruzino/source/Runtime/renderer/resources/nvapi
-        std::filesystem::path nvapi_path = std::filesystem::path(shader_search_path).parent_path() / "resources" / "nvapi";
-        searchPaths.push_back(nvapi_path.string());
-    }
-    
+
     for (auto& search_path : search_paths) {
         searchPaths.push_back(search_path);
     }
@@ -848,8 +895,8 @@ void ShaderFactory::SlangCompile(
             if (sourceCode.empty())
                 continue;
 
-            auto m =
-                load_module_from_source(sourceCode, p_compile_session.get(), module_name);
+            auto m = load_module_from_source(
+                sourceCode, p_compile_session.get(), module_name);
             if (m) {
                 modules.emplace_back(m);
                 loaded_successfully = true;
@@ -867,7 +914,7 @@ void ShaderFactory::SlangCompile(
     for (const auto& path : paths) {
         if (path.empty())
             continue;
-            
+
         auto m = load_module_from_path(path, p_compile_session.get());
         if (m) {
             modules.emplace_back(m);
@@ -948,12 +995,16 @@ ProgramHandle ShaderFactory::createProgram(const ProgramDesc& desc) const
 
     // Create a modifiable copy of the descriptor
     ProgramDesc modified_desc = desc;
-    
+
     // Automatically add NVAPI extension defines if hlslExtensionsUAV is set
     if (modified_desc.hlslExtensionsUAV >= 0) {
         modified_desc.define("ENABLE_SER", "1");
-        modified_desc.define("NV_SHADER_EXTN_SLOT", "u" + std::to_string(modified_desc.hlslExtensionsUAV));
+        modified_desc.define(
+            "NV_SHADER_EXTN_SLOT",
+            "u" + std::to_string(modified_desc.hlslExtensionsUAV));
         modified_desc.define("NV_SHADER_EXTN_REGISTER_SPACE", "space0");
+        // Enable NVAPI support in HLSL prelude for DXC
+        modified_desc.define("SLANG_HLSL_ENABLE_NVAPI", "1");
     }
 
     ret->desc = modified_desc;
@@ -963,7 +1014,8 @@ ProgramHandle ShaderFactory::createProgram(const ProgramDesc& desc) const
                                                            : SLANG_DXIL;
 
     // Try to load from cache first
-    if (try_load_from_cache(modified_desc, ret->blob, ret->reflection_info, target)) {
+    if (try_load_from_cache(
+            modified_desc, ret->blob, ret->reflection_info, target)) {
         // Successfully loaded from cache
         return ret;
     }
@@ -988,26 +1040,29 @@ ProgramHandle ShaderFactory::createProgram(const ProgramDesc& desc) const
     if (modified_desc.hlslExtensionsUAV >= 0 && ret->error_string.empty()) {
         unsigned space = 0;  // space0
         unsigned slot = modified_desc.hlslExtensionsUAV;
-        
+
         // Ensure space exists in binding layout
         if (ret->reflection_info.binding_spaces.size() <= space) {
             ret->reflection_info.binding_spaces.resize(space + 1);
         }
-        
+
         // Add the NVAPI UAV binding
         nvrhi::BindingLayoutItem nvapi_item;
         nvapi_item.slot = slot;
         nvapi_item.type = nvrhi::ResourceType::StructuredBuffer_UAV;
         nvapi_item.size = 1;  // Array size
-        
+
         ret->reflection_info.binding_spaces[space].addItem(nvapi_item);
-        ret->reflection_info.binding_spaces[space].visibility = modified_desc.shaderType;
-        ret->reflection_info.binding_spaces[space].registerSpaceIsDescriptorSet = true;
+        ret->reflection_info.binding_spaces[space].visibility =
+            modified_desc.shaderType;
+        ret->reflection_info.binding_spaces[space]
+            .registerSpaceIsDescriptorSet = true;
         ret->reflection_info.binding_spaces[space].registerSpace = space;
-        
+
         // Add to binding locations map
-        ret->reflection_info.binding_locations["g_NvidiaExt"] = 
-            std::make_tuple(space, ret->reflection_info.binding_spaces[space].bindings.size() - 1);
+        ret->reflection_info.binding_locations["g_NvidiaExt"] = std::make_tuple(
+            space,
+            ret->reflection_info.binding_spaces[space].bindings.size() - 1);
     }
 
     // Save to cache if compilation was successful
@@ -1023,17 +1078,19 @@ std::string ShaderFactory::get_cache_filename(
     SlangCompileTarget target) const
 {
     size_t hash = desc.calculate_hash();
-    
+
     // Add target to hash
-    hash ^= std::hash<int>{}(static_cast<int>(target)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    
+    hash ^= std::hash<int>{}(static_cast<int>(target)) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+
     // Add backend to hash
     auto backend = RHI::get_backend();
-    hash ^= std::hash<int>{}(static_cast<int>(backend)) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    
+    hash ^= std::hash<int>{}(static_cast<int>(backend)) + 0x9e3779b9 +
+            (hash << 6) + (hash >> 2);
+
     std::stringstream ss;
     ss << std::hex << hash;
-    
+
     const char* extension = "";
     switch (target) {
         case SLANG_SPIRV: extension = ".spv"; break;
@@ -1041,7 +1098,7 @@ std::string ShaderFactory::get_cache_filename(
         case SLANG_SHADER_HOST_CALLABLE: extension = ".host"; break;
         default: extension = ".bin"; break;
     }
-    
+
     return ss.str() + extension;
 }
 
@@ -1054,100 +1111,112 @@ bool ShaderFactory::try_load_from_cache(
     if (!cache_enabled) {
         return false;
     }
-    
+
     auto cache_dir = get_cache_directory();
     auto cache_file = cache_dir + "/" + get_cache_filename(desc, target);
     auto meta_file = cache_file + ".meta";
-    
+
     namespace fs = std::filesystem;
-    
+
     if (!fs::exists(cache_file) || !fs::exists(meta_file)) {
         return false;
     }
-    
+
     try {
         // Read shader binary
         std::ifstream shader_stream(cache_file, std::ios::binary);
         if (!shader_stream) {
             return false;
         }
-        
+
         shader_stream.seekg(0, std::ios::end);
         size_t size = shader_stream.tellg();
         shader_stream.seekg(0, std::ios::beg);
-        
+
         std::vector<char> buffer(size);
         shader_stream.read(buffer.data(), size);
         shader_stream.close();
-        
+
         if (!shader_stream.good() && !shader_stream.eof()) {
             return false;
         }
-        
+
         // Read metadata (reflection info)
         std::ifstream meta_stream(meta_file, std::ios::binary);
         if (!meta_stream) {
             return false;
         }
-        
+
         // Deserialize reflection info
         // This is a simplified version - you'd need proper serialization
         size_t space_count;
-        meta_stream.read(reinterpret_cast<char*>(&space_count), sizeof(space_count));
-        
+        meta_stream.read(
+            reinterpret_cast<char*>(&space_count), sizeof(space_count));
+
         reflection_info.binding_spaces.resize(space_count);
         for (size_t i = 0; i < space_count; ++i) {
             size_t item_count;
-            meta_stream.read(reinterpret_cast<char*>(&item_count), sizeof(item_count));
-            
+            meta_stream.read(
+                reinterpret_cast<char*>(&item_count), sizeof(item_count));
+
             for (size_t j = 0; j < item_count; ++j) {
                 nvrhi::BindingLayoutItem item;
                 uint32_t type_val, size_val;
                 uint16_t slot_val;
-                
-                meta_stream.read(reinterpret_cast<char*>(&type_val), sizeof(type_val));
-                meta_stream.read(reinterpret_cast<char*>(&slot_val), sizeof(slot_val));
-                meta_stream.read(reinterpret_cast<char*>(&size_val), sizeof(size_val));
-                
+
+                meta_stream.read(
+                    reinterpret_cast<char*>(&type_val), sizeof(type_val));
+                meta_stream.read(
+                    reinterpret_cast<char*>(&slot_val), sizeof(slot_val));
+                meta_stream.read(
+                    reinterpret_cast<char*>(&size_val), sizeof(size_val));
+
                 item.type = static_cast<nvrhi::ResourceType>(type_val);
                 item.slot = slot_val;
                 item.size = static_cast<uint16_t>(size_val);
-                
+
                 reflection_info.binding_spaces[i].addItem(item);
             }
-            
-            meta_stream.read(reinterpret_cast<char*>(&reflection_info.binding_spaces[i].visibility), 
-                           sizeof(reflection_info.binding_spaces[i].visibility));
-            meta_stream.read(reinterpret_cast<char*>(&reflection_info.binding_spaces[i].registerSpace), 
-                           sizeof(reflection_info.binding_spaces[i].registerSpace));
+
+            meta_stream.read(
+                reinterpret_cast<char*>(
+                    &reflection_info.binding_spaces[i].visibility),
+                sizeof(reflection_info.binding_spaces[i].visibility));
+            meta_stream.read(
+                reinterpret_cast<char*>(
+                    &reflection_info.binding_spaces[i].registerSpace),
+                sizeof(reflection_info.binding_spaces[i].registerSpace));
         }
-        
+
         // Read binding locations
         size_t binding_count;
-        meta_stream.read(reinterpret_cast<char*>(&binding_count), sizeof(binding_count));
-        
+        meta_stream.read(
+            reinterpret_cast<char*>(&binding_count), sizeof(binding_count));
+
         for (size_t i = 0; i < binding_count; ++i) {
             size_t name_len;
-            meta_stream.read(reinterpret_cast<char*>(&name_len), sizeof(name_len));
-            
+            meta_stream.read(
+                reinterpret_cast<char*>(&name_len), sizeof(name_len));
+
             std::string name(name_len, '\0');
             meta_stream.read(&name[0], name_len);
-            
+
             unsigned space, index;
             meta_stream.read(reinterpret_cast<char*>(&space), sizeof(space));
             meta_stream.read(reinterpret_cast<char*>(&index), sizeof(index));
-            
-            reflection_info.binding_locations[name] = std::make_tuple(space, index);
+
+            reflection_info.binding_locations[name] =
+                std::make_tuple(space, index);
         }
-        
+
         meta_stream.close();
-        
+
         // Create blob from buffer using our custom implementation
         blob = Slang::ComPtr<ISlangBlob>(new CustomBlob(std::move(buffer)));
-        
+
         return true;
-        
-    } catch (const std::exception&) {
+    }
+    catch (const std::exception&) {
         return false;
     }
 }
@@ -1161,77 +1230,91 @@ void ShaderFactory::save_to_cache(
     if (!cache_enabled || !blob) {
         return;
     }
-    
+
     namespace fs = std::filesystem;
-    
+
     auto cache_dir = get_cache_directory();
-    
+
     // Create cache directory if it doesn't exist
     if (!fs::exists(cache_dir)) {
         fs::create_directories(cache_dir);
     }
-    
+
     auto cache_file = cache_dir + "/" + get_cache_filename(desc, target);
     auto meta_file = cache_file + ".meta";
-    
+
     try {
         // Write shader binary
         std::ofstream shader_stream(cache_file, std::ios::binary);
         if (!shader_stream) {
             return;
         }
-        
+
         shader_stream.write(
             static_cast<const char*>(blob->getBufferPointer()),
             blob->getBufferSize());
         shader_stream.close();
-        
+
         // Write metadata (reflection info)
         std::ofstream meta_stream(meta_file, std::ios::binary);
         if (!meta_stream) {
             return;
         }
-        
+
         // Serialize reflection info
         size_t space_count = reflection_info.binding_spaces.size();
-        meta_stream.write(reinterpret_cast<const char*>(&space_count), sizeof(space_count));
-        
+        meta_stream.write(
+            reinterpret_cast<const char*>(&space_count), sizeof(space_count));
+
         for (const auto& space : reflection_info.binding_spaces) {
             size_t item_count = space.bindings.size();
-            meta_stream.write(reinterpret_cast<const char*>(&item_count), sizeof(item_count));
-            
+            meta_stream.write(
+                reinterpret_cast<const char*>(&item_count), sizeof(item_count));
+
             for (const auto& item : space.bindings) {
                 uint32_t type_val = static_cast<uint32_t>(item.type);
                 uint16_t slot_val = item.slot;
                 uint32_t size_val = static_cast<uint32_t>(item.size);
-                
-                meta_stream.write(reinterpret_cast<const char*>(&type_val), sizeof(type_val));
-                meta_stream.write(reinterpret_cast<const char*>(&slot_val), sizeof(slot_val));
-                meta_stream.write(reinterpret_cast<const char*>(&size_val), sizeof(size_val));
+
+                meta_stream.write(
+                    reinterpret_cast<const char*>(&type_val), sizeof(type_val));
+                meta_stream.write(
+                    reinterpret_cast<const char*>(&slot_val), sizeof(slot_val));
+                meta_stream.write(
+                    reinterpret_cast<const char*>(&size_val), sizeof(size_val));
             }
-            
-            meta_stream.write(reinterpret_cast<const char*>(&space.visibility), sizeof(space.visibility));
-            meta_stream.write(reinterpret_cast<const char*>(&space.registerSpace), sizeof(space.registerSpace));
+
+            meta_stream.write(
+                reinterpret_cast<const char*>(&space.visibility),
+                sizeof(space.visibility));
+            meta_stream.write(
+                reinterpret_cast<const char*>(&space.registerSpace),
+                sizeof(space.registerSpace));
         }
-        
+
         // Write binding locations
         size_t binding_count = reflection_info.binding_locations.size();
-        meta_stream.write(reinterpret_cast<const char*>(&binding_count), sizeof(binding_count));
-        
+        meta_stream.write(
+            reinterpret_cast<const char*>(&binding_count),
+            sizeof(binding_count));
+
         for (const auto& [name, location] : reflection_info.binding_locations) {
             size_t name_len = name.length();
-            meta_stream.write(reinterpret_cast<const char*>(&name_len), sizeof(name_len));
+            meta_stream.write(
+                reinterpret_cast<const char*>(&name_len), sizeof(name_len));
             meta_stream.write(name.data(), name_len);
-            
+
             unsigned space = std::get<0>(location);
             unsigned index = std::get<1>(location);
-            meta_stream.write(reinterpret_cast<const char*>(&space), sizeof(space));
-            meta_stream.write(reinterpret_cast<const char*>(&index), sizeof(index));
+            meta_stream.write(
+                reinterpret_cast<const char*>(&space), sizeof(space));
+            meta_stream.write(
+                reinterpret_cast<const char*>(&index), sizeof(index));
         }
-        
+
         meta_stream.close();
-        
-    } catch (const std::exception&) {
+    }
+    catch (const std::exception&) {
         // Silently fail - caching is not critical
     }
 }

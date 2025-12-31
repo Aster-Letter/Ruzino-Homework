@@ -64,8 +64,7 @@ void RayGen()
 
             // Trace ray to get geometry information
             TraceRay(
-                SceneBVH, RAY_FLAG_NONE, 0xFF, 0, 0, 0, current_ray, payload);
-
+                SceneBVH, RAY_FLAG_NONE, 0xFF, 0, 1, 0, current_ray, payload);
 #ifdef ENABLE_SER
             // SER: Reorder after TraceRay - hit/miss is THE most important
             // criterion Bit 31: hit(1) vs miss(0) - highest priority to
@@ -297,6 +296,137 @@ void ClosestHit(
     payload.materialID = material_id;
     payload.eta_flipped = eta_flipped;
 }
+
+[shader("closesthit")]
+void SphereClosestHit(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs)
+{
+    payload.hit = true;
+    uint instance_id = InstanceID();
+    uint prim_id = PrimitiveIndex();
+
+    // Compute hit point in world space
+    float3 worldRayOrigin = WorldRayOrigin();
+    float3 worldRayDirection = WorldRayDirection();
+    float t = RayTCurrent();
+    float3 hitPoint = worldRayOrigin + t * worldRayDirection;
+
+    // Read sphere data from vertex buffer via bindless
+    uint mesh_id = instanceDescBuffer[instance_id].geometryID;
+    MeshDesc mesh_desc = meshDescBuffer[mesh_id];
+
+    // Read position (3 floats at stride 12 bytes)
+    uint position_offset = prim_id * 12;  // 3 * sizeof(float)
+    float3 sphereCenterLocal = asfloat(
+        t_BindlessBuffers[mesh_desc.bindlessIndex].Load3(
+            mesh_desc.vbOffset + position_offset));
+
+    // Transform sphere center to world space using 4x3 affine matrix
+    float4x3 objToWorld = ObjectToWorld4x3();
+    float3 sphereCenterWorld = objToWorld[0] * sphereCenterLocal.x +
+                               objToWorld[1] * sphereCenterLocal.y +
+                               objToWorld[2] * sphereCenterLocal.z +
+                               objToWorld[3];
+
+    // Compute geometric normal as direction from sphere center to hit point
+    float3 normal = normalize(hitPoint - sphereCenterWorld);
+
+    // Create vertex info for the sphere hit
+    VertexInfo vertex;
+    vertex.posW = hitPoint;
+    vertex.normalW = normal;
+    vertex.tangentW = float4(0, 0, 0, 1);
+    vertex.faceNormalW = normal;
+    vertex.texC = float2(0, 0);
+    vertex.curveRadius = 0.0;
+    vertex.coneTexLODValue = 0.0;
+    vertex.subsetMaterialID = -1;
+
+    // Fix normal orientation based on ray direction
+    uint eta_flipped = 0;
+    if (dot(worldRayDirection, normal) >= 0.0) {
+        vertex.normalW = -normal;
+        vertex.faceNormalW = -normal;
+        eta_flipped = 1;
+    }
+
+    // Get material ID from instance
+    uint material_id = instanceDescBuffer[instance_id].materialID;
+
+    // Store geometry information in payload
+    payload.vertex = vertex;
+    payload.materialID = material_id;
+    payload.eta_flipped = eta_flipped;
+}
+
+[shader("intersection")]
+void SphereIntersection()
+{
+    uint instance_id = InstanceID();
+    uint prim_id = PrimitiveIndex();
+
+    // Read sphere data from vertex buffer via bindless
+    uint mesh_id = instanceDescBuffer[instance_id].geometryID;
+    MeshDesc mesh_desc = meshDescBuffer[mesh_id];
+
+    // Read position (3 floats at stride 12 bytes)
+    uint position_offset = prim_id * 12;  // 3 * sizeof(float)
+    float3 sphereCenterLocal = asfloat(
+        t_BindlessBuffers[mesh_desc.bindlessIndex].Load3(
+            mesh_desc.vbOffset + position_offset));
+
+    // Transform sphere center to world space
+    float4x3 objToWorld = ObjectToWorld4x3();
+    float3 sphereCenterWorld = objToWorld[0] * sphereCenterLocal.x +
+                               objToWorld[1] * sphereCenterLocal.y +
+                               objToWorld[2] * sphereCenterLocal.z +
+                               objToWorld[3];
+
+    // Read radius - stored after all positions
+    // mesh_desc.ibOffset stores the radius buffer offset (see points.cpp)
+    uint radius_offset = prim_id * 4;  // sizeof(float)
+    float radius = asfloat(
+        t_BindlessBuffers[mesh_desc.bindlessIndex].Load(
+            mesh_desc.ibOffset + radius_offset));
+
+    // Ray-sphere intersection in world space
+    float3 rayOrigin = WorldRayOrigin();
+    float3 rayDir = WorldRayDirection();
+
+    float3 oc = rayOrigin - sphereCenterWorld;
+    float a = dot(rayDir, rayDir);
+    float half_b = dot(oc, rayDir);
+    float c = dot(oc, oc) - radius * radius;
+    float discriminant = half_b * half_b - a * c;
+
+    if (discriminant >= 0.0) {
+        float sqrtd = sqrt(discriminant);
+
+        // Find the nearest valid intersection
+        float t = (-half_b - sqrtd) / a;
+
+        // Check if t is in valid range
+        if (t >= RayTMin() && t <= RayTCurrent()) {
+            // Report intersection with hit kind 0
+            ReportHit(
+                t,
+                /*hitKind=*/0u,
+                BuiltInTriangleIntersectionAttributes(float2(0, 0)));
+        }
+        else {
+            // Try the other root (inside hit or backface)
+            t = (-half_b + sqrtd) / a;
+            if (t >= RayTMin() && t <= RayTCurrent()) {
+                ReportHit(
+                    t,
+                    /*hitKind=*/0u,
+                    BuiltInTriangleIntersectionAttributes(float2(0, 0)));
+            }
+        }
+    }
+}
+
 [shader("miss")]
 void Miss(inout RayPayload payload)
 {
@@ -374,11 +504,97 @@ void ShadowHit(
 
             TraceRay(
                 SceneBVH,
-                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                RAY_FLAG_NONE,
                 0xFF,
                 1,  // Shadow hit group index
-                0,
+                1,
                 1,  // Shadow miss shader index
+                continuationRay,
+                continuationPayload);
+            payload.seed = continuationPayload.seed;
+            payload.isVisible = continuationPayload.isVisible;
+            return;
+        }
+    }
+    // If we reach here, the surface is opaque
+    payload.isVisible = false;
+}
+
+[shader("closesthit")]
+void SphereShadowHit(
+    inout ShadowPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs)
+{
+    // For shadow rays hitting spheres, check opacity similar to triangle shadow
+    // hit
+    payload.isVisible = true;
+
+    // Limit recursion depth
+    const uint MAX_SHADOW_OPACITY = 4;
+    if (payload.recursionDepth >= MAX_SHADOW_OPACITY) {
+        payload.isVisible = false;
+        return;
+    }
+
+    uint instance_id = InstanceID();
+
+    // Get material ID from instance
+    var material_id = instanceDescBuffer[instance_id].materialID;
+
+    if (material_id == uint(-1)) {
+        // No material, assume opaque
+        payload.isVisible = false;
+        return;
+    }
+
+    var material_header = materialHeaderBuffer[material_id];
+
+    // Create a dummy vertex for the sphere hit
+    VertexInfo vertex;
+    vertex.texC = float2(0, 0);
+    vertex.subsetMaterialID = -1;
+
+    // Fetch opacity
+    FetchCallableData opacityFetchData;
+    opacityFetchData.vertexInfo = vertex;
+    opacityFetchData.materialBlobID = material_header.material_blob_id;
+    opacityFetchData.material_params_index = 0;
+    opacityFetchData.shader_type_id = 0;
+
+    CallShader(
+        ptConstants.materialFetchCallableBaseIndex +
+            material_header.material_type_id +
+            ptConstants.materialOpacityCallableOffset,
+        opacityFetchData);
+
+    float opacity = asfloat(opacityFetchData.material_params_index);
+
+    if (opacity < 0.25) {
+        // Material is transparent, continue tracing shadow ray
+        float3 hitPoint =
+            WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+        float remainingDist = payload.rayTMax - RayTCurrent();
+
+        if (remainingDist > 0.001) {
+            RayDesc continuationRay;
+            continuationRay.Origin = hitPoint;
+            continuationRay.Direction = WorldRayDirection();
+            continuationRay.TMin = 0.001;
+            continuationRay.TMax = remainingDist;
+
+            ShadowPayload continuationPayload;
+            continuationPayload.isVisible = true;
+            continuationPayload.rayTMax = remainingDist;
+            continuationPayload.recursionDepth = payload.recursionDepth + 1;
+            continuationPayload.seed = payload.seed;
+
+            TraceRay(
+                SceneBVH,
+                RAY_FLAG_NONE,
+                0xFF,
+                1,
+                1,
+                1,
                 continuationRay,
                 continuationPayload);
             payload.seed = continuationPayload.seed;

@@ -37,6 +37,7 @@
 #include "config.h"
 #include "geometries/field.h"
 #include "geometries/mesh.h"
+#include "geometries/points.h"
 #include "geometries/volume.h"
 #include "gpu_compute.h"
 #include "hd_USTC_CG/render_global_payload.hpp"
@@ -66,6 +67,7 @@ TF_DEFINE_PUBLIC_TOKENS(
 const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_RPRIM_TYPES = {
     HdPrimTypeTokens->mesh,
     HdPrimTypeTokens->volume,
+    HdPrimTypeTokens->points,
 };
 
 const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_SPRIM_TYPES = {
@@ -328,6 +330,11 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
         auto volume = new Hd_USTC_CG_Volume(rprimId);
         spdlog::info("Created volume: {}", rprimId.GetText());
         return volume;
+    }
+    else if (typeId == HdPrimTypeTokens->points) {
+        auto points = new Hd_USTC_CG_Points(rprimId);
+        spdlog::info("Created points: {}", rprimId.GetText());
+        return points;
     }
     TF_CODING_ERROR(
         "Unknown Rprim type=%s id=%s", typeId.GetText(), rprimId.GetText());

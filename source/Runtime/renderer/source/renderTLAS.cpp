@@ -6,9 +6,8 @@ USTC_CG_NAMESPACE_OPEN_SCOPE
 
 Hd_USTC_CG_RenderInstanceCollection::Hd_USTC_CG_RenderInstanceCollection()
     : rt_instance_pool(
-          BufferDesc{}
-              .setIsAccelStructBuildInput(true)
-              .setCanHaveRawViews(true)),
+          BufferDesc{}.setIsAccelStructBuildInput(true).setCanHaveRawViews(
+              true)),
       draw_indirect_pool(BufferDesc{}.setIsDrawIndirectArgs(true))
 {
     nvrhi::rt::AccelStructDesc tlasDesc;
@@ -61,7 +60,8 @@ void Hd_USTC_CG_RenderInstanceCollection::rebuild_tlas()
 {
     auto nvrhi_device = RHI::get_device();
 
-    auto command_list = nvrhi_device->createCommandList();
+    if (!command_list)
+        command_list = nvrhi_device->createCommandList();
     command_list->open();
     command_list->beginMarker("TLAS Update");
     command_list->buildTopLevelAccelStructFromBuffer(

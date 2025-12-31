@@ -31,6 +31,14 @@ struct GPUSceneAssember {
         unsigned material_id,
         unsigned geometry_id);
 
+    // Compute AABBs for spheres on GPU
+    static void compute_sphere_aabbs(
+        nvrhi::BufferHandle vertex_buffer,
+        size_t positions_offset,
+        size_t radii_offset,
+        uint32_t sphere_count,
+        nvrhi::IBuffer* out_aabb_buffer);
+
     static GPUSceneAssember& get_instance()
     {
         return instance;

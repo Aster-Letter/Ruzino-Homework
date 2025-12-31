@@ -38,6 +38,7 @@ class HD_USTC_CG_API Hd_USTC_CG_RenderInstanceCollection {
     DeviceMemoryPool<MaterialHeader> material_header_pool;
     DeviceMemoryPool<nvrhi::DrawIndirectArguments> draw_indirect_pool;
     DeviceMemoryPool<LightData> light_pool;
+    CommandListHandle command_list;
 
     struct BindlessData {
         BindlessData();

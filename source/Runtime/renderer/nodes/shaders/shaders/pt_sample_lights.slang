@@ -123,10 +123,10 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
 
             TraceRay(
                 SceneBVH,
-                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                RAY_FLAG_NONE,
                 0xFF,
                 1,
-                0,
+                1,
                 1,
                 shadowRay,
                 shadowPayload);
@@ -161,10 +161,10 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
             shadowPayload.seed = seed;
             TraceRay(
                 SceneBVH,
-                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                RAY_FLAG_NONE,
                 0xFF,
                 1,
-                0,
+                1,
                 1,
                 shadowRay,
                 shadowPayload);
@@ -207,10 +207,10 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
             shadowPayload.seed = seed;
             TraceRay(
                 SceneBVH,
-                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                RAY_FLAG_NONE,
                 0xFF,
                 1,
-                0,
+                1,
                 1,
                 shadowRay,
                 shadowPayload);
@@ -256,10 +256,10 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
             shadowPayload.seed = seed;
             TraceRay(
                 SceneBVH,
-                RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+                RAY_FLAG_NONE,
                 0xFF,
                 1,
-                0,
+                1,
                 1,
                 shadowRay,
                 shadowPayload);

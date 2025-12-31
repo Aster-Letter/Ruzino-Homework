@@ -447,9 +447,13 @@ void fetch_)" + material.second->GetMaterialName() +
 
         context.announce_raygeneration("RayGen");
         context.announce_hitgroup(
-            "ClosestHit", "", "", 0);  // Primary ray hit group at index 0
+            "ClosestHit", "", "", 0);  // Primary ray hit group at index 0 (triangles)
         context.announce_hitgroup(
-            "ShadowHit", "", "", 1);       // Shadow ray hit group at index 1
+            "ShadowHit", "", "", 1);   // Shadow ray hit group at index 1 (triangles)
+        context.announce_hitgroup(
+            "SphereClosestHit", "", "SphereIntersection", 2);  // Sphere primary ray with custom intersection
+        context.announce_hitgroup(
+            "SphereShadowHit", "", "SphereIntersection", 3);   // Sphere shadow ray with custom intersection
         context.announce_miss("Miss", 0);  // Primary ray miss shader at index 0
         context.announce_miss(
             "ShadowMiss", 1);  // Shadow ray miss shader at index 1

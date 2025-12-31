@@ -1,4 +1,5 @@
 #include <pxr/usd/usdGeom/pointInstancer.h>
+#include <pxr/usd/usdGeom/points.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 
 #include <spdlog/spdlog.h>
@@ -28,7 +29,6 @@
 #include "pxr/usd/usdShade/materialBindingAPI.h"
 #include "stage/stage.hpp"
 #include "widgets/usdtree/usd_fileviewer.h"
-
 
 USTC_CG_NAMESPACE_OPEN_SCOPE
 
@@ -434,13 +434,13 @@ void UsdFileViewer::EditValue()
         ImGui::Text("Path: %s", prim.GetPath().GetString().c_str());
         ImGui::Text("Type: %s", prim.GetTypeName().GetText());
         ImGui::Text("Active: %s", prim.IsActive() ? "Yes" : "No");
-        
+
         // Show references
         if (prim.HasAuthoredReferences()) {
             ImGui::Separator();
             ImGui::Text("References:");
             ImGui::Indent();
-            
+
             auto primStack = prim.GetPrimStack();
             for (const auto& primSpec : primStack) {
                 if (primSpec->HasReferences()) {
@@ -448,7 +448,8 @@ void UsdFileViewer::EditValue()
                     for (const auto& ref : refList.GetAddedOrExplicitItems()) {
                         std::string refStr = ref.GetAssetPath();
                         if (!ref.GetPrimPath().IsEmpty()) {
-                            refStr += " <" + ref.GetPrimPath().GetString() + ">";
+                            refStr +=
+                                " <" + ref.GetPrimPath().GetString() + ">";
                         }
                         ImGui::BulletText("%s", refStr.c_str());
                     }
@@ -456,21 +457,23 @@ void UsdFileViewer::EditValue()
             }
             ImGui::Unindent();
         }
-        
+
         // Show payloads
         if (prim.HasAuthoredPayloads()) {
             ImGui::Separator();
             ImGui::Text("Payloads:");
             ImGui::Indent();
-            
+
             auto primStack = prim.GetPrimStack();
             for (const auto& primSpec : primStack) {
                 if (primSpec->HasPayloads()) {
                     auto payloadList = primSpec->GetPayloadList();
-                    for (const auto& payload : payloadList.GetAddedOrExplicitItems()) {
+                    for (const auto& payload :
+                         payloadList.GetAddedOrExplicitItems()) {
                         std::string payloadStr = payload.GetAssetPath();
                         if (!payload.GetPrimPath().IsEmpty()) {
-                            payloadStr += " <" + payload.GetPrimPath().GetString() + ">";
+                            payloadStr +=
+                                " <" + payload.GetPrimPath().GetString() + ">";
                         }
                         ImGui::BulletText("%s", payloadStr.c_str());
                     }
@@ -478,7 +481,7 @@ void UsdFileViewer::EditValue()
             }
             ImGui::Unindent();
         }
-        
+
         ImGui::Separator();
 
         // Show material binding UI for geometry prims
@@ -790,31 +793,38 @@ void UsdFileViewer::EditValue()
                         {
                             std::string value = v.Get<std::string>();
 
-                            // Special handling for shader_path attribute - show as dropdown
-                            // Works for both dome lights and materials
+                            // Special handling for shader_path attribute - show
+                            // as dropdown Works for both dome lights and
+                            // materials
                             if (attrName == "shader_path") {
                                 // Scan for available shaders based on prim type
                                 std::vector<std::string> shaderFiles;
                                 shaderFiles.push_back("");  // Empty option
 
-                                // Get executable path and construct shader directory path
+                                // Get executable path and construct shader
+                                // directory path
                                 std::filesystem::path executable_path;
 #ifdef _WIN32
                                 char p[MAX_PATH];
                                 GetModuleFileNameA(NULL, p, MAX_PATH);
-                                executable_path = std::filesystem::path(p).parent_path();
+                                executable_path =
+                                    std::filesystem::path(p).parent_path();
 #else
                                 char p[PATH_MAX];
-                                ssize_t count = readlink("/proc/self/exe", p, PATH_MAX);
+                                ssize_t count =
+                                    readlink("/proc/self/exe", p, PATH_MAX);
                                 if (count != -1) {
                                     p[count] = '\0';
-                                    executable_path = std::filesystem::path(p).parent_path();
+                                    executable_path =
+                                        std::filesystem::path(p).parent_path();
                                 }
 #endif
-                                std::filesystem::path shaderDir = executable_path / 
-                                    "../../source/Runtime/renderer/nodes/shaders/shaders/callables";
+                                std::filesystem::path shaderDir =
+                                    executable_path /
+                                    "../../source/Runtime/renderer/nodes/"
+                                    "shaders/shaders/callables";
                                 shaderDir = shaderDir.lexically_normal();
-                                
+
                                 if (std::filesystem::exists(shaderDir)) {
                                     try {
                                         for (const auto& entry : std::
@@ -825,24 +835,47 @@ void UsdFileViewer::EditValue()
                                                     entry.path()
                                                         .filename()
                                                         .string();
-                                                
-                                                // For dome lights, filter for dome light shaders
-                                                // For materials, filter for material eval shaders (including custom ones)
-                                                bool isDomeLightShader = filename.find("eval_dome_light") != std::string::npos;
-                                                bool isMaterialShader = (filename.find("eval_") != std::string::npos || 
-                                                                        filename.find("custom_") != std::string::npos) && 
-                                                                       filename.find("dome_light") == std::string::npos &&
-                                                                       filename != "eval_fallback.slang" &&
-                                                                       filename != "eval_standard_surface.slang" &&
-                                                                       filename != "eval_preview_surface.slang";
-                                                
-                                                // Check if this prim is a dome light
-                                                bool isPrimDomeLight = prim.GetTypeName() == "DomeLight";
-                                                
-                                                // Show appropriate shaders based on prim type
-                                                if (entry.path().extension() == ".slang" &&
-                                                    ((isPrimDomeLight && isDomeLightShader) ||
-                                                     (!isPrimDomeLight && isMaterialShader))) {
+
+                                                // For dome lights, filter for
+                                                // dome light shaders For
+                                                // materials, filter for
+                                                // material eval shaders
+                                                // (including custom ones)
+                                                bool isDomeLightShader =
+                                                    filename.find(
+                                                        "eval_dome_light") !=
+                                                    std::string::npos;
+                                                bool isMaterialShader =
+                                                    (filename.find("eval_") !=
+                                                         std::string::npos ||
+                                                     filename.find("custom_") !=
+                                                         std::string::npos) &&
+                                                    filename.find(
+                                                        "dome_light") ==
+                                                        std::string::npos &&
+                                                    filename !=
+                                                        "eval_fallback.slang" &&
+                                                    filename !=
+                                                        "eval_standard_surface."
+                                                        "slang" &&
+                                                    filename !=
+                                                        "eval_preview_surface."
+                                                        "slang";
+
+                                                // Check if this prim is a dome
+                                                // light
+                                                bool isPrimDomeLight =
+                                                    prim.GetTypeName() ==
+                                                    "DomeLight";
+
+                                                // Show appropriate shaders
+                                                // based on prim type
+                                                if (entry.path().extension() ==
+                                                        ".slang" &&
+                                                    ((isPrimDomeLight &&
+                                                      isDomeLightShader) ||
+                                                     (!isPrimDomeLight &&
+                                                      isMaterialShader))) {
                                                     // Store relative path
                                                     shaderFiles.push_back(
                                                         "shaders/callables/" +
@@ -865,7 +898,8 @@ void UsdFileViewer::EditValue()
                                     }
                                 }
 
-                                // If current value is not in list and not empty, add it
+                                // If current value is not in list and not
+                                // empty, add it
                                 if (currentIdx == 0 && !value.empty()) {
                                     shaderFiles.push_back(value + " (custom)");
                                     currentIdx = shaderFiles.size() - 1;
@@ -887,7 +921,8 @@ void UsdFileViewer::EditValue()
                                                    : shaderFiles[i].c_str();
                                         if (ImGui::Selectable(
                                                 label, isSelected)) {
-                                            // Remove " (custom)" suffix if present
+                                            // Remove " (custom)" suffix if
+                                            // present
                                             std::string selectedPath =
                                                 shaderFiles[i];
                                             size_t customPos =
@@ -1002,27 +1037,30 @@ void UsdFileViewer::EditValue()
 
     // Relationships in a collapsible section
     if (prim) {
-        if (ImGui::CollapsingHeader("Relationships", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::CollapsingHeader(
+                "Relationships", ImGuiTreeNodeFlags_DefaultOpen)) {
             auto relationships = prim.GetRelationships();
 
             if (relationships.empty()) {
                 ImGui::TextDisabled("No relationships");
-            } else {
+            }
+            else {
                 for (auto&& rel : relationships) {
                     std::string relName = rel.GetName().GetString();
                     ImGui::PushID(relName.c_str());
-                    
+
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("%s", relName.c_str());
                     ImGui::SameLine(200);
-                    
+
                     // Get relationship targets
                     SdfPathVector targets;
                     rel.GetTargets(&targets);
-                    
+
                     if (targets.empty()) {
                         ImGui::TextDisabled("(no targets)");
-                    } else {
+                    }
+                    else {
                         // Display targets as clickable links
                         for (size_t i = 0; i < targets.size(); ++i) {
                             if (i > 0) {
@@ -1030,21 +1068,24 @@ void UsdFileViewer::EditValue()
                                 ImGui::TextDisabled(",");
                                 ImGui::SameLine();
                             }
-                            
+
                             std::string targetStr = targets[i].GetString();
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
+                            ImGui::PushStyleColor(
+                                ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
                             if (ImGui::SmallButton(targetStr.c_str())) {
                                 // Navigate to the target prim
                                 selected = targets[i];
                             }
                             ImGui::PopStyleColor();
-                            
+
                             if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("Click to navigate to %s", targetStr.c_str());
+                                ImGui::SetTooltip(
+                                    "Click to navigate to %s",
+                                    targetStr.c_str());
                             }
                         }
                     }
-                    
+
                     ImGui::PopID();
                 }
             }
@@ -1055,7 +1096,7 @@ void UsdFileViewer::EditValue()
 void UsdFileViewer::select_file()
 {
     auto instance = IGFD::FileDialog::Instance();
-    
+
     // Open the dialog on first call
     static bool dialog_opened = false;
     if (!dialog_opened) {
@@ -1068,7 +1109,7 @@ void UsdFileViewer::select_file()
             config);
         dialog_opened = true;
     }
-    
+
     if (instance->Display("SelectFile")) {
         if (instance->IsOk()) {
             auto selected = instance->GetFilePathName();
@@ -1076,7 +1117,7 @@ void UsdFileViewer::select_file()
 
             stage->import_usd_as_payload(selected, selecting_file_base);
         }
-        
+
         // Dialog closed
         instance->Close();
         is_selecting_file = false;
@@ -1272,8 +1313,9 @@ bool UsdFileViewer::is_material_prim(const pxr::UsdPrim& prim)
 
 bool UsdFileViewer::is_geometry_prim(const pxr::UsdPrim& prim)
 {
-    return prim.IsA<pxr::UsdGeomMesh>() || prim.IsA<pxr::UsdGeomSphere>() ||
-           prim.IsA<pxr::UsdGeomCube>() || prim.IsA<pxr::UsdGeomCylinder>() ||
+    return prim.IsA<pxr::UsdGeomMesh>() || prim.IsA<pxr::UsdGeomPoints>() ||
+           prim.IsA<pxr::UsdGeomSphere>() || prim.IsA<pxr::UsdGeomCube>() ||
+           prim.IsA<pxr::UsdGeomCylinder>() ||
            prim.IsA<pxr::UsdGeomPointInstancer>();
 }
 
@@ -1326,7 +1368,8 @@ void UsdFileViewer::show_material_binding_ui(pxr::UsdPrim& prim)
     // Apply MaterialBindingAPI if not already applied
     if (!prim.HasAPI<UsdShadeMaterialBindingAPI>()) {
         UsdShadeMaterialBindingAPI::Apply(prim);
-        spdlog::debug("Applied MaterialBindingAPI to {}", prim.GetPath().GetString());
+        spdlog::debug(
+            "Applied MaterialBindingAPI to {}", prim.GetPath().GetString());
     }
 
     // Get current bound material

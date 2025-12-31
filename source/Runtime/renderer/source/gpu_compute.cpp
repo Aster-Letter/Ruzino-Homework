@@ -116,7 +116,10 @@ void GPUSceneAssember::fill_instances(
     auto index_buffer = get_instance().sa_resource_allocator.create(index_desc);
     MARK_DESTROY_NVRHI_RESOURCE(index_buffer);
 
-    auto cmd = device->createCommandList();
+    // Create single command list for all operations
+    auto cmd = get_instance().sa_resource_allocator.create(CommandListDesc{});
+    MARK_DESTROY_NVRHI_RESOURCE(cmd);
+    
     cmd->open();
     cmd->writeBuffer(
         index_buffer,
@@ -229,11 +232,11 @@ void GPUSceneAssember::fill_instances(
         get_instance().sa_resource_allocator.create(params_desc);
     MARK_DESTROY_NVRHI_RESOURCE(params_buffer);
 
-    cmd = device->createCommandList();
     cmd->open();
     cmd->writeBuffer(params_buffer, &params, sizeof(InstanceParams));
     cmd->close();
     device->executeCommandList(cmd);
+    device->waitForIdle();
 
     // Set up program variables
     filler_program_vars["g_Params"] = params_buffer;
@@ -269,8 +272,87 @@ void GPUSceneAssember::fill_instances(
     compute_context.dispatch(
         {}, filler_program_vars, instance_indices.size(), 64);
     compute_context.finish();
+}
 
+void GPUSceneAssember::compute_sphere_aabbs(
+    nvrhi::BufferHandle vertex_buffer,
+    size_t positions_offset,
+    size_t radii_offset,
+    uint32_t sphere_count,
+    nvrhi::IBuffer* out_aabb_buffer)
+{
+    spdlog::info(
+        "GPUSceneAssember::compute_sphere_aabbs: Computing AABBs for {} "
+        "spheres (posOffset={}, radiiOffset={})",
+        sphere_count,
+        positions_offset,
+        radii_offset);
+
+    auto program_desc =
+        ProgramDesc()
+            .add_path(GPU_ASSEMBLER_SHADER_DIR "compute_sphere_aabbs.slang")
+            .set_entry_name("main")
+            .set_shader_type(nvrhi::ShaderType::Compute);
+
+    ProgramHandle compute_program =
+        get_instance().sa_resource_allocator.create(program_desc);
+    MARK_DESTROY_NVRHI_RESOURCE(compute_program);
+
+    ProgramVars program_vars(
+        get_instance().sa_resource_allocator, compute_program);
+
+    auto device = RHI::get_device();
+
+    // Create params constant buffer
+    struct Params {
+        uint32_t sphere_count;
+        uint32_t positions_offset;
+        uint32_t radii_offset;
+        uint32_t padding;
+    };
+
+    Params params;
+    params.sphere_count = sphere_count;
+    params.positions_offset = static_cast<uint32_t>(positions_offset);
+    params.radii_offset = static_cast<uint32_t>(radii_offset);
+
+    nvrhi::BufferDesc params_desc =
+        nvrhi::BufferDesc{}
+            .setByteSize(sizeof(Params))
+            .setIsConstantBuffer(true)
+            .setInitialState(nvrhi::ResourceStates::ConstantBuffer)
+            .setKeepInitialState(true)
+            .setDebugName("sphere_aabb_params");
+
+    auto params_buffer =
+        get_instance().sa_resource_allocator.create(params_desc);
+    MARK_DESTROY_NVRHI_RESOURCE(params_buffer);
+
+    auto cmd = get_instance().sa_resource_allocator.create(CommandListDesc{});
+    MARK_DESTROY_NVRHI_RESOURCE(cmd);
+    
+    cmd->open();
+    cmd->writeBuffer(params_buffer, &params, sizeof(Params));
+    cmd->close();
+    device->executeCommandList(cmd);
     device->waitForIdle();
+
+    // Set up program variables
+    program_vars["Params"] = params_buffer;
+    program_vars["g_VertexBuffer"] = vertex_buffer;
+    program_vars["g_OutputAABBs"] = out_aabb_buffer;
+
+    program_vars.finish_setting_vars();
+
+    ComputeContext compute_context(
+        get_instance().sa_resource_allocator, program_vars);
+    compute_context.finish_setting_pso();
+
+    compute_context.begin();
+    compute_context.dispatch({}, program_vars, sphere_count, 64);
+    compute_context.finish();
+
+    spdlog::info("GPUSceneAssember::compute_sphere_aabbs: AABB computation complete");
 }
 
 USTC_CG_NAMESPACE_CLOSE_SCOPE

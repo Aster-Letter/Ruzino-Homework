@@ -75,6 +75,7 @@ NODE_DECLARATION_FUNCTION(gpu_sph)
         .default_val(0.0005f)
         .min(0.0001f)
         .max(0.01f);
+    b.add_input<int>("Substeps").default_val(1).min(1).max(10);
     b.add_input<float>("Rest Density")
         .default_val(1000.0f)
         .min(100.0f)
@@ -104,6 +105,7 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
 
     auto radius = params.get_input<float>("Radius");
     auto dt = params.get_input<float>("Time Step");
+    auto substeps = params.get_input<int>("Substeps");
     auto rest_density = params.get_input<float>("Rest Density");
     auto pressure_constant = params.get_input<float>("Pressure Constant");
     auto viscosity = params.get_input<float>("Viscosity");
@@ -200,7 +202,7 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
                 .setDebugName("sph_viscosity"));
 
         // Upload initial positions
-        auto upload_cmd = device->createCommandList();
+        auto upload_cmd = resource_allocator.create(CommandListDesc{});
         upload_cmd->open();
         upload_cmd->writeBuffer(
             storage.positions,
@@ -330,6 +332,9 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
     unsigned pair_count = 0;
     auto contacts = FindNeighborsToBuffer(input_geom, radius * 2, pair_count);
 
+    // Adjust dt for substeps
+    float dt_substep = dt / substeps;
+
     // Setup SPH constants
     SPHConstants sph_constants;
     sph_constants.particleDiameter = radius;
@@ -340,7 +345,7 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
     sph_constants.constPress = pressure_constant;
     sph_constants.constVisc = viscosity;
     sph_constants.constSurf = surface_tension;
-    sph_constants.dt = dt;
+    sph_constants.dt = dt_substep;  // Use substep dt
     sph_constants.numParticles = num_particles;
     sph_constants.numPairs = pair_count;
 
@@ -353,7 +358,7 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
             .setKeepInitialState(true)
             .setDebugName("sph_constants"));
 
-    auto upload_cmd = device->createCommandList();
+    auto upload_cmd = resource_allocator.create(CommandListDesc{});
     upload_cmd->open();
     upload_cmd->writeBuffer(sph_cb, &sph_constants, sizeof(SPHConstants));
     upload_cmd->close();
@@ -361,87 +366,90 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
     device->waitForIdle();
     resource_allocator.destroy(upload_cmd);
 
-    // Step 1: Initialize density with self-contribution
-    {
-        ProgramVars vars(resource_allocator, storage.init_density_program);
-        vars["sph_constants"] = sph_cb.Get();
-        vars["rho"] = storage.rho.Get();
-        vars.finish_setting_vars();
+    // Substep loop for better stability
+    for (int substep = 0; substep < substeps; ++substep) {
+        // Step 1: Initialize density with self-contribution
+        {
+            ProgramVars vars(resource_allocator, storage.init_density_program);
+            vars["sph_constants"] = sph_cb.Get();
+            vars["rho"] = storage.rho.Get();
+            vars.finish_setting_vars();
 
-        ComputeContext ctx(resource_allocator, vars);
-        ctx.finish_setting_pso();
-        ctx.begin();
-        ctx.dispatch({}, vars, num_particles, 32);
-        ctx.finish();
-    }
+            ComputeContext ctx(resource_allocator, vars);
+            ctx.finish_setting_pso();
+            ctx.begin();
+            ctx.dispatch({}, vars, num_particles, 32);
+            ctx.finish();
+        }
 
-    // Step 2: Update density from pair interactions
-    {
-        ProgramVars vars(resource_allocator, storage.density_program);
-        vars["sph_constants"] = sph_cb.Get();
-        vars["positions"] = storage.positions.Get();
-        vars["ContactPairs"] = contacts.Get();
-        vars["rho"] = storage.rho.Get();
-        vars.finish_setting_vars();
+        // Step 2: Update density from pair interactions
+        {
+            ProgramVars vars(resource_allocator, storage.density_program);
+            vars["sph_constants"] = sph_cb.Get();
+            vars["positions"] = storage.positions.Get();
+            vars["ContactPairs"] = contacts.Get();
+            vars["rho"] = storage.rho.Get();
+            vars.finish_setting_vars();
 
-        ComputeContext ctx(resource_allocator, vars);
-        ctx.finish_setting_pso();
-        ctx.begin();
-        ctx.dispatch({}, vars, pair_count, 32);
-        ctx.finish();
-    }
+            ComputeContext ctx(resource_allocator, vars);
+            ctx.finish_setting_pso();
+            ctx.begin();
+            ctx.dispatch({}, vars, pair_count, 32);
+            ctx.finish();
+        }
 
-    // Step 3: Update viscosity
-    {
-        ProgramVars vars(resource_allocator, storage.viscosity_program);
-        vars["sph_constants"] = sph_cb.Get();
-        vars["ContactPairs"] = contacts.Get();
-        vars["positions"] = storage.positions.Get();
-        vars["velocities"] = storage.velocities.Get();
-        vars["rho"] = storage.rho.Get();
-        vars["viscosity"] = storage.viscosity.Get();
-        vars.finish_setting_vars();
+        // Step 3: Update viscosity
+        {
+            ProgramVars vars(resource_allocator, storage.viscosity_program);
+            vars["sph_constants"] = sph_cb.Get();
+            vars["ContactPairs"] = contacts.Get();
+            vars["positions"] = storage.positions.Get();
+            vars["velocities"] = storage.velocities.Get();
+            vars["rho"] = storage.rho.Get();
+            vars["viscosity"] = storage.viscosity.Get();
+            vars.finish_setting_vars();
 
-        ComputeContext ctx(resource_allocator, vars);
-        ctx.finish_setting_pso();
-        ctx.begin();
-        ctx.dispatch({}, vars, pair_count, 32);
-        ctx.finish();
-    }
+            ComputeContext ctx(resource_allocator, vars);
+            ctx.finish_setting_pso();
+            ctx.begin();
+            ctx.dispatch({}, vars, pair_count, 32);
+            ctx.finish();
+        }
 
-    // Step 4: Update pressure
-    {
-        ProgramVars vars(resource_allocator, storage.pressure_program);
-        vars["sph_constants"] = sph_cb.Get();
-        vars["ContactPairs"] = contacts.Get();
-        vars["positions"] = storage.positions.Get();
-        vars["pressure"] = storage.pressure.Get();
-        vars["rho"] = storage.rho.Get();
-        vars.finish_setting_vars();
+        // Step 4: Update pressure
+        {
+            ProgramVars vars(resource_allocator, storage.pressure_program);
+            vars["sph_constants"] = sph_cb.Get();
+            vars["ContactPairs"] = contacts.Get();
+            vars["positions"] = storage.positions.Get();
+            vars["pressure"] = storage.pressure.Get();
+            vars["rho"] = storage.rho.Get();
+            vars.finish_setting_vars();
 
-        ComputeContext ctx(resource_allocator, vars);
-        ctx.finish_setting_pso();
-        ctx.begin();
-        ctx.dispatch({}, vars, pair_count, 32);
-        ctx.finish();
-    }
+            ComputeContext ctx(resource_allocator, vars);
+            ctx.finish_setting_pso();
+            ctx.begin();
+            ctx.dispatch({}, vars, pair_count, 32);
+            ctx.finish();
+        }
 
-    // Step 5: Update positions
-    {
-        ProgramVars vars(resource_allocator, storage.update_pos_program);
-        vars["sph_constants"] = sph_cb.Get();
-        vars["positions"] = storage.positions.Get();
-        vars["velocities"] = storage.velocities.Get();
-        vars["rho"] = storage.rho.Get();
-        vars["pressure"] = storage.pressure.Get();
-        vars["viscosity"] = storage.viscosity.Get();
-        vars.finish_setting_vars();
+        // Step 5: Update positions
+        {
+            ProgramVars vars(resource_allocator, storage.update_pos_program);
+            vars["sph_constants"] = sph_cb.Get();
+            vars["positions"] = storage.positions.Get();
+            vars["velocities"] = storage.velocities.Get();
+            vars["rho"] = storage.rho.Get();
+            vars["pressure"] = storage.pressure.Get();
+            vars["viscosity"] = storage.viscosity.Get();
+            vars.finish_setting_vars();
 
-        ComputeContext ctx(resource_allocator, vars);
-        ctx.finish_setting_pso();
-        ctx.begin();
-        ctx.dispatch({}, vars, num_particles, 32);
-        ctx.finish();
+            ComputeContext ctx(resource_allocator, vars);
+            ctx.finish_setting_pso();
+            ctx.begin();
+            ctx.dispatch({}, vars, num_particles, 32);
+            ctx.finish();
+        }
     }
 
     get_resource_allocator().destroy(contacts);
@@ -453,7 +461,7 @@ NODE_EXECUTION_FUNCTION(gpu_sph)
             .setCpuAccess(nvrhi::CpuAccessMode::Read)
             .setDebugName("sph_readback"));
 
-    auto copy_cmd = device->createCommandList();
+    auto copy_cmd = resource_allocator.create(CommandListDesc{});
     copy_cmd->open();
     copy_cmd->copyBuffer(
         readback_buffer,
