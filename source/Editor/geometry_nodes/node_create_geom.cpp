@@ -238,4 +238,38 @@ NODE_EXECUTION_FUNCTION(create_cube)
     return true;
 }
 
+NODE_DECLARATION_FUNCTION(create_box_grid)
+{
+    b.add_input<int>("resolution_x").min(1).max(50).default_val(2);
+    b.add_input<int>("resolution_y").min(1).max(50).default_val(2);
+    b.add_input<int>("resolution_z").min(1).max(50).default_val(2);
+    b.add_input<float>("width").min(0.1).max(20).default_val(2.0f);
+    b.add_input<float>("height").min(0.1).max(20).default_val(2.0f);
+    b.add_input<float>("depth").min(0.1).max(20).default_val(2.0f);
+    b.add_input<bool>("add_diagonal").default_val(false);
+    b.add_output<Geometry>("Geometry");
+}
+
+NODE_EXECUTION_FUNCTION(create_box_grid)
+{
+    int resolution_x = params.get_input<int>("resolution_x");
+    int resolution_y = params.get_input<int>("resolution_y");
+    int resolution_z = params.get_input<int>("resolution_z");
+    float width = params.get_input<float>("width");
+    float height = params.get_input<float>("height");
+    float depth = params.get_input<float>("depth");
+    bool add_diagonal = params.get_input<bool>("add_diagonal");
+
+    Geometry geometry = create_box_grid(
+        resolution_x,
+        resolution_y,
+        resolution_z,
+        width,
+        height,
+        depth,
+        add_diagonal);
+    params.set_output("Geometry", std::move(geometry));
+    return true;
+}
+
 NODE_DEF_CLOSE_SCOPE

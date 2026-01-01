@@ -70,7 +70,7 @@ UsdviewEngine::UsdviewEngine(Stage* stage) : stage_(stage)
 
         static_cast<FirstPersonCamera*>(free_camera_.get())
             ->LookAt(
-                pxr::GfVec3d{ -10, 0, 0 },
+                pxr::GfVec3d{ -3, -3, 3 },
                 pxr::GfVec3d{ 0, 0, 0 },
                 pxr::GfVec3d{ 0, 0, 1 });
     }
@@ -572,7 +572,7 @@ void UsdviewEngine::finish_render()
     if (!renderer_) {
         return;
     }
-    
+
     renderer_->StopRenderer();
     auto hacked_handle =
         renderer_->GetRendererSetting(pxr::TfToken("VulkanColorAov"));
