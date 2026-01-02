@@ -2,7 +2,7 @@ RUZINO_ADD_LIB(
 	rzsim
 	SHARED
 	WITH_CUDA
-	PUBLIC_LIBS RHI Eigen3::Eigen
+	PUBLIC_LIBS RHI Eigen3::Eigen geometry
 	SKIP_DIRS nodes renderer_nodes geometry_nodes
 )
 
