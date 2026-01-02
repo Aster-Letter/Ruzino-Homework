@@ -7,7 +7,7 @@
 
 #include "RHI/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace RHI {
 
 inline pxr::HgiFormat ConvertToHgiFormat(nvrhi::Format format)
@@ -186,4 +186,4 @@ inline nvrhi::Format ConvertFromHioFormat(pxr::HioFormat format)
 
 }  // namespace RHI
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

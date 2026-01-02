@@ -10,7 +10,7 @@
  */
 
 #pragma once
-#if USTC_CG_WITH_TORCH
+#if RUZINO_WITH_TORCH
 
 #define Py_BUILD_CORE_BUILTIN
 #include <torch/extension.h>

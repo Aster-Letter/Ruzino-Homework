@@ -32,9 +32,9 @@
 #include <filesystem>
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
-class HD_USTC_CG_API FullScreenPass : public BaseGraphicsPass
+class HD_RUZINO_API FullScreenPass : public BaseGraphicsPass
 {
 public:
     struct SharedData;
@@ -86,4 +86,4 @@ protected:
 private:
     std::shared_ptr<SharedData> mpSharedData;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -7,7 +7,7 @@
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 #include <spdlog/spdlog.h>
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 class MemoryPoolTest : public ::testing::Test {
    protected:

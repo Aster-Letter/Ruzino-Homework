@@ -3,7 +3,7 @@
 #include <MaterialXFormat/XmlIo.h>
 #include <sstream>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 MaterialXDocumentViewer::MaterialXDocumentViewer(
     MaterialXNodeTree* node_tree,
@@ -55,4 +55,4 @@ void MaterialXDocumentViewer::RefreshDocument()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

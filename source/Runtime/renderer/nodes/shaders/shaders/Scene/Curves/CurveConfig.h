@@ -27,7 +27,7 @@
  **************************************************************************/
 #pragma once
 
-namespace USTC_CG
+namespace Ruzino
 {
     enum class CurveTessellationMode
     {

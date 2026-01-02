@@ -1,7 +1,7 @@
 #include <cstring>
 #include <fem_bem/Expression.hpp>
 
-namespace USTC_CG {
+namespace Ruzino {
 namespace fem_bem {
     static exprtk::parser<real> parser;
 
@@ -453,4 +453,4 @@ namespace fem_bem {
     }
 
 }  // namespace fem_bem
-}  // namespace USTC_CG
+}  // namespace Ruzino

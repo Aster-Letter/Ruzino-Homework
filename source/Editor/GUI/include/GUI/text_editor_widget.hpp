@@ -8,7 +8,7 @@
 // Forward declaration - TextEditor is in global namespace
 class TextEditor;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class GUI_API TextEditorWidget : public IWidget {
    public:
@@ -71,4 +71,4 @@ class GUI_API TextEditorWidget : public IWidget {
     std::function<void(const std::string&)> save_callback_;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

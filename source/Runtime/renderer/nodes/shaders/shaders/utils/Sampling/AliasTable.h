@@ -32,12 +32,12 @@
 #include <memory>
 #include <random>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Implements the alias method for sampling from a discrete probability distribution.
  */
-class HD_USTC_CG_API AliasTable
+class HD_RUZINO_API AliasTable
 {
 public:
     /**
@@ -80,4 +80,4 @@ private:
     nvrhi::BufferHandle mpItems;   ///< Buffer containing table items.
     nvrhi::BufferHandle mpWeights; ///< Buffer containing item weights.
 };
-} // namespace USTC_CG
+} // namespace Ruzino

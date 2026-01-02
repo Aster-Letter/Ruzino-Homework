@@ -19,7 +19,7 @@
 // #include "widgets/usdtree/usd_fileviewer.h"
 // #include "widgets/usdview/usdview_widget.hpp"
 //
-// using namespace USTC_CG;
+// using namespace Ruzino;
 ///**
 // * I will add a cmd parser to the main function
 // * because I need the ability to use custom stage.usdc file

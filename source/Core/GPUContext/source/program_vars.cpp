@@ -4,7 +4,7 @@
 
 #include "RHI/ResourceManager/resource_allocator.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // ProgramVarsProxy implementation
 ProgramVarsProxy::ProgramVarsProxy(
@@ -555,4 +555,4 @@ std::vector<IProgram*> ProgramVars::get_programs() const
     return programs;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

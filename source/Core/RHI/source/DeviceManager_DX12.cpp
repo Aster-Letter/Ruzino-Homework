@@ -68,9 +68,9 @@ using nvrhi::RefCountPtr;
     if (FAILED(hr))   \
         return false;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-#if USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX12
 class DeviceManager_DX12 : public DeviceManager {
     RefCountPtr<IDXGIFactory2> m_DxgiFactory2;
     RefCountPtr<ID3D12Device> m_Device12;
@@ -358,7 +358,7 @@ bool DeviceManager_DX12::CreateDevice()
     deviceDesc.pGraphicsCommandQueue = m_GraphicsQueue;
     deviceDesc.pComputeCommandQueue = m_ComputeQueue;
     deviceDesc.pCopyCommandQueue = m_CopyQueue;
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
@@ -686,6 +686,6 @@ DeviceManager* DeviceManager::CreateD3D12(void)
     return new DeviceManager_DX12();
 }
 #endif
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif

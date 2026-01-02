@@ -38,7 +38,7 @@
 #include <filesystem>
 #include <unordered_map>
 
-namespace USTC_CG
+namespace Ruzino
 {
     class RenderContext;
     struct ShaderVar;
@@ -67,7 +67,7 @@ namespace USTC_CG
             out the AABB buffer constructed by the SDFSVO. This can then be used to intersect rays against the SDFSVO.
             Distances stored in the voxels of the octree are normalized to the range [-1, 1] so that a value of 1 represents half of a voxel diagonal.
     */
-    class HD_USTC_CG_API SDFGrid : public Object
+    class HD_RUZINO_API SDFGrid : public Object
     {
         FALCOR_OBJECT(SDFGrid)
     public:

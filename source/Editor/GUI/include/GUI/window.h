@@ -12,7 +12,7 @@
 #include "widget.h"
 struct GLFWwindow;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class DockingImguiRenderer;
 
@@ -84,4 +84,4 @@ class GUI_API Window {
     friend class DockingImguiRenderer;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

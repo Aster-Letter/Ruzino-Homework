@@ -31,12 +31,12 @@
 #include "Device.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class ComputeState;
 class ProgramVars;
 class ProgramKernels;
 
-class HD_USTC_CG_API ComputeContext : public CopyContext {
+class HD_RUZINO_API ComputeContext : public CopyContext {
    public:
     /**
      * Constructor.
@@ -98,4 +98,4 @@ class HD_USTC_CG_API ComputeContext : public CopyContext {
     const ProgramVars* mpLastBoundComputeVars = nullptr;
 };
 
-}  // namespace USTC_CG
+}  // namespace Ruzino

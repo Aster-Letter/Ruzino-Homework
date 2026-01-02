@@ -4,7 +4,7 @@
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec3f.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 GraphicsContext::GraphicsContext(
     ResourceAllocator& resource_allocator,
@@ -243,4 +243,4 @@ void GraphicsContext::begin()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

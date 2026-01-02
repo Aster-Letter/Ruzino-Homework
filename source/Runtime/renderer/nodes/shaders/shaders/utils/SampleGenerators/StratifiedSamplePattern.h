@@ -32,7 +32,7 @@
 #include <random>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Stratified random sample pattern generator.
@@ -45,7 +45,7 @@ namespace USTC_CG
  * The order in which samples are generated is randomly permuted to avoid
  * correlation artefacts with low-discrepancy sample generators.
  */
-class HD_USTC_CG_API StratifiedSamplePattern : public CPUSampleGenerator
+class HD_RUZINO_API StratifiedSamplePattern : public CPUSampleGenerator
 {
 public:
     /**
@@ -69,4 +69,4 @@ protected:
     std::mt19937 mRng;
     std::vector<uint32_t> mPermutation;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

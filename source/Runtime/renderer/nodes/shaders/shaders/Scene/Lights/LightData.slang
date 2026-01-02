@@ -29,7 +29,7 @@
 #include "utils/HostDeviceShared.slangh"
 #include "utils/Math/MathConstants.slangh"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /** Types of light sources. Used in LightData structure.
 */
@@ -71,4 +71,4 @@ struct LightData
     uint3    _pad2;                                 ///< Padding for alignment
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

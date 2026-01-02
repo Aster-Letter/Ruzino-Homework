@@ -7,9 +7,9 @@
 #include <unordered_map>
 
 #include "../../api.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-HD_USTC_CG_API extern std::mutex execution_launch_mutex;
+HD_RUZINO_API extern std::mutex execution_launch_mutex;
 
 template<typename T>
 class DeviceMemoryPool {
@@ -529,4 +529,4 @@ void DeviceMemoryPool<T>::relocate_buffer()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

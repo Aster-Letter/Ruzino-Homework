@@ -55,7 +55,7 @@ SOFTWARE.
 #include <cstring>
 #include <algorithm>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 static ImVec4 getSeverityColor(LogSeverity severity)
 {
@@ -496,4 +496,4 @@ void ImGui_Console::SetLogCapture(bool enable)
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -4,7 +4,7 @@
 #include "GUI/window.h"
 #include "imgui.h"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 namespace nb = nanobind;
 
 NB_MODULE(GUI_py, m)

@@ -57,11 +57,11 @@ freely, subject to the following restrictions:
 #include <sstream>
 #include <thread>
 
-#if USTC_CG_WITH_DX11
+#if RUZINO_WITH_DX11
 #include <d3d11.h>
 #endif
 
-#if USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX12
 #include <d3d12.h>
 #endif
 
@@ -70,7 +70,7 @@ freely, subject to the following restrictions:
 #pragma comment(lib, "shcore.lib")
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // The joystick interface in glfw is not per-window like the keys, mouse, etc.
 // The joystick callbacks don't take a window arg. So glfw's model is a global
@@ -459,7 +459,7 @@ bool DeviceManager::CreateInstance(const InstanceParameters &params)
             return false;
     }
 
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     if (params.enableAftermath) {
         m_AftermathCrashDumper.EnableCrashDumpTracking();
     }
@@ -693,7 +693,7 @@ void DeviceManager::RunMessageLoop()
 {
     m_PreviousFrameTimestamp = glfwGetTime();
 
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     bool dumpingCrash = false;
 #endif
     while (!glfwWindowShouldClose(m_Window)) {
@@ -704,7 +704,7 @@ void DeviceManager::RunMessageLoop()
         UpdateWindowSize();
         bool presentSuccess = AnimateRenderPresent();
         if (!presentSuccess) {
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
             dumpingCrash = true;
 #endif
             break;
@@ -712,7 +712,7 @@ void DeviceManager::RunMessageLoop()
     }
 
     GetDevice()->waitForIdle();
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     dumpingCrash |= !waitSuccess;
     // wait for Aftermath dump to complete before exiting application
     if (dumpingCrash && m_DeviceParams.enableAftermath)
@@ -774,7 +774,7 @@ const DeviceCreationParameters &DeviceManager::GetDeviceParams()
 }
 
 DeviceManager::DeviceManager()
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     : m_AftermathCrashDumper(*this)
 #endif
 {
@@ -1166,7 +1166,7 @@ bool DeviceManager::IsMaximized() const
 DeviceManager *DeviceManager::Create(nvrhi::GraphicsAPI api)
 {
     switch (api) {
-#if USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX12
         case nvrhi::GraphicsAPI::D3D12: return CreateD3D12();
 #endif
         case nvrhi::GraphicsAPI::VULKAN: return CreateVK();
@@ -1208,4 +1208,4 @@ void DefaultMessageCallback::message(
         messageText);  // Use nvrhi::utils::FormatMessage() if available
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

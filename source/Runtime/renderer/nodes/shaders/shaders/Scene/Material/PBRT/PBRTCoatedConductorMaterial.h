@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a coated conductor material, i.e. a
         dielectric coating on top of a conductor base. Both conductor
@@ -55,7 +55,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTCoatedConductorMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTCoatedConductorMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTCoatedConductorMaterial)
     public:

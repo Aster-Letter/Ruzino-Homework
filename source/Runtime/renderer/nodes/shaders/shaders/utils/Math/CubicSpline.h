@@ -30,7 +30,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace USTC_CG
+namespace Ruzino
 {
 template<typename T>
 class CubicSpline
@@ -191,4 +191,4 @@ private:
     };
     fast_vector<CubicCoeff> mCoefficient;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

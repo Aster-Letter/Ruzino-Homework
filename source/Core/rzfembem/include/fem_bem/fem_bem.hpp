@@ -8,7 +8,7 @@
 #include "GCore/GOP.h"
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 enum class ElementFamily { P_minus, P, Q_minus, S };
 
@@ -79,4 +79,4 @@ class RZFEMBEM_API ElementSolver {
 RZFEMBEM_API std::shared_ptr<ElementSolver> create_element_solver(
     const ElementSolverDesc& desc);
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

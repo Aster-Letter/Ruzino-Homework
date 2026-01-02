@@ -8,7 +8,7 @@
 
 #include "fem_bem/ElementBasis.hpp"
 
-using namespace USTC_CG::fem_bem;
+using namespace Ruzino::fem_bem;
 
 // Helper function to integrate expressions against basis functions
 // This replaces the removed integration methods from ElementBasis

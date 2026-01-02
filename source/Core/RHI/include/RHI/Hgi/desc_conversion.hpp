@@ -7,7 +7,7 @@
 #include "RHI/Hgi/format_conversion.hpp"
 #include "RHI/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace RHI {
 inline nvrhi::TextureDesc ConvertToNvrhiTextureDesc(
     const pxr::HgiTextureDesc& hgiDesc)
@@ -75,4 +75,4 @@ inline pxr::HgiTextureDesc ConvertToHgiTextureDesc(
 }
 }  // namespace RHI
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

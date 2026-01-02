@@ -30,9 +30,9 @@
 #include "RenderGraph/RenderPass.h"
 #include "SharedTypes.slang"
 
-namespace USTC_CG
+namespace Ruzino
 {
-class HD_USTC_CG_API SceneGradients : public Object
+class HD_RUZINO_API SceneGradients : public Object
 {
     FALCOR_OBJECT(SceneGradients);
 
@@ -97,4 +97,4 @@ private:
 
     ref<ComputePass> mpAggregatePass;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

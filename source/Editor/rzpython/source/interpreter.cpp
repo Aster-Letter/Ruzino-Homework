@@ -7,7 +7,7 @@
 
 #include "rzconsole/string_utils.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace python {
 
 PythonInterpreter::PythonInterpreter() : python_initialized_(false)
@@ -333,4 +333,4 @@ std::shared_ptr<console::Interpreter> CreatePythonInterpreter()
 
 }  // namespace python
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

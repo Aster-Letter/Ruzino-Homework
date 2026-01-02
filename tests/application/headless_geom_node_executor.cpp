@@ -11,7 +11,7 @@
 #include "nodes/core/api.hpp"
 #include "nodes/system/node_system.hpp"
 #include "stage/stage.hpp"
-using namespace USTC_CG;
+using namespace Ruzino;
 
 void print_usage(const char* program_name)
 {

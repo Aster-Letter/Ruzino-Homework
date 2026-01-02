@@ -4,7 +4,7 @@
 #include "MCore/MaterialXNodeTree.hpp"
 #include "MCore/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class MCORE_API MaterialXDocumentViewer : public TextEditorWidget {
    public:
@@ -19,4 +19,4 @@ class MCORE_API MaterialXDocumentViewer : public TextEditorWidget {
     MaterialXNodeTree* node_tree_;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

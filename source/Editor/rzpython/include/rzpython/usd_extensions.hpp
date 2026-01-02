@@ -6,7 +6,7 @@
 
 #include "rzpython.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace python {
 namespace usd {
@@ -283,4 +283,4 @@ namespace usd {
 }  // namespace usd
 }  // namespace python
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

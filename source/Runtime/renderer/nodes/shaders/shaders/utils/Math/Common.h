@@ -29,7 +29,7 @@
 
 #include <type_traits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /// Returns whether an integer number is a power of two.
 template<typename T>
@@ -51,4 +51,4 @@ constexpr typename std::enable_if<std::is_integral<T>::value, T>::type align_to(
 {
     return ((value + alignment - T(1)) / alignment) * alignment;
 }
-} // namespace USTC_CG
+} // namespace Ruzino

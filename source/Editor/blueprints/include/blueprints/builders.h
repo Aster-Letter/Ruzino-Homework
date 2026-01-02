@@ -13,7 +13,7 @@
 
 //------------------------------------------------------------------------------
 #include "imgui_node_editor.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //------------------------------------------------------------------------------
 namespace ax {
 namespace NodeEditor {
@@ -25,18 +25,18 @@ namespace NodeEditor {
                 int textureWidth = 0,
                 int textureHeight = 0);
 
-            void Begin(USTC_CG::NodeId id);
+            void Begin(Ruzino::NodeId id);
             void End();
 
             void Header(const ImVec4& color = ImVec4(1, 1, 1, 1));
             void EndHeader();
 
-            void Input(USTC_CG::SocketID id);
+            void Input(Ruzino::SocketID id);
             void EndInput();
 
             void Middle();
 
-            void Output(USTC_CG::SocketID id);
+            void Output(Ruzino::SocketID id);
             void EndOutput();
 
            private:
@@ -53,13 +53,13 @@ namespace NodeEditor {
 
             bool SetStage(Stage stage);
 
-            void Pin(USTC_CG::SocketID id, ax::NodeEditor::PinKind kind);
+            void Pin(Ruzino::SocketID id, ax::NodeEditor::PinKind kind);
             void EndPin();
 
             ImTextureID HeaderTextureId;
             int HeaderTextureWidth;
             int HeaderTextureHeight;
-            USTC_CG::NodeId CurrentNodeId;
+            Ruzino::NodeId CurrentNodeId;
             Stage CurrentStage;
             ImU32 HeaderColor;
             ImVec2 NodeMin;
@@ -75,4 +75,4 @@ namespace NodeEditor {
     }  // namespace Utilities
 }  // namespace NodeEditor
 }  // namespace ax
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -31,67 +31,67 @@
 
 // Instantiate the config singleton.
 namespace pxrInternal_v0_24_11__pxrReserved__ {
-TF_INSTANTIATE_SINGLETON(USTC_CG::Hd_USTC_CG_Config);
+TF_INSTANTIATE_SINGLETON(Ruzino::Hd_RUZINO_Config);
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 // Each configuration variable has an associated environment variable.
 // The environment variable macro takes the variable name, a default value,
 // and a description...
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_SAMPLES_TO_CONVERGENCE,
+    Hd_RUZINO_SAMPLES_TO_CONVERGENCE,
     100,
     "Samples per pixel before we stop rendering (must be >= 1)");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_TILE_SIZE,
+    Hd_RUZINO_TILE_SIZE,
     8,
     "Size (per axis) of threading work units (must be >= 1)");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_AMBIENT_OCCLUSION_SAMPLES,
+    Hd_RUZINO_AMBIENT_OCCLUSION_SAMPLES,
     16,
     "Ambient occlusion samples per camera ray (must be >= 0; a value of 0 "
     "disables ambient occlusion)");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_JITTER_CAMERA,
+    Hd_RUZINO_JITTER_CAMERA,
     1,
-    "Should Hd_USTC_CG jitter camera rays while rendering? (values >0 are "
+    "Should Hd_RUZINO jitter camera rays while rendering? (values >0 are "
     "true)");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_USE_FACE_COLORS,
+    Hd_RUZINO_USE_FACE_COLORS,
     1,
-    "Should Hd_USTC_CG use face colors while rendering? (values > 0 are true)");
+    "Should Hd_RUZINO use face colors while rendering? (values > 0 are true)");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_CAMERA_LIGHT_INTENSITY,
+    Hd_RUZINO_CAMERA_LIGHT_INTENSITY,
     300,
     "Intensity of the camera light, specified as a percentage of <1,1,1>.");
 
 TF_DEFINE_ENV_SETTING(
-    Hd_USTC_CG_PRINT_CONFIGURATION,
+    Hd_RUZINO_PRINT_CONFIGURATION,
     0,
-    "Should Hd_USTC_CG print configuration on startup? (values > 0 are true)");
+    "Should Hd_RUZINO print configuration on startup? (values > 0 are true)");
 
-Hd_USTC_CG_Config::Hd_USTC_CG_Config()
+Hd_RUZINO_Config::Hd_RUZINO_Config()
 {
     // Read in values from the environment, clamping them to valid ranges.
     samplesToConvergence =
-        std::max(1, TfGetEnvSetting(Hd_USTC_CG_SAMPLES_TO_CONVERGENCE));
-    tileSize = std::max(1, TfGetEnvSetting(Hd_USTC_CG_TILE_SIZE));
+        std::max(1, TfGetEnvSetting(Hd_RUZINO_SAMPLES_TO_CONVERGENCE));
+    tileSize = std::max(1, TfGetEnvSetting(Hd_RUZINO_TILE_SIZE));
     ambientOcclusionSamples =
-        std::max(0, TfGetEnvSetting(Hd_USTC_CG_AMBIENT_OCCLUSION_SAMPLES));
-    jitterCamera = (TfGetEnvSetting(Hd_USTC_CG_JITTER_CAMERA) > 0);
-    useFaceColors = (TfGetEnvSetting(Hd_USTC_CG_USE_FACE_COLORS) > 0);
+        std::max(0, TfGetEnvSetting(Hd_RUZINO_AMBIENT_OCCLUSION_SAMPLES));
+    jitterCamera = (TfGetEnvSetting(Hd_RUZINO_JITTER_CAMERA) > 0);
+    useFaceColors = (TfGetEnvSetting(Hd_RUZINO_USE_FACE_COLORS) > 0);
     cameraLightIntensity =
-        (std::max(100, TfGetEnvSetting(Hd_USTC_CG_CAMERA_LIGHT_INTENSITY)) /
+        (std::max(100, TfGetEnvSetting(Hd_RUZINO_CAMERA_LIGHT_INTENSITY)) /
          100.0f);
 
-    if (TfGetEnvSetting(Hd_USTC_CG_PRINT_CONFIGURATION) > 0) {
-        std::cout << "Hd_USTC_CG Configuration: \n"
+    if (TfGetEnvSetting(Hd_RUZINO_PRINT_CONFIGURATION) > 0) {
+        std::cout << "Hd_RUZINO Configuration: \n"
                   << "  samplesToConvergence       = " << samplesToConvergence
                   << "\n"
                   << "  tileSize                   = " << tileSize << "\n"
@@ -105,9 +105,9 @@ Hd_USTC_CG_Config::Hd_USTC_CG_Config()
 }
 
 /*static*/
-const Hd_USTC_CG_Config& Hd_USTC_CG_Config::GetInstance()
+const Hd_RUZINO_Config& Hd_RUZINO_Config::GetInstance()
 {
-    return TfSingleton<Hd_USTC_CG_Config>::GetInstance();
+    return TfSingleton<Hd_RUZINO_Config>::GetInstance();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

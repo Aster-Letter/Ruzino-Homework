@@ -86,7 +86,7 @@ NODE_EXECUTION_FUNCTION(node_render_ray_generation)
         CHECK_PROGRAM_ERROR(storage.cached_program);
     }
 
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
     auto view_constants = camera_to_view_constants(free_camera);
 
     bool view_changed = false;

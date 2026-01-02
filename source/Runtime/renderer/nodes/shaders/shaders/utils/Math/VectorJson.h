@@ -34,7 +34,7 @@
 
 #include <Utils/json.hpp>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -57,4 +57,4 @@ void from_json(const nlohmann::json& j, vector<T, N>& v)
 
 } // namespace math
 
-} // namespace USTC_CG
+} // namespace Ruzino

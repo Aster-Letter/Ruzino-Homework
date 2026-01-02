@@ -32,11 +32,11 @@
 
 #include "Core/Pass/ComputePass.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** SDF Sparse Voxel Octree. Can only be utilized on the GPU.
     */
-    class HD_USTC_CG_API SDFSVO : public SDFGrid
+    class HD_RUZINO_API SDFSVO : public SDFGrid
     {
     public:
         struct SharedData;

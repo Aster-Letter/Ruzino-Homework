@@ -4,7 +4,7 @@
 #include "RHI/api.h"
 #include "RHI/internal/nvrhi_patch.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class RHI_API ShaderReflectionInfo {
    public:
     [[nodiscard]] const nvrhi::BindingLayoutDescVector&
@@ -53,4 +53,4 @@ class RHI_API ShaderReflectionInfo {
 RHI_API std::ostream& operator<<(
     std::ostream& os,
     const ShaderReflectionInfo& info);
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

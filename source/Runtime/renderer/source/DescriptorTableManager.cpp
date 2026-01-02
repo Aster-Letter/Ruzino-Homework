@@ -21,7 +21,7 @@
  */
 
 #include "DescriptorTableManager.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 DescriptorHandle::DescriptorHandle() : m_DescriptorIndex(-1)
 {
 }
@@ -151,4 +151,4 @@ DescriptorTableManager::~DescriptorTableManager()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

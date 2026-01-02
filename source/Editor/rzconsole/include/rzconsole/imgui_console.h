@@ -58,7 +58,7 @@ SOFTWARE.
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace console {
 class Interpreter;
@@ -147,4 +147,4 @@ class RZCONSOLE_API ImGui_Console : public IWidget {
     std::shared_ptr<console::Interpreter> m_Interpreter;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

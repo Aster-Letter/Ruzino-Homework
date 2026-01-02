@@ -1,4 +1,4 @@
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	TreeGen
 	SHARED
 	SKIP_DIRS nodes geometry_nodes

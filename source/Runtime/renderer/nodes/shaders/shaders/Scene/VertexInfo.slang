@@ -28,7 +28,7 @@
 #pragma once
 #include "utils/HostDeviceShared.slangh"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /** Struct representing interpolated vertex attributes in world space.
     Note the tangent is not guaranteed to be orthogonal to the normal.
@@ -48,4 +48,4 @@ struct VertexInfo
     uint subsetMaterialID; ///< Subset material ID. This is the material ID of the subset the vertex belongs to.
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

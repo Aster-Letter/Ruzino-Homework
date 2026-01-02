@@ -9,7 +9,7 @@
 #include "rzpython/rzpython.hpp"
 #include "rzpython/usd_extensions.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 // Test fixture that initializes Python once for all tests
 class RZPythonRuntimeTest : public ::testing::Test {

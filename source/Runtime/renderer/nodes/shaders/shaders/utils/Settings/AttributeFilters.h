@@ -45,7 +45,7 @@ namespace pybind11
 class dict;
 }
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 namespace settings
@@ -118,4 +118,4 @@ private:
 
 } // namespace settings
 
-} // namespace USTC_CG
+} // namespace Ruzino

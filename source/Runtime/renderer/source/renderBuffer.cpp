@@ -30,10 +30,10 @@
 #include "pxr/base/gf/half.h"
 #include "renderParam.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_RenderBuffer::Hd_USTC_CG_RenderBuffer(SdfPath const &id)
+Hd_RUZINO_RenderBuffer::Hd_RUZINO_RenderBuffer(SdfPath const &id)
     : HdRenderBuffer(id),
       _width(0),
       _height(0),
@@ -46,31 +46,31 @@ Hd_USTC_CG_RenderBuffer::Hd_USTC_CG_RenderBuffer(SdfPath const &id)
 {
 }
 
-Hd_USTC_CG_RenderBuffer::~Hd_USTC_CG_RenderBuffer()
+Hd_RUZINO_RenderBuffer::~Hd_RUZINO_RenderBuffer()
 {
     staging = nullptr;
     m_CommandList = nullptr;
 }
 
 /*virtual*/
-void Hd_USTC_CG_RenderBuffer::Sync(
+void Hd_RUZINO_RenderBuffer::Sync(
     HdSceneDelegate *sceneDelegate,
     HdRenderParam *renderParam,
     HdDirtyBits *dirtyBits)
 {
-    auto ustc_renderParam = static_cast<Hd_USTC_CG_RenderParam *>(renderParam);
+    auto ruzino_renderParam = static_cast<Hd_RUZINO_RenderParam *>(renderParam);
     nvrhi_device = RHI::get_device();
     HdRenderBuffer::Sync(sceneDelegate, renderParam, dirtyBits);
 }
 
 /*virtual*/
-void Hd_USTC_CG_RenderBuffer::Finalize(HdRenderParam *renderParam)
+void Hd_RUZINO_RenderBuffer::Finalize(HdRenderParam *renderParam)
 {
     HdRenderBuffer::Finalize(renderParam);
 }
 
 /*virtual*/
-void Hd_USTC_CG_RenderBuffer::_Deallocate()
+void Hd_RUZINO_RenderBuffer::_Deallocate()
 {
     // If the buffer is mapped while we're doing this, there's not a great
     // recovery path...
@@ -88,11 +88,11 @@ void Hd_USTC_CG_RenderBuffer::_Deallocate()
     _converged.store(false);
 }
 
-void Hd_USTC_CG_RenderBuffer::Resolve()
+void Hd_RUZINO_RenderBuffer::Resolve()
 {
 }
 
-bool Hd_USTC_CG_RenderBuffer::Allocate(
+bool Hd_RUZINO_RenderBuffer::Allocate(
     GfVec3i const &dimensions,
     HdFormat format,
     bool multiSampled)
@@ -120,18 +120,18 @@ bool Hd_USTC_CG_RenderBuffer::Allocate(
     return true;
 }
 
-VtValue Hd_USTC_CG_RenderBuffer::GetResource(bool multiSampled) const
+VtValue Hd_RUZINO_RenderBuffer::GetResource(bool multiSampled) const
 {
     return VtValue(pxr::HgiTextureHandle{});
 }
 
-void Hd_USTC_CG_RenderBuffer::Clear()
+void Hd_RUZINO_RenderBuffer::Clear()
 {
 }
 
-void Hd_USTC_CG_RenderBuffer::Present(nvrhi::TextureHandle handle)
+void Hd_RUZINO_RenderBuffer::Present(nvrhi::TextureHandle handle)
 {
-#ifndef USTC_CG_DIRECT_VK_DISPLAY
+#ifndef RUZINO_DIRECT_VK_DISPLAY
     if (!m_CommandList) {
         m_CommandList = nvrhi_device->createCommandList();
     }
@@ -156,16 +156,16 @@ void Hd_USTC_CG_RenderBuffer::Present(nvrhi::TextureHandle handle)
     nvrhi_device->unmapStagingTexture(staging);
 #endif
 }
-void *Hd_USTC_CG_RenderBuffer::Map()
+void *Hd_RUZINO_RenderBuffer::Map()
 {
     nvrhi_device->waitForIdle();
     _mappers++;
     return _buffer.data();
 }
 
-void Hd_USTC_CG_RenderBuffer::Unmap()
+void Hd_RUZINO_RenderBuffer::Unmap()
 {
     _mappers--;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

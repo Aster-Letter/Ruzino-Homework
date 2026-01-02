@@ -4,7 +4,7 @@
 
 namespace nb = nanobind;
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 // Tell nanobind to treat IDevice as an opaque pointer type
 NB_MAKE_OPAQUE(nvrhi::IDevice*);

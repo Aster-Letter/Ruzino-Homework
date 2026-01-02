@@ -39,7 +39,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
@@ -58,7 +58,7 @@ namespace USTC_CG
  * For example:
  *
  * @code
- * class HD_USTC_CG_API PluginBase
+ * class HD_RUZINO_API PluginBase
  * {
  * public:
  *     struct PluginInfo { const char* desc };
@@ -89,7 +89,7 @@ namespace USTC_CG
  * The _plugin library_ must export a `registerPlugin` function for registering all the plugin class types when called.
  *
  * @code
- * extern "C" HD_USTC_CG_API_EXPORT void registerPlugin(USTC_CG::PluginRegistry& registry)
+ * extern "C" HD_RUZINO_API_EXPORT void registerPlugin(Ruzino::PluginRegistry& registry)
  * {
  *     registry.registerClass<PluginBase, PluginA>();
  * }
@@ -104,7 +104,7 @@ namespace USTC_CG
  *
  * The `getInfos` function returns a list of plugin infos for all loaded plugin types of a given plugin base class.
  */
-class HD_USTC_CG_API PluginManager
+class HD_RUZINO_API PluginManager
 {
 public:
     /// Singleton accessor.
@@ -335,4 +335,4 @@ public:                                                    \
         return kPluginInfo;                                \
     }
 
-} // namespace USTC_CG
+} // namespace Ruzino

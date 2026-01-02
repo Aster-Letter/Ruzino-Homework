@@ -28,7 +28,7 @@
 #pragma once
 #include "BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Class representing the standard material.
 
@@ -65,7 +65,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API StandardMaterial : public BasicMaterial
+    class HD_RUZINO_API StandardMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(StandardMaterial)
     public:

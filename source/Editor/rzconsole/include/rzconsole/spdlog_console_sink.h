@@ -11,11 +11,11 @@
 #include "api.h"
 
 // Forward declare to avoid circular include
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class ImGui_Console;
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Custom spdlog sink that forwards log messages to ImGui_Console
 template<typename Mutex>
@@ -52,4 +52,4 @@ std::shared_ptr<spdlog::logger> create_console_logger(
     const std::string& logger_name,
     ImGui_Console* console);
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

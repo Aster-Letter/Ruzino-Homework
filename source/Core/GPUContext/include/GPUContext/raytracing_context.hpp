@@ -2,7 +2,7 @@
 
 #include "context.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 struct GPUCONTEXT_API RaytracingState{};
 
@@ -71,4 +71,4 @@ class GPUCONTEXT_API RaytracingContext : public GPUContext {
     nvrhi::rt::PipelineHandle raytracing_pipeline;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

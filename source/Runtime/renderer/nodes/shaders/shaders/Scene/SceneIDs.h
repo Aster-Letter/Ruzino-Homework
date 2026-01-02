@@ -30,7 +30,7 @@
 #include <cstdint>
 
 // Scene1 IDs are now defined in scene1 namespace, so places that need to distinguish multiple MeshIDs can.
-namespace USTC_CG::scene1
+namespace Ruzino::scene1
 {
     enum class SceneObjectKind
     {
@@ -62,7 +62,7 @@ namespace USTC_CG::scene1
 }
 
 // scene1 is by default included in Falcor namespace to keep ensure that everything works are when IDs were directly in Falcor namespace
-namespace USTC_CG
+namespace Ruzino
 {
 using namespace scene1;
 }

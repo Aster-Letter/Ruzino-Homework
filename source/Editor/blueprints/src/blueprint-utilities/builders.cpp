@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //------------------------------------------------------------------------------
 namespace ed = ax::NodeEditor;
 namespace util = ax::NodeEditor::Utilities;
@@ -32,7 +32,7 @@ util::BlueprintNodeBuilder::BlueprintNodeBuilder(
 {
 }
 
-void util::BlueprintNodeBuilder::Begin(USTC_CG::NodeId id)
+void util::BlueprintNodeBuilder::Begin(Ruzino::NodeId id)
 {
     HasHeader = false;
     HeaderMin = HeaderMax = ImVec2();
@@ -120,7 +120,7 @@ void util::BlueprintNodeBuilder::EndHeader()
     SetStage(Stage::Content);
 }
 
-void util::BlueprintNodeBuilder::Input(USTC_CG::SocketID id)
+void util::BlueprintNodeBuilder::Input(Ruzino::SocketID id)
 {
     if (CurrentStage == Stage::Begin)
         SetStage(Stage::Content);
@@ -152,7 +152,7 @@ void util::BlueprintNodeBuilder::Middle()
     SetStage(Stage::Middle);
 }
 
-void util::BlueprintNodeBuilder::Output(USTC_CG::SocketID id)
+void util::BlueprintNodeBuilder::Output(Ruzino::SocketID id)
 {
     if (CurrentStage == Stage::Begin)
         SetStage(Stage::Content);
@@ -307,7 +307,7 @@ bool util::BlueprintNodeBuilder::SetStage(Stage stage)
     return true;
 }
 
-void util::BlueprintNodeBuilder::Pin(USTC_CG::SocketID id, ed::PinKind kind)
+void util::BlueprintNodeBuilder::Pin(Ruzino::SocketID id, ed::PinKind kind)
 {
     ed::BeginPin(id, kind);
 }
@@ -322,4 +322,4 @@ void util::BlueprintNodeBuilder::EndPin()
     //     64));
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

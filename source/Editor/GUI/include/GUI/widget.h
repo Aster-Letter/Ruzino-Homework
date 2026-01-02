@@ -7,7 +7,7 @@
 #include "GUI/api.h"
 #include "imgui.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class Window;
 
 class GUI_API IWidget {
@@ -134,4 +134,4 @@ class IWidgetFactory {
         const std::vector<std::unique_ptr<IWidget>>& others) = 0;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

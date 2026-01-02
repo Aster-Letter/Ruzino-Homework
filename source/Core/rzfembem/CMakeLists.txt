@@ -8,7 +8,7 @@ if(MSVC)
 
 endif()
 
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
     RZFemBem
     SHARED
     WITH_CUDA

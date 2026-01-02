@@ -30,7 +30,7 @@
 #include <utility>
 #include <stdexcept>
 
-namespace USTC_CG
+namespace Ruzino
 {
 template<typename T, typename Enable = void>
 class NumericRange final
@@ -77,4 +77,4 @@ public:
 private:
     T mBegin, mEnd;
 };
-}; // namespace USTC_CG
+}; // namespace Ruzino

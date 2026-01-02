@@ -13,7 +13,7 @@
 #include "widgets/api.h"
 
 struct PickEvent;
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class BaseCamera;
 class FreeCamera;
 class NodeTree;
@@ -102,4 +102,4 @@ class USDVIEW_WIDGET_API UsdviewEngine final : public IWidget {
 
     std::shared_ptr<PickEvent> current_pick_event_;
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -8,7 +8,7 @@
 #include "fem_bem/ElementBasis.hpp"
 #include "fem_bem/Expression.hpp"
 
-using namespace USTC_CG::fem_bem;
+using namespace Ruzino::fem_bem;
 
 class IntegrationPerformanceTest : public ::testing::Test {
    protected:

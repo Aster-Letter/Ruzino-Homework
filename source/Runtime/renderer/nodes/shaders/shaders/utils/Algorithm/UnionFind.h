@@ -29,7 +29,7 @@
 #include <vector>
 #include <cstddef>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
@@ -91,4 +91,4 @@ private:
     size_t mSetCount{0};
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

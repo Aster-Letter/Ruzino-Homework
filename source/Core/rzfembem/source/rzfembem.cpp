@@ -10,7 +10,7 @@
 #include "fem_bem/api.h"
 #include "fem_bem/fem_bem.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class FEMSolver2D : public ElementSolver {
    public:
@@ -749,4 +749,4 @@ std::shared_ptr<ElementSolver> create_element_solver(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

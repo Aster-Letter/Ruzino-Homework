@@ -11,7 +11,7 @@ namespace vk {
 class Image;
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class DeviceManager;
 
 namespace RHI {
@@ -114,4 +114,4 @@ namespace internal {
 }
 
 }  // namespace RHI
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

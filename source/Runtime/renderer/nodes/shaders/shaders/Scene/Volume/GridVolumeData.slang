@@ -28,7 +28,7 @@
 #pragma once
 #include "utils/HostDeviceShared.slangh"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /** This is a host/device structure that describes a grid volume.
 */
@@ -48,4 +48,4 @@ struct GridVolumeData
     float   emissionTemperature     = 0.f;          ///< Emission base temperature (K).
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

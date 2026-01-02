@@ -30,7 +30,7 @@
 #include "ScalarMath.h"
 #include "Vector.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -90,4 +90,4 @@ inline uint packSnorm2x16(float2 v)
     return (floatToSnorm16(v.x) & 0x0000ffff) | (floatToSnorm16(v.y) << 16);
 }
 
-} // namespace USTC_CG
+} // namespace Ruzino

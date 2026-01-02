@@ -2,7 +2,7 @@
 #include <imgui.h>
 #include "drawing.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace ax
 {
     namespace Widgets
@@ -18,4 +18,4 @@ namespace ax
     } // namespace Widgets
 }     // namespace ax
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

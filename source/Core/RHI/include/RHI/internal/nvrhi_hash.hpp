@@ -6,8 +6,8 @@
 namespace std {
 
 template<>
-struct hash<USTC_CG::ProgramDesc> {
-    size_t operator()(const USTC_CG::ProgramDesc& s) const noexcept
+struct hash<Ruzino::ProgramDesc> {
+    size_t operator()(const Ruzino::ProgramDesc& s) const noexcept
     {
         size_t seed = 0;
         for (const auto& path : s.paths) {

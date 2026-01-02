@@ -37,11 +37,11 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     struct ShaderVar;
 
-    class HD_USTC_CG_API LightProfile : public Object
+    class HD_RUZINO_API LightProfile : public Object
     {
         FALCOR_OBJECT(LightProfile)
     public:

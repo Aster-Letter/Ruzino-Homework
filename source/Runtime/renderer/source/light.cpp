@@ -17,9 +17,9 @@
 #include "renderParam.h"
 
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-void Hd_USTC_CG_Light::Sync(
+void Hd_RUZINO_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
@@ -33,7 +33,7 @@ void Hd_USTC_CG_Light::Sync(
         return;
     }
 
-    auto render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     render_param->InstanceCollection->mark_lights_dirty();
 
     const SdfPath& id = GetId();
@@ -179,7 +179,7 @@ void Hd_USTC_CG_Light::Sync(
     // Don't clear dirty bits here - let derived classes handle it
 }
 
-HdDirtyBits Hd_USTC_CG_Light::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Light::GetInitialDirtyBitsMask() const
 {
     // In the case of simple and distant lights we want to sync all dirty bits,
     // but for area lights coming from the scenegraph we just want to extract
@@ -193,29 +193,29 @@ HdDirtyBits Hd_USTC_CG_Light::GetInitialDirtyBitsMask() const
     }
 }
 
-VtValue Hd_USTC_CG_Light::Get(const TfToken& token) const
+VtValue Hd_RUZINO_Light::Get(const TfToken& token) const
 {
     VtValue val;
     TfMapLookup(_params, token, &val);
     return val;
 }
-void Hd_USTC_CG_Light::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Light::Finalize(HdRenderParam* renderParam)
 {
-    auto render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     render_param->InstanceCollection->mark_lights_dirty();
     HdLight::Finalize(renderParam);
 }
 
-void Hd_USTC_CG_Simple_Light::Sync(
+void Hd_RUZINO_Simple_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Allocate and populate light buffer for simple/point light
     if (*dirtyBits & (DirtyParams | DirtyTransform)) {
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -268,12 +268,12 @@ void Hd_USTC_CG_Simple_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Distant_Light::Sync(
+void Hd_RUZINO_Distant_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Get distant light specific parameters
     const SdfPath& id = this->GetId();
@@ -295,7 +295,7 @@ void Hd_USTC_CG_Distant_Light::Sync(
         }
 
         // Allocate and populate light buffer
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -330,12 +330,12 @@ void Hd_USTC_CG_Distant_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Sphere_Light::Sync(
+void Hd_RUZINO_Sphere_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Get sphere light specific parameters
     const SdfPath& id = this->GetId();
@@ -351,7 +351,7 @@ void Hd_USTC_CG_Sphere_Light::Sync(
 
     // Allocate and populate light buffer
     if (bits & (DirtyParams | DirtyTransform)) {
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -394,12 +394,12 @@ void Hd_USTC_CG_Sphere_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Rect_Light::Sync(
+void Hd_RUZINO_Rect_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Get rectangle light specific parameters
     const SdfPath& id = this->GetId();
@@ -421,7 +421,7 @@ void Hd_USTC_CG_Rect_Light::Sync(
 
     // Allocate and populate light buffer
     if (bits & (DirtyParams | DirtyTransform)) {
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -516,12 +516,12 @@ void Hd_USTC_CG_Rect_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Disk_Light::Sync(
+void Hd_RUZINO_Disk_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Get disk light specific parameters
     const SdfPath& id = this->GetId();
@@ -537,7 +537,7 @@ void Hd_USTC_CG_Disk_Light::Sync(
 
     // Allocate and populate light buffer
     if (bits & (DirtyParams | DirtyTransform)) {
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -613,12 +613,12 @@ void Hd_USTC_CG_Disk_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Cylinder_Light::Sync(
+void Hd_RUZINO_Cylinder_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     // Get cylinder light specific parameters
     const SdfPath& id = this->GetId();
@@ -640,7 +640,7 @@ void Hd_USTC_CG_Cylinder_Light::Sync(
 
     // Allocate and populate light buffer
     if (bits & (DirtyParams | DirtyTransform)) {
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
         if (!this->light_buffer) {
             this->light_buffer =
                 render_param->InstanceCollection->light_pool.allocate(1);
@@ -684,7 +684,7 @@ void Hd_USTC_CG_Cylinder_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Dome_Light::_PrepareDomeLight(
+void Hd_RUZINO_Dome_Light::_PrepareDomeLight(
     SdfPath const& id,
     HdSceneDelegate* sceneDelegate)
 {
@@ -717,12 +717,12 @@ void Hd_USTC_CG_Dome_Light::_PrepareDomeLight(
     radiance *= finalIntensity;
 }
 
-void Hd_USTC_CG_Dome_Light::Sync(
+void Hd_RUZINO_Dome_Light::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Light::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Light::Sync(sceneDelegate, renderParam, dirtyBits);
 
     const SdfPath& id = GetId();
     HdDirtyBits bits = *dirtyBits;
@@ -780,7 +780,7 @@ void Hd_USTC_CG_Dome_Light::Sync(
             }
         }
 
-        auto* render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+        auto* render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
 
         // Allocate light buffer if needed
         if (!this->light_buffer) {
@@ -927,7 +927,7 @@ void Hd_USTC_CG_Dome_Light::Sync(
     *dirtyBits = Clean;
 }
 
-void Hd_USTC_CG_Dome_Light::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Dome_Light::Finalize(HdRenderParam* renderParam)
 {
     // Clean up texture descriptor
     if (env_texture.descriptor.IsValid()) {
@@ -940,7 +940,7 @@ void Hd_USTC_CG_Dome_Light::Finalize(HdRenderParam* renderParam)
         env_texture.glTexture = 0;
     }
 
-    Hd_USTC_CG_Light::Finalize(renderParam);
+    Hd_RUZINO_Light::Finalize(renderParam);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -33,14 +33,14 @@
 #include "Scene/Material/RGLFile.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class allows taking a virtual measurement of a BRDF
         and converting it into the parametrization proposed by
         Dupuy & Jakob,  "An Adaptive Parameterization for Efficient
         Material Acquisition and Rendering".
     */
-    class HD_USTC_CG_API RGLAcquisition
+    class HD_RUZINO_API RGLAcquisition
     {
     public:
         /// Constructor.

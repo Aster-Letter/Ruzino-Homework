@@ -8,7 +8,7 @@
 #include <iomanip>
 #include <random>
 
-using namespace USTC_CG::Solver;
+using namespace Ruzino::Solver;
 
 class LargeScaleTest : public ::testing::Test {
    protected:

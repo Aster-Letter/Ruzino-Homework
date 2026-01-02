@@ -42,7 +42,7 @@
 
 #include <format>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -773,15 +773,15 @@ bool lex_lt(const matrix<T, R, C>& lhs, const matrix<T, R, C>& rhs)
     return false;
 }
 } // namespace math
-} // namespace USTC_CG
+} // namespace Ruzino
 
 template<typename T, int R, int C>
-struct std::formatter<USTC_CG::math::matrix<T, R, C>> : formatter<typename USTC_CG::math::matrix<T, R, C>::RowType>
+struct std::formatter<Ruzino::math::matrix<T, R, C>> : formatter<typename Ruzino::math::matrix<T, R, C>::RowType>
 {
-    using MatrixRowType = typename USTC_CG::math::matrix<T, R, C>::RowType;
+    using MatrixRowType = typename Ruzino::math::matrix<T, R, C>::RowType;
 
     template<typename FormatContext>
-    auto format(const USTC_CG::math::matrix<T, R, C>& matrix, FormatContext& ctx) const
+    auto format(const Ruzino::math::matrix<T, R, C>& matrix, FormatContext& ctx) const
     {
         auto out = ctx.out();
         for (int r = 0; r < R; ++r)

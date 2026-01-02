@@ -10,7 +10,7 @@
 #include "pxr/base/tf/token.h"
 #include "stage_listener/stage_listener.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class BaseCamera;
 class FreeCamera;
@@ -118,7 +118,7 @@ class POLYSCOPE_WIDGET_API PolyscopeRenderer final : public IWidget {
     // Animate(float elapsed_time_seconds) override;
     std::string child_window_name = "";
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 /*
  * polyscope::draw() 中用于控制镜头的方法

@@ -33,7 +33,7 @@
 #include <vector>
 #include <cmath>
 
-namespace USTC_CG
+namespace Ruzino
 {
 enum class SpectrumInterpolation
 {
@@ -209,4 +209,4 @@ T SampledSpectrum<T>::eval(const float lambda, const SpectrumInterpolation inter
     float w = x - (float)i;
     return math::lerp(mSamples[i], mSamples[i + 1], T(w));
 }
-} // namespace USTC_CG
+} // namespace Ruzino

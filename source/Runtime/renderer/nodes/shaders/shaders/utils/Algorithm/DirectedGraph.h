@@ -33,7 +33,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class DirectedGraph
 {
@@ -229,4 +229,4 @@ private:
         FALCOR_UNREACHABLE();
     }
 };
-} // namespace USTC_CG
+} // namespace Ruzino

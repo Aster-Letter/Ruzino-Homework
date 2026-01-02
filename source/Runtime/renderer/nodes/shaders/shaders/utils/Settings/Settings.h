@@ -43,10 +43,10 @@ class dict;
 class list;
 } // namespace pybind11
 
-namespace USTC_CG
+namespace Ruzino
 {
 
-class HD_USTC_CG_API Settings
+class HD_RUZINO_API Settings
 {
 public:
     using Options = settings::Attributes;
@@ -220,4 +220,4 @@ private:
     Settings& mSettings;
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

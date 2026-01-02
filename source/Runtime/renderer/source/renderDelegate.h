@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_RENDER_DELEGATE_H
-#define Hd_USTC_CG_RENDER_DELEGATE_H
+#ifndef Hd_RUZINO_RENDER_DELEGATE_H
+#define Hd_RUZINO_RENDER_DELEGATE_H
 
 #include "api.h"
 #include "nodes/system/node_system.hpp"
@@ -35,34 +35,34 @@
 
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 
-namespace USTC_CG {
+namespace Ruzino {
 class LensSystem;
 struct RenderGlobalPayload;
-}  // namespace USTC_CG
+}  // namespace Ruzino
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_Material;
-class Hd_USTC_CG_Light;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_Material;
+class Hd_RUZINO_Light;
 using namespace pxr;
-#define Hd_USTC_CG_RENDER_SETTINGS_TOKENS        \
+#define Hd_RUZINO_RENDER_SETTINGS_TOKENS        \
     (enableAmbientOcclusion)(enableSceneColors)( \
         ambientOcclusionSamples)(renderMode)
 // Also: HdRenderSettingsTokens->convergedSamplesPerPixel
 
 TF_DECLARE_PUBLIC_TOKENS(
-    Hd_USTC_CG_RenderSettingsTokens,
-    Hd_USTC_CG_RENDER_SETTINGS_TOKENS);
+    Hd_RUZINO_RenderSettingsTokens,
+    Hd_RUZINO_RENDER_SETTINGS_TOKENS);
 
-using MaterialMap = pxr::TfHashMap<SdfPath, Hd_USTC_CG_Material*, TfHash>;
+using MaterialMap = pxr::TfHashMap<SdfPath, Hd_RUZINO_Material*, TfHash>;
 
-class HD_USTC_CG_API Hd_USTC_CG_RenderDelegate final : public HdRenderDelegate {
+class HD_RUZINO_API Hd_RUZINO_RenderDelegate final : public HdRenderDelegate {
    public:
     /// Render delegate constructor.
-    Hd_USTC_CG_RenderDelegate();
+    Hd_RUZINO_RenderDelegate();
     /// Render delegate constructor.
-    Hd_USTC_CG_RenderDelegate(const HdRenderSettingsMap& settingsMap);
+    Hd_RUZINO_RenderDelegate(const HdRenderSettingsMap& settingsMap);
     /// Render delegate destructor.
-    ~Hd_USTC_CG_RenderDelegate() override;
+    ~Hd_RUZINO_RenderDelegate() override;
 
     /// Supported types
     const TfTokenVector& GetSupportedRprimTypes() const override;
@@ -111,13 +111,13 @@ class HD_USTC_CG_API Hd_USTC_CG_RenderDelegate final : public HdRenderDelegate {
     void _Initialize();
 
     std::atomic<int> _sceneVersion;
-    std::shared_ptr<Hd_USTC_CG_RenderParam> _renderParam;
+    std::shared_ptr<Hd_RUZINO_RenderParam> _renderParam;
     HdRenderThread _renderThread;
-    std::shared_ptr<Hd_USTC_CG_Renderer> _renderer;
-    pxr::VtArray<Hd_USTC_CG_Light*> lights;
-    pxr::VtArray<Hd_USTC_CG_Camera*> cameras;
+    std::shared_ptr<Hd_RUZINO_Renderer> _renderer;
+    pxr::VtArray<Hd_RUZINO_Light*> lights;
+    pxr::VtArray<Hd_RUZINO_Camera*> cameras;
     MaterialMap materials;
-    pxr::VtArray<Hd_USTC_CG_Mesh*> meshes;
+    pxr::VtArray<Hd_RUZINO_Mesh*> meshes;
     nvrhi::IDevice* nvrhi_device;
     std::unique_ptr<RenderGlobalPayload> _globalPayload;
     std::shared_ptr<NodeSystem> node_system;
@@ -128,8 +128,8 @@ class HD_USTC_CG_API Hd_USTC_CG_RenderDelegate final : public HdRenderDelegate {
 
     // Unique Material ID. The IDs are
 
-    Hd_USTC_CG_RenderDelegate(const Hd_USTC_CG_RenderDelegate&) = delete;
-    Hd_USTC_CG_RenderDelegate& operator=(const Hd_USTC_CG_RenderDelegate&) =
+    Hd_RUZINO_RenderDelegate(const Hd_RUZINO_RenderDelegate&) = delete;
+    Hd_RUZINO_RenderDelegate& operator=(const Hd_RUZINO_RenderDelegate&) =
         delete;
 
    public:
@@ -143,6 +143,6 @@ class HD_USTC_CG_API Hd_USTC_CG_RenderDelegate final : public HdRenderDelegate {
     bool m_TearingSupported = false;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_RENDER_DELEGATE_H
+#endif  // Hd_RUZINO_RENDER_DELEGATE_H

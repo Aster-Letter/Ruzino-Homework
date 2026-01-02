@@ -20,7 +20,7 @@
 #include <spdlog/spdlog.h>
 #include "RHI/ShaderFactory/shader.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 #include <iostream>
 
 #define CHECK(statement) \
@@ -173,7 +173,7 @@ class ShaderGeneratorTester {
           _logFilePath(logFilePath),
           _writeShadersToDisk(writeShadersToDisk)
     {
-        _shaderFactory.set_search_path("usd/hd_USTC_CG/resources/libraries");
+        _shaderFactory.set_search_path("usd/hd_RUZINO/resources/libraries");
 
         // load successed files
         std::ifstream file("successed_files.txt");
@@ -360,7 +360,7 @@ void checkImplementations(
         searchPath,
         doc);
     mx::loadLibraries(
-        { "usd/hd_USTC_CG/resources/libraries" }, searchPath, doc);
+        { "usd/hd_RUZINO/resources/libraries" }, searchPath, doc);
 
     const std::string& target = shadergen.getTarget();
 
@@ -572,7 +572,7 @@ void testUniqueNames(mx::GenContext& context, const std::string& stage)
     mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
     loadLibraries({ "libraries/targets", "libraries/stdlib" }, searchPath, doc);
     mx::loadLibraries(
-        { "usd/hd_USTC_CG/resources/libraries" }, searchPath, doc);
+        { "usd/hd_RUZINO/resources/libraries" }, searchPath, doc);
 
     const std::string exampleName = "unique_names";
 
@@ -894,7 +894,7 @@ inline void ShaderGeneratorTester::setupDependentLibraries()
     // Load the standard libraries.
     loadLibraries({ "libraries" }, _searchPath, _dependLib, _skipLibraryFiles);
     mx::loadLibraries(
-        { "usd/hd_USTC_CG/resources/libraries" }, _searchPath, _dependLib);
+        { "usd/hd_RUZINO/resources/libraries" }, _searchPath, _dependLib);
 }
 
 inline LightIdMap ShaderGeneratorTester::computeLightIdMap(
@@ -1021,7 +1021,7 @@ inline void ShaderGeneratorTester::validate_shader_compile(
     context.getOptions() = generateOptions;
     context.registerSourceCodeSearchPath(_searchPath);
     auto searchPath = mx::getDefaultDataSearchPath();
-    searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
+    searchPath.append(mx::FileSearchPath("usd/hd_RUZINO/resources"));
     context.registerSourceCodeSearchPath(searchPath);
 
     // Register shader metadata defined in the libraries.
@@ -1558,4 +1558,4 @@ class SlangShaderGeneratorTester : public GenShaderUtil::ShaderGeneratorTester {
 
 }  // namespace GenShaderUtil
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

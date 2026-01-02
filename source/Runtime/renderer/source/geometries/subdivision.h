@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef HD_USTC_CG_SUBDIVISION_H
-#define HD_USTC_CG_SUBDIVISION_H
+#ifndef HD_RUZINO_SUBDIVISION_H
+#define HD_RUZINO_SUBDIVISION_H
 
 #include <opensubdiv/far/patchTable.h>
 #include <opensubdiv/far/stencilTable.h>
@@ -20,7 +20,7 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /// \class Hd_Subdivision
 ///
@@ -163,6 +163,6 @@ class HdSt_OsdRefineComputationCPU final : public pxr::HdBufferSource {
     int _fvarChannel;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // HD_USTC_CG_SUBDIVISION_H
+#endif  // HD_RUZINO_SUBDIVISION_H

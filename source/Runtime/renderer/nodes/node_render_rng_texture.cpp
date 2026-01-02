@@ -16,7 +16,7 @@ NODE_DECLARATION_FUNCTION(rng_texture)
 
 NODE_EXECUTION_FUNCTION(rng_texture)
 {
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
     auto size = free_camera->dataWindow.GetSize();
 
     nvrhi::TextureDesc output_desc;

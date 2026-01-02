@@ -7,7 +7,7 @@
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace python {
 
@@ -74,7 +74,7 @@ void send(const std::string& name, const T& value);
 
 }  // namespace python
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 // Template implementations - include after declarations
 #include "rzpython_impl.hpp"

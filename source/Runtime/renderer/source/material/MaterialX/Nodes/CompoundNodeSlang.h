@@ -15,7 +15,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Compound node implementation
-class HD_USTC_CG_API CompoundNodeSlang : public ShaderNodeImpl {
+class HD_RUZINO_API CompoundNodeSlang : public ShaderNodeImpl {
    public:
     static ShaderNodeImplPtr create();
 

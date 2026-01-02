@@ -36,7 +36,7 @@
 #include "utils/Algorithm/ParallelReduction.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Helper class for collecting runtime stats in the path tracer.
 
@@ -44,7 +44,7 @@ namespace USTC_CG
         after end() is called. These stats are summarized in a reduction pass, which are
         available in getStats() or printStats() after async readback to the CPU.
     */
-    class HD_USTC_CG_API PixelStats
+    class HD_RUZINO_API PixelStats
     {
     public:
         struct Stats

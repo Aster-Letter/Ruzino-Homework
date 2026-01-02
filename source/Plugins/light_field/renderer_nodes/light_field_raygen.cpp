@@ -90,7 +90,7 @@ NODE_DECLARATION_FUNCTION(light_field_raygen)
 
 NODE_EXECUTION_FUNCTION(light_field_raygen)
 {
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
     auto image_size = free_camera->dataWindow.GetSize();
 
     auto display_screen_z = params.get_input<float>("Display Screen Z");

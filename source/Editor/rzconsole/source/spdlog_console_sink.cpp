@@ -2,7 +2,7 @@
 #include <rzconsole/imgui_console.h>
 #include <spdlog/spdlog.h>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 template<typename Mutex>
 void console_sink<Mutex>::set_console(ImGui_Console* console) {
@@ -78,4 +78,4 @@ std::shared_ptr<spdlog::logger> create_console_logger(
     return logger;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

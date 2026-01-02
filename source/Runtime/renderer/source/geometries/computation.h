@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef HD_USTC_CG_COMPUTATION_H
-#define HD_USTC_CG_COMPUTATION_H
+#ifndef HD_RUZINO_COMPUTATION_H
+#define HD_RUZINO_COMPUTATION_H
 
 #include <memory>
 #include <vector>
@@ -14,7 +14,7 @@
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class HdResourceRegistry;
 
 using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
@@ -32,7 +32,7 @@ using HdStComputationSharedPtrVector = std::vector<HdStComputationSharedPtr>;
 ///
 class HdStComputation {
    public:
-    HD_USTC_CG_API
+    HD_RUZINO_API
     virtual ~HdStComputation();
 
     /// Execute computation.
@@ -62,6 +62,6 @@ class HdStComputation {
     }
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // HD_USTC_CG_COMPUTATION_H
+#endif  // HD_RUZINO_COMPUTATION_H

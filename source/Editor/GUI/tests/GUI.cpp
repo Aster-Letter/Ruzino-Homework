@@ -8,7 +8,7 @@
 #include "RHI/rhi.hpp"
 #include "imgui.h"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 TEST(CreateRHI, window)
 {
@@ -136,10 +136,10 @@ TEST(FileDialog, create_dialog)
 
 TEST(ImageWidget, red_texture)
 {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
     // Initialize RHI and CUDA
     RHI::init(true);
-    USTC_CG::cuda::cuda_init();
+    Ruzino::cuda::cuda_init();
 
     {
         Window window;
@@ -157,7 +157,7 @@ TEST(ImageWidget, red_texture)
 
         // Create CUDA linear buffer for RGBA data
         auto cuda_buffer =
-            USTC_CG::cuda::create_cuda_linear_buffer<uint32_t>(pixel_count);
+            Ruzino::cuda::create_cuda_linear_buffer<uint32_t>(pixel_count);
 
         // Fill the buffer with red color using CUDA (validation of CUDA
         // filling)
@@ -183,7 +183,7 @@ TEST(ImageWidget, red_texture)
         // conversion)
         auto device = RHI::get_device();
         auto texture_handle =
-            USTC_CG::cuda::cuda_linear_buffer_to_nvrhi_texture(
+            Ruzino::cuda::cuda_linear_buffer_to_nvrhi_texture(
                 device, cuda_buffer, texture_desc);
 
         // Create and register the image widget

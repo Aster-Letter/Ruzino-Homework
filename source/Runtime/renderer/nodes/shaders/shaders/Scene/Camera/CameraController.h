@@ -34,7 +34,7 @@
 #include <bitset>
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
     struct MouseEvent;
     struct KeyboardEvent;
@@ -42,7 +42,7 @@ namespace USTC_CG
 
     /** Camera controller interface. Camera controllers should inherit from this object.
     */
-    class HD_USTC_CG_API CameraController
+    class HD_RUZINO_API CameraController
     {
     public:
         enum class UpDirection
@@ -111,7 +111,7 @@ namespace USTC_CG
         * Left mouse click + movement will orbit around the model.
         * Mouse wheel zooms in/out.
     */
-    class HD_USTC_CG_API OrbiterCameraController : public CameraController
+    class HD_RUZINO_API OrbiterCameraController : public CameraController
     {
     public:
         OrbiterCameraController(const ref<Camera>& pCamera) : CameraController(pCamera) {}
@@ -159,7 +159,7 @@ namespace USTC_CG
         - Ctrl for slower movement.
     */
     template<bool b6DoF>
-    class HD_USTC_CG_API FirstPersonCameraControllerCommon : public CameraController
+    class HD_RUZINO_API FirstPersonCameraControllerCommon : public CameraController
     {
     public:
         FirstPersonCameraControllerCommon(const ref<Camera>& pCamera);

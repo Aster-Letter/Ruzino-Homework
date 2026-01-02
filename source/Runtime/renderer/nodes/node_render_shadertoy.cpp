@@ -19,7 +19,7 @@ NODE_DECLARATION_FUNCTION(shadertoy)
 
 NODE_EXECUTION_FUNCTION(shadertoy)
 {
-#ifdef USTC_CG_BACKEND_OPENGL
+#ifdef RUZINO_BACKEND_OPENGL
     auto cameras = params.get_input<CameraArray>("Camera");
 
     auto free_camera = cameras.back();

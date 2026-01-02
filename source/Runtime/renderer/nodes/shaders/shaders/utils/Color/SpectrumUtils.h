@@ -35,12 +35,12 @@
 #include <functional>
 #include <type_traits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 template<typename T>
 class SampledSpectrum;
 
-class HD_USTC_CG_API SpectrumUtils
+class HD_RUZINO_API SpectrumUtils
 {
 public:
     static const SampledSpectrum<float3> sCIE_XYZ_1931_1nm;
@@ -187,4 +187,4 @@ public:
         return RGB * (1.0f / Y_D65);
     }
 };
-} // namespace USTC_CG
+} // namespace Ruzino

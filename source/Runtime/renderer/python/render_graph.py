@@ -59,7 +59,7 @@ except ImportError as e:
 
 # Import required modules
 try:
-    import hd_USTC_CG_py as renderer
+    import hd_RUZINO_py as renderer
     HAS_RENDERER = True
 except ImportError as e:
     HAS_RENDERER = False
@@ -82,7 +82,7 @@ class RenderGraph(RuzinoGraph):
         if not HAS_RENDERER:
             raise RuntimeError(
                 "Renderer modules not available. "
-                "Make sure hd_USTC_CG_py is built."
+                "Make sure hd_RUZINO_py is built."
             )
         
         super().__init__(name)

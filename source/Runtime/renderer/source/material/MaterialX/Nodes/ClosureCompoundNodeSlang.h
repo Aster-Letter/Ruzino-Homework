@@ -12,7 +12,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Extending the CompoundNode with requirements for closures.
-class HD_USTC_CG_API ClosureCompoundNodeSlang : public CompoundNode {
+class HD_RUZINO_API ClosureCompoundNodeSlang : public CompoundNode {
    public:
     static ShaderNodeImplPtr create();
 

@@ -10,7 +10,7 @@
 #include "nodes/system/node_system_dl.hpp"
 #include "nodes/core/node_exec_eager.hpp"
 #include "nodes/core/api.hpp"
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 #include "RHI/rhi.hpp"
 #include "pxr/base/vt/array.h"
 #include "renderTLAS.h"
@@ -34,13 +34,13 @@
 #include <windows.h>
 #endif
 
-#ifdef USTC_CG_WITH_CUDA
+#ifdef RUZINO_WITH_CUDA
 #include "RHI/internal/cuda_extension.hpp"
 #include <cuda_runtime.h>
 #endif
 
 namespace nb = nanobind;
-using namespace USTC_CG;
+using namespace Ruzino;
 
 // OpenGL context initialization (Windows)
 static void CreateGLContext()
@@ -90,7 +90,7 @@ public:
         params.allowAsynchronousSceneProcessing = false;
         
         engine_ = std::make_unique<pxr::UsdImagingGLEngine>(params);
-        engine_->SetRendererPlugin(pxr::TfToken("Hd_USTC_CG_RendererPlugin"));
+        engine_->SetRendererPlugin(pxr::TfToken("Hd_RUZINO_RendererPlugin"));
         engine_->SetEnablePresentation(false);
         engine_->SetRenderBufferSize(pxr::GfVec2i(width, height));
         engine_->SetRenderViewport(pxr::GfVec4d(0, 0, width, height));
@@ -210,7 +210,7 @@ public:
         return result;
     }
 
-#ifdef USTC_CG_WITH_CUDA
+#ifdef RUZINO_WITH_CUDA
     // Get output texture as CUDA buffer (zero-copy to GPU)
     // name: optional texture name (uses default if empty)
     cuda::CUDALinearBufferHandle get_output_cuda_buffer(const std::string& name = "") {
@@ -274,7 +274,7 @@ private:
     int height_;
 };
 
-NB_MODULE(hd_USTC_CG_py, m)
+NB_MODULE(hd_RUZINO_py, m)
 {
     m.doc() = "Ruzino Renderer Python bindings - Render graph support with USD/Hydra";
 
@@ -297,7 +297,7 @@ NB_MODULE(hd_USTC_CG_py, m)
              nb::arg("name") = "",
              "Get the rendered texture as a float array (RGBA, row-major). "
              "Optional name parameter to get specific named texture from present nodes.")
-#ifdef USTC_CG_WITH_CUDA
+#ifdef RUZINO_WITH_CUDA
         .def("get_output_cuda_buffer", &HydraRenderer::get_output_cuda_buffer,
              nb::arg("name") = "",
              "Get the rendered texture as CUDA buffer (GPU memory, zero-copy). "
@@ -321,14 +321,14 @@ NB_MODULE(hd_USTC_CG_py, m)
     // This is a minimal version without USD integration, suitable for testing
     m.def("create_render_global_payload", []() -> entt::meta_any {
         // Create empty arrays for cameras, lights, and materials (use static to keep them alive)
-        static pxr::VtArray<Hd_USTC_CG_Camera*> cameras;
-        static pxr::VtArray<Hd_USTC_CG_Light*> lights;
-        static pxr::TfHashMap<pxr::SdfPath, Hd_USTC_CG_Material*, pxr::TfHash> materials;
-        static std::unique_ptr<Hd_USTC_CG_RenderInstanceCollection> instance_collection;
+        static pxr::VtArray<Hd_RUZINO_Camera*> cameras;
+        static pxr::VtArray<Hd_RUZINO_Light*> lights;
+        static pxr::TfHashMap<pxr::SdfPath, Hd_RUZINO_Material*, pxr::TfHash> materials;
+        static std::unique_ptr<Hd_RUZINO_RenderInstanceCollection> instance_collection;
         
         // Initialize on first call
         if (!instance_collection) {
-            instance_collection = std::make_unique<Hd_USTC_CG_RenderInstanceCollection>();
+            instance_collection = std::make_unique<Hd_RUZINO_RenderInstanceCollection>();
         }
         
         // Get the NVRHI device
@@ -340,19 +340,19 @@ NB_MODULE(hd_USTC_CG_py, m)
         payload.lens_system = nullptr;  // Not needed for basic rendering
         
         // Register type and wrap in meta_any
-        USTC_CG::register_cpp_type<RenderGlobalPayload>();
-        auto& ctx = USTC_CG::get_entt_ctx();
+        Ruzino::register_cpp_type<RenderGlobalPayload>();
+        auto& ctx = Ruzino::get_entt_ctx();
         return entt::meta_any{ctx, payload};
     }, "Create a basic RenderGlobalPayload wrapped in meta_any for standalone rendering");
 
     // Helper to wrap RenderGlobalPayload in meta_any for node system (kept for compatibility)
     m.def("create_meta_any_from_render_payload", [](const RenderGlobalPayload& payload) -> entt::meta_any {
         // Ensure type is registered with the correct context
-        USTC_CG::register_cpp_type<RenderGlobalPayload>();
+        Ruzino::register_cpp_type<RenderGlobalPayload>();
         
         // Create meta_any with the RenderGlobalPayload using the same context
         // CRITICAL: Must use the same entt context as the node system!
-        auto& ctx = USTC_CG::get_entt_ctx();
+        auto& ctx = Ruzino::get_entt_ctx();
         auto type = entt::resolve<RenderGlobalPayload>(ctx);
         
         if (!type) {
@@ -365,7 +365,7 @@ NB_MODULE(hd_USTC_CG_py, m)
     }, nb::arg("payload"), 
     "Wrap RenderGlobalPayload in meta_any for node system use");
 
-#ifdef USTC_CG_WITH_CUDA
+#ifdef RUZINO_WITH_CUDA
     // CUDA buffer binding - expose as capsule for nanobind dlpack support
     nb::class_<cuda::ICUDALinearBuffer, nvrhi::IResource>(m, "CUDALinearBuffer")
         .def("get_device_ptr", [](cuda::ICUDALinearBuffer& buf) {

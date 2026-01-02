@@ -7,8 +7,8 @@
 #include "GCore/algorithms/delauney.h"
 #include "nodes/core/def/node_def.hpp"
 
-using namespace USTC_CG::fem_bem;
-using namespace USTC_CG;
+using namespace Ruzino::fem_bem;
+using namespace Ruzino;
 
 NODE_DEF_OPEN_SCOPE
 NODE_DECLARATION_FUNCTION(fem_solver)

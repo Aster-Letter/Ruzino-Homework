@@ -1,7 +1,7 @@
 #pragma once
 
-#define USTC_CG_NAMESPACE_OPEN_SCOPE  namespace USTC_CG {
-#define USTC_CG_NAMESPACE_CLOSE_SCOPE }
+#define RUZINO_NAMESPACE_OPEN_SCOPE  namespace Ruzino {
+#define RUZINO_NAMESPACE_CLOSE_SCOPE }
 
 #if defined(_MSC_VER)
 #define POLYSCOPE_WIDGET_EXPORT   __declspec(dllexport)

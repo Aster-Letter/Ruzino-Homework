@@ -7,7 +7,7 @@
 #include "polyscope_widget/api.h"
 #include "polyscope_widget/polyscope_info_viewer.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 PolyscopeInfoViewer::PolyscopeInfoViewer()
 {
@@ -34,4 +34,4 @@ bool PolyscopeInfoViewer::BuildUI()
     return true;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

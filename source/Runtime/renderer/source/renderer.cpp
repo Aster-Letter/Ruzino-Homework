@@ -9,16 +9,16 @@
 #include "renderBuffer.h"
 #include "renderParam.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_Renderer::Hd_USTC_CG_Renderer(Hd_USTC_CG_RenderParam* render_param)
+Hd_RUZINO_Renderer::Hd_RUZINO_Renderer(Hd_RUZINO_RenderParam* render_param)
     : _enableSceneColors(false),
       render_param(render_param)
 {
 }
 
-Hd_USTC_CG_Renderer::~Hd_USTC_CG_Renderer()
+Hd_RUZINO_Renderer::~Hd_RUZINO_Renderer()
 {
     auto executor = dynamic_cast<EagerNodeTreeExecutorRender*>(
         render_param->node_system->get_node_tree_executor());
@@ -50,7 +50,7 @@ static TextureHandle create_empty_texture(
     return texture;
 }
 
-void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
+void Hd_RUZINO_Renderer::Render(HdRenderThread* renderThread)
 {
     _completedSamples.store(0);
 
@@ -197,9 +197,9 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
             }
 
             // Update render buffer
-            auto rb = static_cast<Hd_USTC_CG_RenderBuffer*>(
+            auto rb = static_cast<Hd_RUZINO_RenderBuffer*>(
                 _aovBindings[i].renderBuffer);
-#ifdef USTC_CG_DIRECT_VK_DISPLAY
+#ifdef RUZINO_DIRECT_VK_DISPLAY
             // Already stored above
 #else
             rb->Present(texture);
@@ -221,7 +221,7 @@ void Hd_USTC_CG_Renderer::Render(HdRenderThread* renderThread)
     // executor->finalize(node_tree);
 }
 
-void Hd_USTC_CG_Renderer::Clear()
+void Hd_RUZINO_Renderer::Clear()
 {
     for (size_t i = 0; i < _aovBindings.size(); ++i) {
         if (_aovBindings[i].clearValue.IsEmpty()) {
@@ -229,12 +229,12 @@ void Hd_USTC_CG_Renderer::Clear()
         }
 
         auto rb =
-            static_cast<Hd_USTC_CG_RenderBuffer*>(_aovBindings[i].renderBuffer);
+            static_cast<Hd_RUZINO_RenderBuffer*>(_aovBindings[i].renderBuffer);
         rb->Clear();
     }
 }
 
-void Hd_USTC_CG_Renderer::SetAovBindings(
+void Hd_RUZINO_Renderer::SetAovBindings(
     const HdRenderPassAovBindingVector& aovBindings)
 {
     _aovBindings = aovBindings;
@@ -247,30 +247,30 @@ void Hd_USTC_CG_Renderer::SetAovBindings(
     _aovBindingsNeedValidation = true;
 }
 
-void Hd_USTC_CG_Renderer::MarkAovBuffersUnconverged()
+void Hd_RUZINO_Renderer::MarkAovBuffersUnconverged()
 {
     for (size_t i = 0; i < _aovBindings.size(); ++i) {
         auto rb =
-            static_cast<Hd_USTC_CG_RenderBuffer*>(_aovBindings[i].renderBuffer);
+            static_cast<Hd_RUZINO_RenderBuffer*>(_aovBindings[i].renderBuffer);
         rb->SetConverged(false);
     }
 }
 
-void Hd_USTC_CG_Renderer::renderTimeUpdateCamera(
+void Hd_RUZINO_Renderer::renderTimeUpdateCamera(
     const HdRenderPassStateSharedPtr& renderPassState)
 {
     camera_ =
-        static_cast<const Hd_USTC_CG_Camera*>(renderPassState->GetCamera());
+        static_cast<const Hd_RUZINO_Camera*>(renderPassState->GetCamera());
     camera_->update(renderPassState);
 }
 
-bool Hd_USTC_CG_Renderer::nodetree_modified()
+bool Hd_RUZINO_Renderer::nodetree_modified()
 {
     //    return render_param->node_tree->GetDirty();
     return false;
 }
 
-bool Hd_USTC_CG_Renderer::nodetree_modified(bool new_status)
+bool Hd_RUZINO_Renderer::nodetree_modified(bool new_status)
 {
     // auto old_status = render_param->node_tree->GetDirty();
     // render_param->node_tree->SetDirty(new_status);
@@ -279,4 +279,4 @@ bool Hd_USTC_CG_Renderer::nodetree_modified(bool new_status)
     return false;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

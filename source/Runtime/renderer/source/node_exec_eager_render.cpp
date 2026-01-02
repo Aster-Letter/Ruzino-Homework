@@ -2,11 +2,11 @@
 
 #include <set>
 
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 #include "nodes/core/node_exec.hpp"
 #include "nodes/core/node_exec_eager.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 bool EagerNodeTreeExecutorRender::execute_node(NodeTree* tree, Node* node)
 {
@@ -93,4 +93,4 @@ void EagerNodeTreeExecutorRender::reset_allocator()
     storage.clear();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

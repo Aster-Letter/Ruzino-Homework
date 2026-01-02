@@ -11,7 +11,7 @@
 #include "slang-com-ptr.h"
 #include "slang-cpp-prelude.h"
 #include "slang-cpp-types.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class ShaderReflectionInfo;
 struct Program;
 struct ProgramDesc;
@@ -179,9 +179,9 @@ struct Program : nvrhi::RefCounter<IProgram> {
     Slang::ComPtr<slang::IComponentType> linkedProgram;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 #define DESC_HANDLE_TRAIT(RESOURCE)        \
     template<>                             \
@@ -205,4 +205,4 @@ struct DescResouce {
     using Resource = void;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

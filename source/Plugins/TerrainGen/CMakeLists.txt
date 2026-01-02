@@ -1,4 +1,4 @@
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	TerrainGen
 	SHARED
 	SKIP_DIRS geometry_nodes

@@ -2,7 +2,7 @@
 
 #include "RHI/ResourceManager/resource_allocator.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 template<typename T>
 class RAII_resource_cleaner {
@@ -31,4 +31,4 @@ class RAII_resource_cleaner {
     RAII_resource_cleaner<decltype(resource)> resource##_cleaner( \
         resource_allocator);                                      \
     resource##_cleaner.set_data(resource)
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -10,21 +10,21 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/assetPath.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 using namespace pxr;
 // Forward declarations
 struct LightData;
 // Base light class
-class HD_USTC_CG_API Hd_USTC_CG_Light : public HdLight {
+class HD_RUZINO_API Hd_RUZINO_Light : public HdLight {
    public:
-    explicit Hd_USTC_CG_Light(const SdfPath& id, const TfToken& lightType)
+    explicit Hd_RUZINO_Light(const SdfPath& id, const TfToken& lightType)
         : HdLight(id),
           _lightType(lightType)
     {
     }
 
-    virtual ~Hd_USTC_CG_Light() = default;
+    virtual ~Hd_RUZINO_Light() = default;
 
     void Sync(
         HdSceneDelegate* sceneDelegate,
@@ -57,10 +57,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Light : public HdLight {
 };
 
 // Simple light (directional, point light)
-class HD_USTC_CG_API Hd_USTC_CG_Simple_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Simple_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Simple_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Simple_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -71,10 +71,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Simple_Light : public Hd_USTC_CG_Light {
 };
 
 // Distant light (sun light)
-class HD_USTC_CG_API Hd_USTC_CG_Distant_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Distant_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Distant_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Distant_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -99,10 +99,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Distant_Light : public Hd_USTC_CG_Light {
 };
 
 // Sphere light
-class HD_USTC_CG_API Hd_USTC_CG_Sphere_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Sphere_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Sphere_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Sphere_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -122,10 +122,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Sphere_Light : public Hd_USTC_CG_Light {
 };
 
 // Rectangle light
-class HD_USTC_CG_API Hd_USTC_CG_Rect_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Rect_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Rect_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Rect_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -150,10 +150,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Rect_Light : public Hd_USTC_CG_Light {
 };
 
 // Disk light
-class HD_USTC_CG_API Hd_USTC_CG_Disk_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Disk_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Disk_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Disk_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -173,10 +173,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Disk_Light : public Hd_USTC_CG_Light {
 };
 
 // Cylinder light
-class HD_USTC_CG_API Hd_USTC_CG_Cylinder_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Cylinder_Light : public Hd_RUZINO_Light {
    public:
-    Hd_USTC_CG_Cylinder_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Cylinder_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -200,9 +200,9 @@ class HD_USTC_CG_API Hd_USTC_CG_Cylinder_Light : public Hd_USTC_CG_Light {
     float _length = 1.0f;
 };
 
-class HD_USTC_CG_API Hd_USTC_CG_Dome_Light : public Hd_USTC_CG_Light {
+class HD_RUZINO_API Hd_RUZINO_Dome_Light : public Hd_RUZINO_Light {
    public:
-    struct HD_USTC_CG_API InputDescriptor {
+    struct HD_RUZINO_API InputDescriptor {
         HioImageSharedPtr image = nullptr;
 
         TfToken wrapS;
@@ -219,8 +219,8 @@ class HD_USTC_CG_API Hd_USTC_CG_Dome_Light : public Hd_USTC_CG_Light {
         DescriptorHandle descriptor;
     };
 
-    Hd_USTC_CG_Dome_Light(const SdfPath& id, const TfToken& lightType)
-        : Hd_USTC_CG_Light(id, lightType)
+    Hd_RUZINO_Dome_Light(const SdfPath& id, const TfToken& lightType)
+        : Hd_RUZINO_Light(id, lightType)
     {
     }
 
@@ -254,4 +254,4 @@ class HD_USTC_CG_API Hd_USTC_CG_Dome_Light : public Hd_USTC_CG_Light {
         false;  // True only if shader_path points to a valid file
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

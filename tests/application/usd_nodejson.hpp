@@ -8,8 +8,8 @@
 #include "nodes/ui/imgui.hpp"
 #include "stage/stage.hpp"
 
-struct UsdBasedNodeStorage : public USTC_CG::NodeSystemStorage {
-    UsdBasedNodeStorage(USTC_CG::Stage* stage, const pxr::SdfPath& path)
+struct UsdBasedNodeStorage : public Ruzino::NodeSystemStorage {
+    UsdBasedNodeStorage(Ruzino::Stage* stage, const pxr::SdfPath& path)
         : stage_(stage),
           path_(path)
     {
@@ -17,16 +17,16 @@ struct UsdBasedNodeStorage : public USTC_CG::NodeSystemStorage {
     void save(const std::string& data) override;
     std::string load() override;
     pxr::SdfPath path_;
-    USTC_CG::Stage* stage_;
+    Ruzino::Stage* stage_;
 };
 
-struct UsdBasedNodeWidgetSettings : public USTC_CG::NodeWidgetSettings {
+struct UsdBasedNodeWidgetSettings : public Ruzino::NodeWidgetSettings {
     pxr::SdfPath json_path;
-    USTC_CG::Stage* stage;
+    Ruzino::Stage* stage;
 
     std::string WidgetName() const override;
 
-    std::unique_ptr<USTC_CG::NodeSystemStorage> create_storage() const override;
+    std::unique_ptr<Ruzino::NodeSystemStorage> create_storage() const override;
 };
 
 inline void UsdBasedNodeStorage::save(const std::string& data)
@@ -48,7 +48,7 @@ inline std::string UsdBasedNodeWidgetSettings::WidgetName() const
     return json_path.GetString();
 }
 
-inline std::unique_ptr<USTC_CG::NodeSystemStorage>
+inline std::unique_ptr<Ruzino::NodeSystemStorage>
 UsdBasedNodeWidgetSettings::create_storage() const
 {
     return std::make_unique<UsdBasedNodeStorage>(stage, json_path);

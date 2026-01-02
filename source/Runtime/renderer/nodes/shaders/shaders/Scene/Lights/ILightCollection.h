@@ -35,7 +35,7 @@
 #include <vector>
 #include <functional>
 
-namespace USTC_CG
+namespace Ruzino
 {
     class Device;
     class Scene;
@@ -50,7 +50,7 @@ namespace USTC_CG
         The LightCollection can be used standalone, but more commonly it will be wrapped
         by an emissive light sampler.
     */
-    class HD_USTC_CG_API ILightCollection : public Object
+    class HD_RUZINO_API ILightCollection : public Object
     {
     public:
         enum class UpdateFlags : uint32_t

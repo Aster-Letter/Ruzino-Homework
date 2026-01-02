@@ -3,17 +3,17 @@
     {
       "Info": {
         "Types": {
-          "Hd_USTC_CG_RendererPlugin": {
+          "Hd_RUZINO_RendererPlugin": {
             "bases": [
               "HdRendererPlugin"
             ],
-            "displayName": "USTC_CG Renderer",
+            "displayName": "RUZINO Renderer",
             "priority": 1
           }
         }
       },
-      "LibraryPath": "../../hd_USTC_CG.dll",
-      "Name": "USTC_CG Renderer",
+      "LibraryPath": "../../hd_RUZINO.dll",
+      "Name": "RUZINO Renderer",
       "ResourcePath": "resources",
       "Root": "..",
       "Type": "library"

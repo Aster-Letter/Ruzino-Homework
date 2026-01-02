@@ -5,7 +5,7 @@
 #include "RHI/internal/nvrhi_patch.hpp"
 #include "nvrhi/utils.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 GPUContext::~GPUContext()
 {
     resource_allocator_.destroy(commandList_);
@@ -91,4 +91,4 @@ void GPUContext::clear_texture(
     commandList_->clearTextureFloat(texture, subresources, color);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

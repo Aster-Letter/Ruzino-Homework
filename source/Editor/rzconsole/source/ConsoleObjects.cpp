@@ -33,7 +33,7 @@
 #include <sstream>
 #include <stdexcept>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace console {
 
 using int2 = glm::ivec2;
@@ -275,4 +275,4 @@ void ResetAll()
 }
 
 }  // end namespace console
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

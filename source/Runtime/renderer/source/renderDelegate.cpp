@@ -40,7 +40,7 @@
 #include "geometries/points.h"
 #include "geometries/volume.h"
 #include "gpu_compute.h"
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 #include "instancer.h"
 #include "light.h"
 #include "material/material.h"
@@ -58,19 +58,19 @@
     if (FAILED(hr))   \
         assert(false);
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 TF_DEFINE_PUBLIC_TOKENS(
-    Hd_USTC_CG_RenderSettingsTokens,
-    Hd_USTC_CG_RENDER_SETTINGS_TOKEN);
+    Hd_RUZINO_RenderSettingsTokens,
+    Hd_RUZINO_RENDER_SETTINGS_TOKEN);
 
-const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_RPRIM_TYPES = {
+const TfTokenVector Hd_RUZINO_RenderDelegate::SUPPORTED_RPRIM_TYPES = {
     HdPrimTypeTokens->mesh,
     HdPrimTypeTokens->volume,
     HdPrimTypeTokens->points,
 };
 
-const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_SPRIM_TYPES = {
+const TfTokenVector Hd_RUZINO_RenderDelegate::SUPPORTED_SPRIM_TYPES = {
     HdPrimTypeTokens->camera,         HdPrimTypeTokens->simpleLight,
     HdPrimTypeTokens->sphereLight,    HdPrimTypeTokens->domeLight,
     HdPrimTypeTokens->material,       HdPrimTypeTokens->drawTarget,
@@ -79,17 +79,17 @@ const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_SPRIM_TYPES = {
     HdPrimTypeTokens->rectLight,      HdPrimTypeTokens->imageShader
 };
 
-const TfTokenVector Hd_USTC_CG_RenderDelegate::SUPPORTED_BPRIM_TYPES = {
+const TfTokenVector Hd_RUZINO_RenderDelegate::SUPPORTED_BPRIM_TYPES = {
     HdPrimTypeTokens->renderBuffer,
     UsdVolImagingTokens->openvdbAsset
 };
 
-Hd_USTC_CG_RenderDelegate::Hd_USTC_CG_RenderDelegate() : HdRenderDelegate()
+Hd_RUZINO_RenderDelegate::Hd_RUZINO_RenderDelegate() : HdRenderDelegate()
 {
     _Initialize();
 }
 
-Hd_USTC_CG_RenderDelegate::Hd_USTC_CG_RenderDelegate(
+Hd_RUZINO_RenderDelegate::Hd_RUZINO_RenderDelegate(
     const HdRenderSettingsMap& settingsMap)
     : HdRenderDelegate(settingsMap)
 {
@@ -97,47 +97,47 @@ Hd_USTC_CG_RenderDelegate::Hd_USTC_CG_RenderDelegate(
 }
 
 static void _RenderCallback(
-    Hd_USTC_CG_Renderer* renderer,
+    Hd_RUZINO_Renderer* renderer,
     HdRenderThread* renderThread)
 {
     renderer->Render(renderThread);
 }
 
-std::mutex Hd_USTC_CG_RenderDelegate::_mutexResourceRegistry;
-std::atomic_int Hd_USTC_CG_RenderDelegate::_counterResourceRegistry;
-HdResourceRegistrySharedPtr Hd_USTC_CG_RenderDelegate::_resourceRegistry;
+std::mutex Hd_RUZINO_RenderDelegate::_mutexResourceRegistry;
+std::atomic_int Hd_RUZINO_RenderDelegate::_counterResourceRegistry;
+HdResourceRegistrySharedPtr Hd_RUZINO_RenderDelegate::_resourceRegistry;
 
-void Hd_USTC_CG_RenderDelegate::_Initialize()
+void Hd_RUZINO_RenderDelegate::_Initialize()
 {
     // Initialize the settings and settings descriptors.
     _settingDescriptors.resize(5);
     _settingDescriptors[0] = {
         "Enable Scene Colors",
-        Hd_USTC_CG_RenderSettingsTokens->enableSceneColors,
-        VtValue(Hd_USTC_CG_Config::GetInstance().useFaceColors)
+        Hd_RUZINO_RenderSettingsTokens->enableSceneColors,
+        VtValue(Hd_RUZINO_Config::GetInstance().useFaceColors)
     };
     _settingDescriptors[1] = {
         "Enable Ambient Occlusion",
-        Hd_USTC_CG_RenderSettingsTokens->enableAmbientOcclusion,
-        VtValue(Hd_USTC_CG_Config::GetInstance().ambientOcclusionSamples > 0)
+        Hd_RUZINO_RenderSettingsTokens->enableAmbientOcclusion,
+        VtValue(Hd_RUZINO_Config::GetInstance().ambientOcclusionSamples > 0)
     };
     _settingDescriptors[2] = {
         "Ambient Occlusion Samples",
-        Hd_USTC_CG_RenderSettingsTokens->ambientOcclusionSamples,
+        Hd_RUZINO_RenderSettingsTokens->ambientOcclusionSamples,
         VtValue(
             static_cast<int>(
-                Hd_USTC_CG_Config::GetInstance().ambientOcclusionSamples))
+                Hd_RUZINO_Config::GetInstance().ambientOcclusionSamples))
     };
     _settingDescriptors[3] = {
         "Samples To Convergence",
         HdRenderSettingsTokens->convergedSamplesPerPixel,
         VtValue(
             static_cast<int>(
-                Hd_USTC_CG_Config::GetInstance().samplesToConvergence))
+                Hd_RUZINO_Config::GetInstance().samplesToConvergence))
     };
 
     _settingDescriptors[4] = { "Render Mode",
-                               Hd_USTC_CG_RenderSettingsTokens->renderMode,
+                               Hd_RUZINO_RenderSettingsTokens->renderMode,
                                VtValue(0) };
     _PopulateDefaultSettings(_settingDescriptors);
 
@@ -209,10 +209,10 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
 
     node_system->set_global_params(global_payload);
 
-    _renderParam = std::make_shared<Hd_USTC_CG_RenderParam>(
+    _renderParam = std::make_shared<Hd_RUZINO_RenderParam>(
         &_renderThread, &_sceneVersion, node_system.get(), &materials);
 
-    _renderer = std::make_shared<Hd_USTC_CG_Renderer>(_renderParam.get());
+    _renderer = std::make_shared<Hd_RUZINO_Renderer>(_renderParam.get());
 
     // Initialize GPU Scene Assembler resource allocator
     GPUSceneAssember::initialize_instance();
@@ -220,7 +220,7 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
     spdlog::info("GPU Scene Assembler initialized");
 
     // Set the background render thread's rendering entrypoint to
-    // Hd_USTC_CG_Renderer::Render.
+    // Hd_RUZINO_Renderer::Render.
     _renderThread.SetRenderCallback(
         std::bind(_RenderCallback, _renderer.get(), &_renderThread));
     _renderThread.StartThread();
@@ -234,7 +234,7 @@ void Hd_USTC_CG_RenderDelegate::_Initialize()
     _resourceRegistry = std::make_shared<HdResourceRegistry>();
 }
 
-HdAovDescriptor Hd_USTC_CG_RenderDelegate::GetDefaultAovDescriptor(
+HdAovDescriptor Hd_RUZINO_RenderDelegate::GetDefaultAovDescriptor(
     const TfToken& name) const
 {
     if (name == HdAovTokens->color) {
@@ -261,7 +261,7 @@ HdAovDescriptor Hd_USTC_CG_RenderDelegate::GetDefaultAovDescriptor(
     return HdAovDescriptor();
 }
 
-Hd_USTC_CG_RenderDelegate::~Hd_USTC_CG_RenderDelegate()
+Hd_RUZINO_RenderDelegate::~Hd_RUZINO_RenderDelegate()
 {
     // Clean up GPU Scene Assembler before destroying other resources
     GPUSceneAssember::destroy_instance();
@@ -282,57 +282,57 @@ Hd_USTC_CG_RenderDelegate::~Hd_USTC_CG_RenderDelegate()
     std::cout << "Destroying RenderDelegate" << std::endl;
 }
 
-const TfTokenVector& Hd_USTC_CG_RenderDelegate::GetSupportedRprimTypes() const
+const TfTokenVector& Hd_RUZINO_RenderDelegate::GetSupportedRprimTypes() const
 {
     return SUPPORTED_RPRIM_TYPES;
 }
 
-const TfTokenVector& Hd_USTC_CG_RenderDelegate::GetSupportedSprimTypes() const
+const TfTokenVector& Hd_RUZINO_RenderDelegate::GetSupportedSprimTypes() const
 {
     return SUPPORTED_SPRIM_TYPES;
 }
 
-const TfTokenVector& Hd_USTC_CG_RenderDelegate::GetSupportedBprimTypes() const
+const TfTokenVector& Hd_RUZINO_RenderDelegate::GetSupportedBprimTypes() const
 {
     return SUPPORTED_BPRIM_TYPES;
 }
 
-HdResourceRegistrySharedPtr Hd_USTC_CG_RenderDelegate::GetResourceRegistry()
+HdResourceRegistrySharedPtr Hd_RUZINO_RenderDelegate::GetResourceRegistry()
     const
 {
     return _resourceRegistry;
 }
 
-void Hd_USTC_CG_RenderDelegate::CommitResources(HdChangeTracker* tracker)
+void Hd_RUZINO_RenderDelegate::CommitResources(HdChangeTracker* tracker)
 {
 }
 
-HdRenderPassSharedPtr Hd_USTC_CG_RenderDelegate::CreateRenderPass(
+HdRenderPassSharedPtr Hd_RUZINO_RenderDelegate::CreateRenderPass(
     HdRenderIndex* index,
     const HdRprimCollection& collection)
 {
-    return std::make_shared<Hd_USTC_CG_RenderPass>(
+    return std::make_shared<Hd_RUZINO_RenderPass>(
         index, collection, &_renderThread, _renderer.get(), &_sceneVersion);
 }
 
-HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
+HdRprim* Hd_RUZINO_RenderDelegate::CreateRprim(
     const TfToken& typeId,
     const SdfPath& rprimId)
 {
     if (typeId == HdPrimTypeTokens->mesh) {
-        auto mesh = new Hd_USTC_CG_Mesh(rprimId);
+        auto mesh = new Hd_RUZINO_Mesh(rprimId);
         // spdlog::info(("Create Rprim id=" + rprimId.GetString()).c_str());
 
         meshes.push_back(mesh);
         return mesh;
     }
     else if (typeId == HdPrimTypeTokens->volume) {
-        auto volume = new Hd_USTC_CG_Volume(rprimId);
+        auto volume = new Hd_RUZINO_Volume(rprimId);
         spdlog::info("Created volume: {}", rprimId.GetText());
         return volume;
     }
     else if (typeId == HdPrimTypeTokens->points) {
-        auto points = new Hd_USTC_CG_Points(rprimId);
+        auto points = new Hd_RUZINO_Points(rprimId);
         spdlog::info("Created points: {}", rprimId.GetText());
         return points;
     }
@@ -341,7 +341,7 @@ HdRprim* Hd_USTC_CG_RenderDelegate::CreateRprim(
     return nullptr;
 }
 
-void Hd_USTC_CG_RenderDelegate::DestroyRprim(HdRprim* rPrim)
+void Hd_RUZINO_RenderDelegate::DestroyRprim(HdRprim* rPrim)
 {
     // spdlog::info(("Destroy Rprim id=" + rPrim->GetId().GetString()).c_str());
     meshes.erase(
@@ -349,12 +349,12 @@ void Hd_USTC_CG_RenderDelegate::DestroyRprim(HdRprim* rPrim)
     delete rPrim;
 }
 
-HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
+HdSprim* Hd_RUZINO_RenderDelegate::CreateSprim(
     const TfToken& typeId,
     const SdfPath& sprimId)
 {
     if (typeId == HdPrimTypeTokens->camera) {
-        auto camera = new Hd_USTC_CG_Camera(sprimId);
+        auto camera = new Hd_RUZINO_Camera(sprimId);
         cameras.push_back(camera);
         return camera;
     }
@@ -367,7 +367,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
         // so we'll create MaterialX by default and let Sync handle shader
         // detection For now, we'll just create MaterialX which can fall back to
         // shader if needed
-        auto material = new Hd_USTC_CG_MaterialX(sprimId);
+        auto material = new Hd_RUZINO_MaterialX(sprimId);
         spdlog::info("=== Created material: {} ===", sprimId.GetText());
         materials[sprimId] = material;
 
@@ -378,37 +378,37 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
         return material;
     }
     else if (typeId == HdPrimTypeTokens->simpleLight) {
-        auto light = new Hd_USTC_CG_Simple_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Simple_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->distantLight) {
-        auto light = new Hd_USTC_CG_Distant_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Distant_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->sphereLight) {
-        auto light = new Hd_USTC_CG_Sphere_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Sphere_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->rectLight) {
-        auto light = new Hd_USTC_CG_Rect_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Rect_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->diskLight) {
-        auto light = new Hd_USTC_CG_Disk_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Disk_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->cylinderLight) {
-        auto light = new Hd_USTC_CG_Cylinder_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Cylinder_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
     else if (typeId == HdPrimTypeTokens->domeLight) {
-        auto light = new Hd_USTC_CG_Dome_Light(sprimId, typeId);
+        auto light = new Hd_RUZINO_Dome_Light(sprimId, typeId);
         lights.push_back(light);
         return light;
     }
@@ -425,12 +425,12 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateSprim(
     return nullptr;
 }
 
-HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
+HdSprim* Hd_RUZINO_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
 {
     // For fallback sprims, create objects with an empty scene path.
     // They'll use default values and won't be updated by a scene delegate.
     if (typeId == HdPrimTypeTokens->camera) {
-        auto camera = new Hd_USTC_CG_Camera(SdfPath::EmptyPath());
+        auto camera = new Hd_RUZINO_Camera(SdfPath::EmptyPath());
         cameras.push_back(camera);
         return camera;
     }
@@ -438,7 +438,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
         return new HdExtComputation(SdfPath::EmptyPath());
     }
     else if (typeId == HdPrimTypeTokens->material) {
-        auto material = new Hd_USTC_CG_MaterialX(SdfPath::EmptyPath());
+        auto material = new Hd_RUZINO_MaterialX(SdfPath::EmptyPath());
         materials[SdfPath::EmptyPath()] = material;
 
         assert(materials[SdfPath::EmptyPath()] != nullptr);
@@ -447,28 +447,28 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
     }
     else if (typeId == HdPrimTypeTokens->simpleLight) {
         // Don't add fallback lights to the lights list
-        return new Hd_USTC_CG_Simple_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Simple_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->distantLight) {
-        return new Hd_USTC_CG_Distant_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Distant_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->sphereLight) {
-        return new Hd_USTC_CG_Sphere_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Sphere_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->rectLight) {
-        return new Hd_USTC_CG_Rect_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Rect_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->diskLight) {
-        return new Hd_USTC_CG_Disk_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Disk_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->cylinderLight) {
         auto light =
-            new Hd_USTC_CG_Cylinder_Light(SdfPath::EmptyPath(), typeId);
+            new Hd_RUZINO_Cylinder_Light(SdfPath::EmptyPath(), typeId);
         lights.push_back(light);
-        return new Hd_USTC_CG_Cylinder_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Cylinder_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (typeId == HdPrimTypeTokens->domeLight) {
-        return new Hd_USTC_CG_Dome_Light(SdfPath::EmptyPath(), typeId);
+        return new Hd_RUZINO_Dome_Light(SdfPath::EmptyPath(), typeId);
     }
     else if (
         typeId == TfToken("drawTarget") || typeId == TfToken("imageShader")) {
@@ -482,7 +482,7 @@ HdSprim* Hd_USTC_CG_RenderDelegate::CreateFallbackSprim(const TfToken& typeId)
     return nullptr;
 }
 
-void Hd_USTC_CG_RenderDelegate::DestroySprim(HdSprim* sPrim)
+void Hd_RUZINO_RenderDelegate::DestroySprim(HdSprim* sPrim)
 {
     // spdlog::info((sPrim->GetId().GetAsString() + " destroyed").c_str());
     lights.erase(
@@ -490,14 +490,14 @@ void Hd_USTC_CG_RenderDelegate::DestroySprim(HdSprim* sPrim)
     cameras.erase(
         std::remove(cameras.begin(), cameras.end(), sPrim), cameras.end());
 
-    auto material = dynamic_cast<Hd_USTC_CG_Material*>(sPrim);
+    auto material = dynamic_cast<Hd_RUZINO_Material*>(sPrim);
     if (material) {
         materials.erase(material->GetId());
     }
     delete sPrim;
 }
 
-HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
+HdBprim* Hd_RUZINO_RenderDelegate::CreateBprim(
     const TfToken& typeId,
     const SdfPath& bprimId)
 {
@@ -506,36 +506,36 @@ HdBprim* Hd_USTC_CG_RenderDelegate::CreateBprim(
         //            ",prim id = " + bprimId.GetString())
         //               .c_str());
 
-        return new Hd_USTC_CG_RenderBuffer(bprimId);
+        return new Hd_RUZINO_RenderBuffer(bprimId);
     }
     if (typeId == UsdVolImagingTokens->openvdbAsset) {
         // spdlog::info(("Create bprim: type id=" + typeId.GetString() +
         //            ",prim id = " + bprimId.GetString())
         //               .c_str());
-        return new Hd_USTC_CG_Field(bprimId);
+        return new Hd_RUZINO_Field(bprimId);
     }
 
     TF_CODING_ERROR("Unknown Bprim Type %s", typeId.GetText());
     return nullptr;
 }
 
-HdBprim* Hd_USTC_CG_RenderDelegate::CreateFallbackBprim(const TfToken& typeId)
+HdBprim* Hd_RUZINO_RenderDelegate::CreateFallbackBprim(const TfToken& typeId)
 {
     if (typeId == HdPrimTypeTokens->renderBuffer) {
         spdlog::info(
             ("Create fallback bprim: type id=" + typeId.GetString()).c_str());
-        return new Hd_USTC_CG_RenderBuffer(SdfPath::EmptyPath());
+        return new Hd_RUZINO_RenderBuffer(SdfPath::EmptyPath());
     }
     if (typeId == UsdVolImagingTokens->openvdbAsset) {
         spdlog::info(
             ("Create fallback bprim: type id=" + typeId.GetString()).c_str());
-        return new Hd_USTC_CG_Field(SdfPath::EmptyPath());
+        return new Hd_RUZINO_Field(SdfPath::EmptyPath());
     }
     TF_CODING_ERROR("Unknown Bprim Type %s", typeId.GetText());
     return nullptr;
 }
 
-void Hd_USTC_CG_RenderDelegate::DestroyBprim(HdBprim* bPrim)
+void Hd_RUZINO_RenderDelegate::DestroyBprim(HdBprim* bPrim)
 {
     std::string sentence = "Destroy Bprim";
     auto bprim_name = bPrim->GetId().GetString();
@@ -546,14 +546,14 @@ void Hd_USTC_CG_RenderDelegate::DestroyBprim(HdBprim* bPrim)
     delete bPrim;
 }
 
-HdInstancer* Hd_USTC_CG_RenderDelegate::CreateInstancer(
+HdInstancer* Hd_RUZINO_RenderDelegate::CreateInstancer(
     HdSceneDelegate* delegate,
     const SdfPath& id)
 {
-    return new Hd_USTC_CG_Instancer(delegate, id);
+    return new Hd_RUZINO_Instancer(delegate, id);
 }
 
-void Hd_USTC_CG_RenderDelegate::DestroyInstancer(HdInstancer* instancer)
+void Hd_RUZINO_RenderDelegate::DestroyInstancer(HdInstancer* instancer)
 {
     delete instancer;
     // TF_CODING_ERROR("Destroy instancer not supported");
@@ -562,18 +562,18 @@ void Hd_USTC_CG_RenderDelegate::DestroyInstancer(HdInstancer* instancer)
     //     ("Destroy Instancer id=" + instancer->GetId().GetString()).c_str());
 }
 
-HdRenderParam* Hd_USTC_CG_RenderDelegate::GetRenderParam() const
+HdRenderParam* Hd_RUZINO_RenderDelegate::GetRenderParam() const
 {
     return _renderParam.get();
 }
 
-VtValue Hd_USTC_CG_RenderDelegate::GetRenderSetting(TfToken const& key) const
+VtValue Hd_RUZINO_RenderDelegate::GetRenderSetting(TfToken const& key) const
 {
     if (key == TfToken("RenderNodeSystem")) {
         return VtValue(reinterpret_cast<const void*>(&node_system));
     }
 
-#ifdef USTC_CG_DIRECT_VK_DISPLAY
+#ifdef RUZINO_DIRECT_VK_DISPLAY
     if (key == TfToken("VulkanColorAov")) {
         // Legacy: return default texture for backward compatibility
         if (!_renderParam->default_texture_name.empty()) {
@@ -608,7 +608,7 @@ VtValue Hd_USTC_CG_RenderDelegate::GetRenderSetting(TfToken const& key) const
     return HdRenderDelegate::GetRenderSetting(key);
 }
 
-void Hd_USTC_CG_RenderDelegate::SetRenderSetting(
+void Hd_RUZINO_RenderDelegate::SetRenderSetting(
     const TfToken& key,
     const VtValue& value)
 
@@ -622,10 +622,10 @@ void Hd_USTC_CG_RenderDelegate::SetRenderSetting(
     }
 }
 
-bool Hd_USTC_CG_RenderDelegate::Stop(bool blocking)
+bool Hd_RUZINO_RenderDelegate::Stop(bool blocking)
 {
     _renderThread.StopRender();
     return HdRenderDelegate::Stop(blocking);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

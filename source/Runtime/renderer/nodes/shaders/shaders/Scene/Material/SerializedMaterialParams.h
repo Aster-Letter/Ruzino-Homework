@@ -31,7 +31,7 @@
 #include "utils/Math/Vector.h"
 #include <array>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 struct SerializedMaterialParams : public std::array<float, 20>
@@ -67,4 +67,4 @@ struct SerializedMaterialParams : public std::array<float, 20>
     }
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

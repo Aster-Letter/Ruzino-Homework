@@ -14,7 +14,7 @@
 #include "pxr/imaging/hd/vtBufferSource.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 HdSt_TriangleIndexBuilderComputation::HdSt_TriangleIndexBuilderComputation(
     HdSt_MeshTopology *topology,
@@ -135,4 +135,4 @@ bool HdSt_TriangulateFaceVaryingComputation::_CheckValid() const
     return (_source->IsValid());
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

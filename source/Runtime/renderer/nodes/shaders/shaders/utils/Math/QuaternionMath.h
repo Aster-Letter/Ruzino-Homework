@@ -40,7 +40,7 @@
 #include "MathConstants.slangh"
 #include "Core/Error.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -487,30 +487,30 @@ template<typename T>
 }
 
 } // namespace math
-} // namespace USTC_CG
+} // namespace Ruzino
 
 template<typename T>
-struct std::equal_to<::USTC_CG::math::quat<T>>
+struct std::equal_to<::Ruzino::math::quat<T>>
 {
-    constexpr bool operator()(const ::USTC_CG::math::quat<T>& lhs, const ::USTC_CG::math::quat<T>& rhs) const
+    constexpr bool operator()(const ::Ruzino::math::quat<T>& lhs, const ::Ruzino::math::quat<T>& rhs) const
     {
         return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z && lhs.w == rhs.w;
     }
 };
 
 template<typename T>
-struct std::not_equal_to<::USTC_CG::math::quat<T>>
+struct std::not_equal_to<::Ruzino::math::quat<T>>
 {
-    constexpr bool operator()(const ::USTC_CG::math::quat<T>& lhs, const ::USTC_CG::math::quat<T>& rhs) const
+    constexpr bool operator()(const ::Ruzino::math::quat<T>& lhs, const ::Ruzino::math::quat<T>& rhs) const
     {
         return lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z || lhs.w != rhs.w;
     }
 };
 
 template<typename T>
-struct std::hash<::USTC_CG::math::quat<T>>
+struct std::hash<::Ruzino::math::quat<T>>
 {
-    constexpr size_t operator()(const ::USTC_CG::math::quat<T>& v) const
+    constexpr size_t operator()(const ::Ruzino::math::quat<T>& v) const
     {
         size_t result = 0;
         for (size_t i = 0; i < 4; ++i)
@@ -521,10 +521,10 @@ struct std::hash<::USTC_CG::math::quat<T>>
 
 /// Quaternion string formatter.
 template<typename T>
-struct std::formatter<USTC_CG::math::quat<T>> : formatter<T>
+struct std::formatter<Ruzino::math::quat<T>> : formatter<T>
 {
     template<typename FormatContext>
-    auto format(const USTC_CG::math::quat<T>& v, FormatContext& ctx) const
+    auto format(const Ruzino::math::quat<T>& v, FormatContext& ctx) const
     {
         auto out = ctx.out();
         out = std::format_to(out, "{{{}, {}, {}, {}}}", v.x, v.y, v.z, v.w);

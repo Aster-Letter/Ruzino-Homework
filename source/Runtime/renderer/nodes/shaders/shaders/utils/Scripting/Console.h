@@ -34,11 +34,11 @@
 // Forward declaration.
 struct ImGuiInputTextCallbackData;
 
-namespace USTC_CG
+namespace Ruzino
 {
 class Gui;
 
-class HD_USTC_CG_API Console
+class HD_RUZINO_API Console
 {
 public:
     /**
@@ -74,4 +74,4 @@ private:
     int32_t mHistoryIndex = -1;
     bool mScrollToBottom = true;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

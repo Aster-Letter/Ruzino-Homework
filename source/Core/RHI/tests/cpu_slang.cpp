@@ -4,7 +4,7 @@
 
 #include "RHI/ShaderFactory/shader.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 const char* str = R"(
 

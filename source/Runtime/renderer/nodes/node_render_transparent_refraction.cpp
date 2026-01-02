@@ -29,19 +29,19 @@ NODE_DECLARATION_FUNCTION(transparent_refraction)
 
 NODE_EXECUTION_FUNCTION(transparent_refraction)
 {
-#ifdef USTC_CG_BACKEND_OPENGL 
+#ifdef RUZINO_BACKEND_OPENGL 
     auto lights = params.get_input<LightArray>("Lights");
     auto baseColor = params.get_input<TextureHandle>("diffuseColor");
     auto normal_texture = params.get_input<TextureHandle>("Normal");
 
-    Hd_USTC_CG_Dome_Light* dome_light = nullptr;
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Dome_Light* dome_light = nullptr;
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
 
     for (int i = 0; i < lights.size(); ++i) {
         auto light = lights[i];
         if (light->GetId() != SdfPath::EmptyPath()) {
             if (HdPrimTypeTokens->domeLight == light->GetLightType()) {
-                dome_light = dynamic_cast<Hd_USTC_CG_Dome_Light*>(light);
+                dome_light = dynamic_cast<Hd_RUZINO_Dome_Light*>(light);
                 break;
             }
         }
@@ -52,7 +52,7 @@ NODE_EXECUTION_FUNCTION(transparent_refraction)
         for (int i = 0; i < lights.size(); ++i) {
             auto light = lights[i];
             if (HdPrimTypeTokens->domeLight == light->GetLightType()) {
-                dome_light = dynamic_cast<Hd_USTC_CG_Dome_Light*>(light);
+                dome_light = dynamic_cast<Hd_RUZINO_Dome_Light*>(light);
                 break;
             }
         }

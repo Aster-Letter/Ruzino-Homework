@@ -32,7 +32,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Helper class to load material textures using the texture manager.
 
@@ -42,7 +42,7 @@ namespace USTC_CG
         `MaterialTextureLoader`, it blocks until all textures are loaded and assigns
         them to the materials.
     */
-    class HD_USTC_CG_API MaterialTextureLoader
+    class HD_RUZINO_API MaterialTextureLoader
     {
     public:
         MaterialTextureLoader(TextureManager& textureManager, bool useSrgb);

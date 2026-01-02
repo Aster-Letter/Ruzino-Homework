@@ -5,11 +5,11 @@
 #include "nodes/core/node_exec.hpp"
 #include "nodes/system/node_system.hpp"
 
-namespace USTC_CG {
+namespace Ruzino {
 class Stage;
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace animation {
 
 class WithDynamicLogic {
@@ -69,4 +69,4 @@ class WithDynamicLogicPrim : public WithDynamicLogic {
 
 }  // namespace animation
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef HD_USTC_CG_TRIANGULATE_H
-#define HD_USTC_CG_TRIANGULATE_H
+#ifndef HD_RUZINO_TRIANGULATE_H
+#define HD_RUZINO_TRIANGULATE_H
 
 #include "../api.h"
 #include "pxr/imaging/hd/bufferSource.h"
@@ -13,7 +13,7 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class HdSt_MeshTopology;
 
@@ -85,6 +85,6 @@ class HdSt_TriangulateFaceVaryingComputation
     pxr::HdBufferSourceSharedPtr _source;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif  // HdSt_TRIANGULATE_H

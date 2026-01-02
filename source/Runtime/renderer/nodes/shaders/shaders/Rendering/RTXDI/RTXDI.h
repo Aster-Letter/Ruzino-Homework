@@ -39,7 +39,7 @@
 #include "rtxdi/RTXDI.h"
 #endif
 
-namespace USTC_CG
+namespace Ruzino
 {
     class RenderContext;
 
@@ -83,7 +83,7 @@ namespace USTC_CG
 
         Also see the Source/RenderPasses/RTXDIPass/RTXDIPass.cpp for a minimal example on how to use the module.
     */
-    class HD_USTC_CG_API RTXDI
+    class HD_RUZINO_API RTXDI
     {
     public:
         /** RTXDI sampling modes.

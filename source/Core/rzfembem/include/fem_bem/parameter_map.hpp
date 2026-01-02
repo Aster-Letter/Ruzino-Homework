@@ -25,7 +25,7 @@
 #define FORCE_INLINE inline
 #endif
 
-namespace USTC_CG {
+namespace Ruzino {
 namespace fem_bem {
 
     // Global counters for profiling
@@ -302,4 +302,4 @@ namespace fem_bem {
     using ParameterMapF = ParameterMap<float>;
 
 }  // namespace fem_bem
-}  // namespace USTC_CG
+}  // namespace Ruzino

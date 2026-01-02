@@ -2,7 +2,7 @@
 # include "blueprints/widgets.h"
 # include <imgui_internal.h>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 void ax::Widgets::Icon(const ImVec2& size, IconType type, bool filled, const ImVec4& color/* = ImVec4(1, 1, 1, 1)*/, const ImVec4& innerColor/* = ImVec4(0, 0, 0, 0)*/)
 {
@@ -16,4 +16,4 @@ void ax::Widgets::Icon(const ImVec2& size, IconType type, bool filled, const ImV
     ImGui::Dummy(size);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

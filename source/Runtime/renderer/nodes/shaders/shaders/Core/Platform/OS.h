@@ -35,7 +35,7 @@
 #include <regex>
 #include <thread>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Utility class to start/stop OS services.
@@ -53,18 +53,18 @@ public:
  * @param[in] windowHandle The api handle of the window for which we need to set the icon to. nullptr will apply the icon to the foreground
  * window.
  */
-HD_USTC_CG_API void setWindowIcon(const std::filesystem::path& path, WindowHandle windowHandle);
+HD_RUZINO_API void setWindowIcon(const std::filesystem::path& path, WindowHandle windowHandle);
 
 /**
  * Retrieves estimated/user-set pixel density of a display.
  * @return integer value of number of pixels per inch.
  */
-HD_USTC_CG_API int getDisplayDpi();
+HD_RUZINO_API int getDisplayDpi();
 
 /**
  * Get the requested display scale factor
  */
-HD_USTC_CG_API float getDisplayScaleFactor();
+HD_RUZINO_API float getDisplayScaleFactor();
 
 /**
  * Message box icons.
@@ -111,7 +111,7 @@ enum class MsgBoxButton
  * @param[in] icon Optional. Icon to display.
  * @return An enum indicating which button was clicked.
  */
-HD_USTC_CG_API MsgBoxButton
+HD_RUZINO_API MsgBoxButton
 msgBox(const std::string& title, const std::string& msg, MsgBoxType type = MsgBoxType::Ok, MsgBoxIcon icon = MsgBoxIcon::None);
 
 /**
@@ -136,7 +136,7 @@ struct MsgBoxCustomButton
  * @param[in] defaultButtonId Optional. Button to highlight by default.
  * @return The id of the button that was clicked.
  */
-HD_USTC_CG_API uint32_t msgBox(
+HD_RUZINO_API uint32_t msgBox(
     const std::string& title,
     const std::string& msg,
     std::vector<MsgBoxCustomButton> buttons,
@@ -150,7 +150,7 @@ HD_USTC_CG_API uint32_t msgBox(
  * STL's equivalent comparator throws when either of the paths does not exist.
  * This complements the two by allowing comparing non-existent paths, but at the same time ignoring case on windows.
  */
-HD_USTC_CG_API bool isSamePath(const std::filesystem::path& lhs, const std::filesystem::path& rhs);
+HD_RUZINO_API bool isSamePath(const std::filesystem::path& lhs, const std::filesystem::path& rhs);
 
 /**
  * Finds a file in a list of search directories.
@@ -158,7 +158,7 @@ HD_USTC_CG_API bool isSamePath(const std::filesystem::path& lhs, const std::file
  * @param[in] directories List of directories to search in.
  * @return Returns the found path, or an empty path if not found.
  */
-HD_USTC_CG_API std::filesystem::path findFileInDirectories(const std::filesystem::path& path, std::span<std::filesystem::path> directories);
+HD_RUZINO_API std::filesystem::path findFileInDirectories(const std::filesystem::path& path, std::span<std::filesystem::path> directories);
 
 /**
  * Finds all files in given (absolute or relative path), whose filename matches the given regexPattern.
@@ -170,7 +170,7 @@ HD_USTC_CG_API std::filesystem::path findFileInDirectories(const std::filesystem
  * @param[in] firstMatchOnly Set true when you want only the first file matching the pattern.
  * @return All paths to the resolved files in the form path / <matching filename>.
  */
-HD_USTC_CG_API std::vector<std::filesystem::path> globFilesInDirectory(
+HD_RUZINO_API std::vector<std::filesystem::path> globFilesInDirectory(
     const std::filesystem::path& path,
     const std::regex& regexPattern,
     bool firstMatchOnly = false
@@ -185,7 +185,7 @@ HD_USTC_CG_API std::vector<std::filesystem::path> globFilesInDirectory(
  * @param[in] firstMatchOnly Set true when you want only the first file matching the pattern.
  * @return Full paths to all files matching the pattern.
  */
-HD_USTC_CG_API std::vector<std::filesystem::path> globFilesInDirectories(
+HD_RUZINO_API std::vector<std::filesystem::path> globFilesInDirectories(
     const std::filesystem::path& path,
     const std::regex& regexPattern,
     std::span<std::filesystem::path> directories,
@@ -200,17 +200,17 @@ HD_USTC_CG_API std::vector<std::filesystem::path> globFilesInDirectories(
  * @param[in] fullPath If the file was found, the full path to the file. If the file wasn't found, this is invalid.
  * @return Returns true if the file was found, false otherwise.
  */
-HD_USTC_CG_API bool findFileInShaderDirectories(const std::filesystem::path& path, std::filesystem::path& fullPath);
+HD_RUZINO_API bool findFileInShaderDirectories(const std::filesystem::path& path, std::filesystem::path& fullPath);
 
 /**
  * Get a list of all shader directories.
  */
-HD_USTC_CG_API const std::vector<std::filesystem::path>& getShaderDirectoriesList();
+HD_RUZINO_API const std::vector<std::filesystem::path>& getShaderDirectoriesList();
 
 /**
  * Structure to help with file dialog file-extension filters
  */
-struct HD_USTC_CG_API FileDialogFilter
+struct HD_RUZINO_API FileDialogFilter
 {
     FileDialogFilter(const std::string& ext_, const std::string& desc_ = {}) : desc(desc_), ext(ext_) {}
     std::string desc; // The description ("Portable Network Graphics")
@@ -225,7 +225,7 @@ using FileDialogFilterVec = std::vector<FileDialogFilter>;
  * @param[in] path On successful return, the path of the file selected by the user.
  * @return true if a file was selected, otherwise false (if the user clicked 'Cancel').
  */
-HD_USTC_CG_API bool openFileDialog(const FileDialogFilterVec& filters, std::filesystem::path& path);
+HD_RUZINO_API bool openFileDialog(const FileDialogFilterVec& filters, std::filesystem::path& path);
 
 /**
  * Creates a 'save file' dialog box.
@@ -233,27 +233,27 @@ HD_USTC_CG_API bool openFileDialog(const FileDialogFilterVec& filters, std::file
  * @param[out] path On successful return, the path of the file selected by the user.
  * @return true if a file was selected, otherwise false (if the user clicked 'Cancel').
  */
-HD_USTC_CG_API bool saveFileDialog(const FileDialogFilterVec& filters, std::filesystem::path& path);
+HD_RUZINO_API bool saveFileDialog(const FileDialogFilterVec& filters, std::filesystem::path& path);
 
 /**
  * Creates a dialog box for browsing and selecting folders
  * @param[out] folder On successful return, the path of the folder selected by the user.
  * @return true if a folder was selected, otherwise false (if the user clicked 'Cancel').
  */
-HD_USTC_CG_API bool chooseFolderDialog(std::filesystem::path& path);
+HD_RUZINO_API bool chooseFolderDialog(std::filesystem::path& path);
 
 /**
  * Open watch thread for file changes and call callback when the file is written to.
  * @param[in] path path to the file to watch for changes
  * @param[in] callback function
  */
-HD_USTC_CG_API void monitorFileUpdates(const std::filesystem::path& path, const std::function<void()>& callback = {});
+HD_RUZINO_API void monitorFileUpdates(const std::filesystem::path& path, const std::function<void()>& callback = {});
 
 /**
  * Close watch thread for file changes
  * @param[in] path path to the file that was being watched for changes
  */
-HD_USTC_CG_API void closeSharedFile(const std::filesystem::path& path);
+HD_RUZINO_API void closeSharedFile(const std::filesystem::path& path);
 
 /**
  * Generates a unique path to a temporary file.
@@ -261,7 +261,7 @@ HD_USTC_CG_API void closeSharedFile(const std::filesystem::path& path);
  * before the caller can create it.
  * @return Absolute path to unique temporary file.
  */
-HD_USTC_CG_API std::filesystem::path getTempFilePath();
+HD_RUZINO_API std::filesystem::path getTempFilePath();
 
 /**
  * Create a junction (soft link).
@@ -269,76 +269,76 @@ HD_USTC_CG_API std::filesystem::path getTempFilePath();
  * @param[in] target Target path.
  * @return Returns true if successful.
  */
-HD_USTC_CG_API bool createJunction(const std::filesystem::path& link, const std::filesystem::path& target);
+HD_RUZINO_API bool createJunction(const std::filesystem::path& link, const std::filesystem::path& target);
 
 /**
  * Delete a junction (sof link).
  * @param[in] link Link path.
  * @return Returns true if successful.
  */
-HD_USTC_CG_API bool deleteJunction(const std::filesystem::path& link);
+HD_RUZINO_API bool deleteJunction(const std::filesystem::path& link);
 
 /**
  * Given the app name and full command line arguments, begin the process
  */
-HD_USTC_CG_API size_t executeProcess(const std::string& appName, const std::string& commandLineArgs);
+HD_RUZINO_API size_t executeProcess(const std::string& appName, const std::string& commandLineArgs);
 
 /**
  * Check if the given process is still active
  */
-HD_USTC_CG_API bool isProcessRunning(size_t processID);
+HD_RUZINO_API bool isProcessRunning(size_t processID);
 
 /**
  * Terminate process
  */
-HD_USTC_CG_API void terminateProcess(size_t processID);
+HD_RUZINO_API void terminateProcess(size_t processID);
 
 /**
  * Get the full path to the Falcor project directory.
  * Note: This is only useful during development.
  * @return The full path of the project directory.
  */
-HD_USTC_CG_API const std::filesystem::path& getProjectDirectory();
+HD_RUZINO_API const std::filesystem::path& getProjectDirectory();
 
 /**
  * Get the full path to the current executable.
  * @return The full path of the executable.
  */
-HD_USTC_CG_API const std::filesystem::path& getExecutablePath();
+HD_RUZINO_API const std::filesystem::path& getExecutablePath();
 
 /**
  * Get the current executable directory
  * @return The full path of the application directory
  */
-HD_USTC_CG_API const std::filesystem::path& getExecutableDirectory();
+HD_RUZINO_API const std::filesystem::path& getExecutableDirectory();
 
 /**
  * Get the current executable name
  * @return The name of the executable
  */
-HD_USTC_CG_API const std::string& getExecutableName();
+HD_RUZINO_API const std::string& getExecutableName();
 
 /**
  * Get the Falcor runtime directory. This is derived from the location of the main Falcor library.
  */
-HD_USTC_CG_API const std::filesystem::path& getRuntimeDirectory();
+HD_RUZINO_API const std::filesystem::path& getRuntimeDirectory();
 
 /**
  * Get the application data directory.
  */
-HD_USTC_CG_API const std::filesystem::path& getAppDataDirectory();
+HD_RUZINO_API const std::filesystem::path& getAppDataDirectory();
 
 /**
  * Get the user's home directory (if available).
  */
-HD_USTC_CG_API const std::filesystem::path& getHomeDirectory();
+HD_RUZINO_API const std::filesystem::path& getHomeDirectory();
 
 /**
  * Get the content of a system environment variable.
  * @param[in] varName Name of the environment variable
  * @return The environment variable's value or nullopt if not found.
  */
-HD_USTC_CG_API std::optional<std::string> getEnvironmentVariable(const std::string& varName);
+HD_RUZINO_API std::optional<std::string> getEnvironmentVariable(const std::string& varName);
 
 /**
  * Find a new filename based on the supplied parameters. This function doesn't actually create the file, just find an available file name.
@@ -347,7 +347,7 @@ HD_USTC_CG_API std::optional<std::string> getEnvironmentVariable(const std::stri
  * @param[in] extension The requested file extension.
  * @return Returns a valid unused filename in the following format - 'Directory\\Prefix.<index>.Extension'.
  */
-HD_USTC_CG_API std::filesystem::path findAvailableFilename(
+HD_RUZINO_API std::filesystem::path findAvailableFilename(
     const std::string& prefix,
     const std::filesystem::path& directory,
     const std::string& extension
@@ -357,31 +357,31 @@ HD_USTC_CG_API std::filesystem::path findAvailableFilename(
  * Setup a callback function to be called when Ctrl-C is detected.
  * @param handler Handler function (nullptr to remove handler).
  */
-HD_USTC_CG_API void setKeyboardInterruptHandler(std::function<void()> handler);
+HD_RUZINO_API void setKeyboardInterruptHandler(std::function<void()> handler);
 
 /**
  * Check if a debugger session is attached.
  * @return true if debugger is attached to the Falcor process.
  */
-HD_USTC_CG_API bool isDebuggerPresent();
+HD_RUZINO_API bool isDebuggerPresent();
 
 /**
  * Check if application is launched in development mode.
  * Development mode is enabled by having FALCOR_DEVMODE=1 as an environment variable on launch.
  * @return true if application is in development mode.
  */
-HD_USTC_CG_API bool isDevelopmentMode();
+HD_RUZINO_API bool isDevelopmentMode();
 
 /**
  * Breaks in debugger (int 3 functionality)
  */
-HD_USTC_CG_API void debugBreak();
+HD_RUZINO_API void debugBreak();
 
 /**
  * Print a message into the debug window
  * @param[in] s Text to pring
  */
-HD_USTC_CG_API void printToDebugWindow(const std::string& s);
+HD_RUZINO_API void printToDebugWindow(const std::string& s);
 
 /**
  * Check if a file path has a given file extension. Does a case-insensitive comparison.
@@ -389,31 +389,31 @@ HD_USTC_CG_API void printToDebugWindow(const std::string& s);
  * @param[in] ext The file extension.
  * @return True if the path has the given file extension.
  */
-HD_USTC_CG_API bool hasExtension(const std::filesystem::path& path, const std::string_view ext);
+HD_RUZINO_API bool hasExtension(const std::filesystem::path& path, const std::string_view ext);
 
 /**
  * Get the file extension from a path.
  * @param[in] path The file path to get the extension from.
  * @return The file extension in lower-case and without the leading '.' character.
  */
-HD_USTC_CG_API std::string getExtensionFromPath(const std::filesystem::path& path);
+HD_RUZINO_API std::string getExtensionFromPath(const std::filesystem::path& path);
 
 /**
  * Return current thread handle
  */
-HD_USTC_CG_API std::thread::native_handle_type getCurrentThread();
+HD_RUZINO_API std::thread::native_handle_type getCurrentThread();
 
 /**
  * Sets thread affinity mask
  */
-HD_USTC_CG_API void setThreadAffinity(std::thread::native_handle_type thread, uint32_t affinityMask);
+HD_RUZINO_API void setThreadAffinity(std::thread::native_handle_type thread, uint32_t affinityMask);
 
 /**
  * Get the last time a file was modified. If the file is not found will return 0
  * @param[in] path The file path to look for
  * @return Epoch timestamp of when the file was last modified
  */
-HD_USTC_CG_API time_t getFileModifiedTime(const std::filesystem::path& path);
+HD_RUZINO_API time_t getFileModifiedTime(const std::filesystem::path& path);
 
 enum class ThreadPriorityType : int32_t
 {
@@ -429,47 +429,47 @@ enum class ThreadPriorityType : int32_t
 /**
  * Sets thread priority
  */
-HD_USTC_CG_API void setThreadPriority(std::thread::native_handle_type thread, ThreadPriorityType priority);
+HD_RUZINO_API void setThreadPriority(std::thread::native_handle_type thread, ThreadPriorityType priority);
 
 /**
  * Get the Total Virtual Memory.
  */
-HD_USTC_CG_API uint64_t getTotalVirtualMemory();
+HD_RUZINO_API uint64_t getTotalVirtualMemory();
 
 /**
  * Get the Used Virtual Memory.
  */
-HD_USTC_CG_API uint64_t getUsedVirtualMemory();
+HD_RUZINO_API uint64_t getUsedVirtualMemory();
 
 /**
  * Get the Virtual Memory Used by this Process.
  */
-HD_USTC_CG_API uint64_t getProcessUsedVirtualMemory();
+HD_RUZINO_API uint64_t getProcessUsedVirtualMemory();
 
 /**
  * Returns the current resident/working set size, how much memory does the process actually use.
  */
-HD_USTC_CG_API uint64_t getCurrentRSS();
+HD_RUZINO_API uint64_t getCurrentRSS();
 
 /**
  * Returns the peak resident/working set size, how much memory has the processes maximally occupy during its runtime.
  */
-HD_USTC_CG_API uint64_t getPeakRSS();
+HD_RUZINO_API uint64_t getPeakRSS();
 
 /**
  * Returns index of most significant set bit, or 0 if no bits were set.
  */
-HD_USTC_CG_API uint32_t bitScanReverse(uint32_t a);
+HD_RUZINO_API uint32_t bitScanReverse(uint32_t a);
 
 /**
  * Returns index of least significant set bit, or 0 if no bits were set.
  */
-HD_USTC_CG_API uint32_t bitScanForward(uint32_t a);
+HD_RUZINO_API uint32_t bitScanForward(uint32_t a);
 
 /**
  * Gets the number of set bits.
  */
-HD_USTC_CG_API uint32_t popcount(uint32_t a);
+HD_RUZINO_API uint32_t popcount(uint32_t a);
 
 /**
  * Read the contents of a file into a string.
@@ -477,7 +477,7 @@ HD_USTC_CG_API uint32_t popcount(uint32_t a);
  * @param[in] path File path.
  * @return The contents of the file.
  */
-HD_USTC_CG_API std::string readFile(const std::filesystem::path& path);
+HD_RUZINO_API std::string readFile(const std::filesystem::path& path);
 
 /**
  * Read and decompress the contents of a .gz file into a string.
@@ -485,22 +485,22 @@ HD_USTC_CG_API std::string readFile(const std::filesystem::path& path);
  * @param[in] path File path.
  * @return The contents of the file.
  */
-HD_USTC_CG_API std::string decompressFile(const std::filesystem::path& path);
+HD_RUZINO_API std::string decompressFile(const std::filesystem::path& path);
 
 /**
  * Load a shared-library
  */
-HD_USTC_CG_API SharedLibraryHandle loadSharedLibrary(const std::filesystem::path& path);
+HD_RUZINO_API SharedLibraryHandle loadSharedLibrary(const std::filesystem::path& path);
 
 /**
  * Release a shared-library
  */
-HD_USTC_CG_API void releaseSharedLibrary(SharedLibraryHandle library);
+HD_RUZINO_API void releaseSharedLibrary(SharedLibraryHandle library);
 
 /**
  * Get a function pointer from a library
  */
-HD_USTC_CG_API void* getProcAddress(SharedLibraryHandle library, const std::string& funcName);
+HD_RUZINO_API void* getProcAddress(SharedLibraryHandle library, const std::string& funcName);
 
 /**
  * Get a stack trace as a string.
@@ -508,6 +508,6 @@ HD_USTC_CG_API void* getProcAddress(SharedLibraryHandle library, const std::stri
  * @param[in] maxDepth Maximum number of frames (0 = unlimited).
  * @return The stack trace.
  */
-HD_USTC_CG_API std::string getStackTrace(size_t skip = 0, size_t maxDepth = 0);
+HD_RUZINO_API std::string getStackTrace(size_t skip = 0, size_t maxDepth = 0);
 
-} // namespace USTC_CG
+} // namespace Ruzino

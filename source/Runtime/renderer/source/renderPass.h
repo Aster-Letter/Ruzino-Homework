@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_RENDER_PASS_H
-#define Hd_USTC_CG_RENDER_PASS_H
+#ifndef Hd_RUZINO_RENDER_PASS_H
+#define Hd_RUZINO_RENDER_PASS_H
 
 #include "renderBuffer.h"
 #include "renderer.h"
@@ -30,15 +30,15 @@
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderThread.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-/// \class Hd_USTC_CG_RenderPass
+/// \class Hd_RUZINO_RenderPass
 ///
 /// HdRenderPass represents a single render iteration, rendering a view of the
 /// scene (the HdRprimCollection) for a specific viewer (the camera/viewport
 /// parameters in HdRenderPassState) to the current draw target.
 ///
-class Hd_USTC_CG_RenderPass final : public HdRenderPass
+class Hd_RUZINO_RenderPass final : public HdRenderPass
 {
 public:
     /// Renderpass constructor.
@@ -46,14 +46,14 @@ public:
     ///   \param collection The initial rprim collection for this renderpass.
     ///   \param renderThread A handle to the global render thread.
     ///   \param renderer A handle to the global renderer.
-    Hd_USTC_CG_RenderPass(
+    Hd_RUZINO_RenderPass(
         HdRenderIndex* index,
         const HdRprimCollection& collection,
         HdRenderThread* renderThread,
-        Hd_USTC_CG_Renderer* renderer,
+        Hd_RUZINO_Renderer* renderer,
         std::atomic<int>* sceneVersion);
     /// Renderpass destructor.
-    ~Hd_USTC_CG_RenderPass() override;
+    ~Hd_RUZINO_RenderPass() override;
 
 protected:
     /// Draw the scene with the bound renderpass state.
@@ -72,7 +72,7 @@ protected:
     HdRenderPassAovBindingVector _aovBindings;
     // A handle to the render thread.
     HdRenderThread* _renderThread;
-    Hd_USTC_CG_Renderer* _renderer;
+    Hd_RUZINO_Renderer* _renderer;
     std::atomic<int>* _sceneVersion;
     int _lastSceneVersion;
     int _lastSettingsVersion;
@@ -85,6 +85,6 @@ protected:
     bool needStartRender = true;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif // Hd_USTC_CG_RENDER_PASS_H
+#endif // Hd_RUZINO_RENDER_PASS_H

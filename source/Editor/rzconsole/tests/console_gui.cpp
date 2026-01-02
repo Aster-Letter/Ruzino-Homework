@@ -9,7 +9,7 @@
 
 #include <memory>
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 class ConsoleWidgetFactory : public IWidgetFactory {
    public:

@@ -30,7 +30,7 @@
 #include "utils/Math/Vector.h"
 #include <limits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Axis-aligned UV tile stored by its min/max points.
@@ -161,4 +161,4 @@ struct Rectangle
         return bb &= rhs;
     }
 };
-} // namespace USTC_CG
+} // namespace Ruzino

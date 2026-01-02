@@ -18,7 +18,7 @@ NODE_DECLARATION_FUNCTION(shadow_mapping)
 
 NODE_EXECUTION_FUNCTION(shadow_mapping)
 {
-#ifdef USTC_CG_BACKEND_OPENGL
+#ifdef RUZINO_BACKEND_OPENGL
     auto meshes = params.get_input<MeshArray>("Meshes");
     auto lights = params.get_input<LightArray>("Lights");
     auto resolution = params.get_input<int>("resolution");
@@ -82,7 +82,7 @@ NODE_EXECUTION_FUNCTION(shadow_mapping)
             }
             // else (lights[light_id]->GetLightType() ==
             // HdPrimTypeTokens->distantLight). See light.cpp under
-            // hd_ustc_cg_gl/
+            // hd_ruzino_cg_gl/
 
             shader_handle->shader.setMat4("light_view", light_view_mat);
             shader_handle->shader.setMat4(

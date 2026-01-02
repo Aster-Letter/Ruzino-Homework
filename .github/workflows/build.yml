@@ -429,7 +429,7 @@ jobs:
           
           cmake -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
-            -DUSTC_CG_WITH_CUDA=OFF ^
+            -DRUZINO_WITH_CUDA=OFF ^
             -DCMAKE_INSTALL_PREFIX="../install_nocuda" ^
             ..
           
@@ -598,7 +598,7 @@ jobs:
           
           cmake -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
-            -DUSTC_CG_WITH_CUDA=ON ^
+            -DRUZINO_WITH_CUDA=ON ^
             -DCMAKE_CUDA_ARCHITECTURES=75;86;89 ^
             -DCMAKE_INSTALL_PREFIX="../install_cuda" ^
             ..

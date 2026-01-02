@@ -4,7 +4,7 @@
 
 #include "pxr/usd/usd/prim.h"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 TEST(Stage, CreateStage)
 {

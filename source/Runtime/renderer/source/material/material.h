@@ -13,14 +13,14 @@ class Hio_OpenEXRImage;
 
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class Shader;
 using namespace pxr;
 
 class Hio_StbImage;
-class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
+class HD_RUZINO_API Hd_RUZINO_Material : public HdMaterial {
    public:
-    explicit Hd_USTC_CG_Material(SdfPath const& id);
+    explicit Hd_RUZINO_Material(SdfPath const& id);
 
     HdDirtyBits GetInitialDirtyBitsMask() const override;
 
@@ -29,7 +29,7 @@ class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
         HdSceneDelegate* sceneDelegate,
         HdRenderParam* renderParam,
         HdDirtyBits* dirtyBits) override;
-    void ensure_material_data_handle(Hd_USTC_CG_RenderParam* render_param);
+    void ensure_material_data_handle(Hd_RUZINO_RenderParam* render_param);
 
     virtual void ensure_shader_ready(const ShaderFactory& factory);
     
@@ -103,4 +103,4 @@ class HD_USTC_CG_API Hd_USTC_CG_Material : public HdMaterial {
     bool has_valid_shader = false;  // True only if shader_path points to a valid file
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -29,7 +29,7 @@
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace console {
 // Commnad-line lexer (splits a command line into a vector of tokens)
@@ -91,4 +91,4 @@ class RZCONSOLE_API Interpreter {
 };
 
 }  // end namespace console
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

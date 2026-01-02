@@ -2,9 +2,9 @@
 
 #include "pxr/imaging/garch/glApi.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-#ifdef USTC_CG_BACKEND_OPENGL
+#ifdef RUZINO_BACKEND_OPENGL
 float vertices[] = {
     // positions
     -1.0f, 1.0f, 0.0f, -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f,
@@ -31,4 +31,4 @@ void DestroyFullScreenVAO(unsigned& VAO, unsigned& VBO)
 
 #endif
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

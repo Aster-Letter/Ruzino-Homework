@@ -91,9 +91,9 @@ def test_hydra_renderer_basic():
     workspace_root, binary_dir = _prepare_env()
     
     try:
-        import hd_USTC_CG_py as renderer  # type: ignore
+        import hd_RUZINO_py as renderer  # type: ignore
     except ImportError as e:
-        pytest.skip(f"hd_USTC_CG_py not available: {e}")
+        pytest.skip(f"hd_RUZINO_py not available: {e}")
 
     usd_stage = workspace_root / "Assets" / "shader_ball.usdc"
     if not usd_stage.exists():
@@ -134,9 +134,9 @@ def test_render_to_tensor():
     workspace_root, binary_dir = _prepare_env()
     
     try:
-        import hd_USTC_CG_py as renderer  # type: ignore
+        import hd_RUZINO_py as renderer  # type: ignore
     except ImportError as e:
-        pytest.skip(f"hd_USTC_CG_py not available: {e}")
+        pytest.skip(f"hd_RUZINO_py not available: {e}")
 
     usd_stage = workspace_root / "Assets" / "shader_ball.usdc"
     if not usd_stage.exists():

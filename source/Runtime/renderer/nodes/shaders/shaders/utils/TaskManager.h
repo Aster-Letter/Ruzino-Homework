@@ -38,10 +38,10 @@
 #include <atomic>
 #include <exception>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class RenderContext;
-class HD_USTC_CG_API TaskManager
+class HD_RUZINO_API TaskManager
 {
 public:
     using CpuTask = std::function<void()>;
@@ -81,4 +81,4 @@ private:
     std::exception_ptr mException;
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

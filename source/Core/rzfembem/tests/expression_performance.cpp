@@ -5,7 +5,7 @@
 
 #include "fem_bem/Expression.hpp"
 
-using namespace USTC_CG::fem_bem;
+using namespace Ruzino::fem_bem;
 
 // Test Expression class specific functionality - Derivative interface
 int main()

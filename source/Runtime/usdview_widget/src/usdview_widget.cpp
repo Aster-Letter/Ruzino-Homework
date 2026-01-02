@@ -25,7 +25,7 @@
 #include "pxr/usd/usdGeom/camera.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class NodeTree;
 
 struct UsdviewEnginePrivateData {
@@ -86,13 +86,13 @@ void UsdviewEngine::ChooseRenderer(
     renderer_->SetRendererPlugin(available_renderers[i]);
     spdlog::info(
         "Switching to renderer {}", available_renderers[i].GetString().c_str());
-    if (available_renderers[i].GetString() == "Hd_USTC_CG_RendererPlugin") {
+    if (available_renderers[i].GetString() == "Hd_RUZINO_RendererPlugin") {
         renderer_ui_control =
             renderer_->GetRendererSetting(pxr::TfToken("RenderNodeSystem"))
                 .Get<const void*>();
     }
 
-    if (available_renderers[i].GetString() == "Hd_USTC_CG_GL_RendererPlugin") {
+    if (available_renderers[i].GetString() == "Hd_RUZINO_GL_RendererPlugin") {
         renderer_ui_control =
             renderer_->GetRendererSetting(pxr::TfToken("RenderNodeSystem"))
                 .Get<const void*>();
@@ -394,7 +394,7 @@ void UsdviewEngine::time_controller()
     // TODO:  1.加个显示当前仿真进度的进度条 (current_time)
 }
 
-// std::unique_ptr<USTC_CG::PickEvent> UsdviewEngine::get_pick_event()
+// std::unique_ptr<Ruzino::PickEvent> UsdviewEngine::get_pick_event()
 //{
 //     return std::move(pick_event);
 // }
@@ -637,4 +637,4 @@ std::shared_ptr<PickEvent> UsdviewEngine::consume_pick_event()
     return event;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

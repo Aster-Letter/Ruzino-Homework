@@ -38,7 +38,7 @@
 #include "utils/Math/Vector.h"
 #include "utils/UI/Gui.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 /** Utility class for building 2-way light BVH on the CPU.
 
     The building process can be customized via the |Options|,
@@ -47,7 +47,7 @@ namespace USTC_CG {
     TODO: Rename all things triangle* to light* as the BVH class can be used for
    other types.
 */
-class HD_USTC_CG_API LightBVHBuilder {
+class HD_RUZINO_API LightBVHBuilder {
    public:
     enum class SplitHeuristic : uint32_t {
         Equal = 0u,       ///< Split the input into two equal partitions.
@@ -287,4 +287,4 @@ class HD_USTC_CG_API LightBVHBuilder {
 };
 
 FALCOR_ENUM_REGISTER(LightBVHBuilder::SplitHeuristic);
-}  // namespace USTC_CG
+}  // namespace Ruzino

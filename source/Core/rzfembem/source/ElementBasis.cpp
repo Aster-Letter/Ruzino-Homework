@@ -1,6 +1,6 @@
 #include "fem_bem/ElementBasis.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace fem_bem {
 ElementBasis::ElementBasis(unsigned problem_dim, ElementBasisType type)
@@ -262,4 +262,4 @@ ElementBasisHandle make_bem_3d()
     return std::make_shared<ElementBasis>(3, ElementBasisType::BoundaryElement);
 }
 }  // namespace fem_bem
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

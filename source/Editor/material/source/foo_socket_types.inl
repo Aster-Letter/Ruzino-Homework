@@ -14,9 +14,9 @@ class SocketTypePlaceHolder { };
 
 MACRO_MAP(INSTANTIATE_SOCKET_TYPE_PLACEHOLDER, INTEGER_LIST)
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 // We have _uniqueSocketType in the MaterialXNodeTree class
-USTC_CG::SocketType MaterialXNodeTree::get_unique_socket_type(const char* name)
+Ruzino::SocketType MaterialXNodeTree::get_unique_socket_type(const char* name)
 {
     auto type = entt::resolve(get_entt_ctx(), entt::hashed_string{ name });
     if (type) {
@@ -45,4 +45,4 @@ USTC_CG::SocketType MaterialXNodeTree::get_unique_socket_type(const char* name)
     return get_socket_type(entt::hashed_string{ name });
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

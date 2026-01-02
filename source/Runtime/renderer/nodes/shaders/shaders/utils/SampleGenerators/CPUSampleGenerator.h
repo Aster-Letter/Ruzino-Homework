@@ -30,12 +30,12 @@
 #include "Core/Object.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Two-dimensional sample pattern generator on the CPU.
  */
-class HD_USTC_CG_API CPUSampleGenerator : public Object
+class HD_RUZINO_API CPUSampleGenerator : public Object
 {
     FALCOR_OBJECT(CPUSampleGenerator)
 public:
@@ -61,4 +61,4 @@ public:
 protected:
     CPUSampleGenerator() = default;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

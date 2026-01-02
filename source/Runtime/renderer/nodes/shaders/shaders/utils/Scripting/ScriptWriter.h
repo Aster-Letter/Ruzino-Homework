@@ -32,7 +32,7 @@
 #include <filesystem>
 #include <string>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Helper class to write Python script code including:
@@ -109,4 +109,4 @@ inline std::string ScriptWriter::getArgString(const ScriptWriter::VariableName& 
     return varName.name;
 }
 
-} // namespace USTC_CG
+} // namespace Ruzino

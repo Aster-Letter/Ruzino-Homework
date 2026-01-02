@@ -5,7 +5,7 @@
 #include "imgui.h"
 #include "text_editor_widget.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 TextEditorWidget::TextEditorWidget(const std::string& title)
     : title_(title),
@@ -178,4 +178,4 @@ void TextEditorWidget::ApplyChanges()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

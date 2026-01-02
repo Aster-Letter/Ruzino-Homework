@@ -4,7 +4,7 @@
 #include <Eigen/Sparse>
 #include <RZSolver/Solver.hpp>
 
-using namespace USTC_CG::Solver;
+using namespace Ruzino::Solver;
 
 class CudaBackendTest : public ::testing::Test {
    protected:

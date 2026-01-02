@@ -35,7 +35,7 @@
 __exported import Utils.SDF.SDFOperationType;
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 enum class SDF3DShapeType
 {
@@ -61,4 +61,4 @@ struct SDF3DPrimitive
     float3x3 invRotationScale;          ///< Inverted rotation and scale matrix.
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

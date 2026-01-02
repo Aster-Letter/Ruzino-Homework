@@ -8,7 +8,7 @@
 #include "RHI/DeviceManager/DeviceManager.h"
 #include "nvrhi/utils.h"
 
-#if USTC_CG_WITH_OPENUSD
+#if RUZINO_WITH_OPENUSD
 #include "pxr/imaging/garch/glApi.h"
 #endif
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
@@ -16,7 +16,7 @@
 
 #include "vulkan/vulkan.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace RHI {
 
 std::unique_ptr<DeviceManager> device_manager = nullptr;
@@ -196,7 +196,7 @@ inline void copy_from_texture(
     command_list->close();
     device->executeCommandList(command_list);
 }
-#if USTC_CG_WITH_OPENUSD
+#if RUZINO_WITH_OPENUSD
 nvrhi::TextureHandle load_ogl_texture(
     const nvrhi::TextureDesc& desc,
     unsigned gl_texture)
@@ -322,4 +322,4 @@ int shutdown()
     return device_manager == nullptr ? 0 : -1;
 }
 }  // namespace RHI
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

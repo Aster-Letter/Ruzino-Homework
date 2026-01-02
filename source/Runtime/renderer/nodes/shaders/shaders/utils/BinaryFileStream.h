@@ -29,7 +29,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Helper class to manage file I/O with binary files
@@ -186,4 +186,4 @@ private:
     std::fstream mStream;
     std::filesystem::path mPath;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

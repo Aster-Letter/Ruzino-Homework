@@ -6,7 +6,7 @@
 
 namespace mx = MaterialX;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class MCORE_API MaterialXNodeTreeDescriptor : public NodeTreeDescriptor {
    public:
     NodeTypeInfo* get_node_type(const std::string& name) override
@@ -171,4 +171,4 @@ MCORE_API mx::OutputPtr getMaterialXOutput(Node* node);
 MCORE_API mx::InputPtr getMaterialXPinInput(NodeSocket* socket);
 MCORE_API mx::OutputPtr getMaterialXPinOutput(NodeSocket* socket);
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

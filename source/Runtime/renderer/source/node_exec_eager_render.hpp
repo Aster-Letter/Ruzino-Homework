@@ -2,12 +2,12 @@
 
 #include <set>
 
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 #include "node_exec_eager_render.hpp"
 #include "nodes/core/node_exec.hpp"
 #include "nodes/core/node_exec_eager.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class EagerNodeTreeExecutorRender : public EagerNodeTreeExecutor {
    protected:
@@ -29,4 +29,4 @@ class EagerNodeTreeExecutorRender : public EagerNodeTreeExecutor {
     }
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

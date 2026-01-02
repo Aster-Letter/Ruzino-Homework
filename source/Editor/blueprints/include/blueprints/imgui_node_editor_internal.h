@@ -36,7 +36,7 @@
 
 #include "nodes/core/id.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //------------------------------------------------------------------------------
 namespace ax
 {
@@ -154,9 +154,9 @@ namespace ax
             using ax::NodeEditor::StyleVar;
             using ax::NodeEditor::SaveReasonFlags;
 
-            using USTC_CG::NodeId;
-            using USTC_CG::SocketID;
-            using USTC_CG::LinkId;
+            using Ruzino::NodeId;
+            using Ruzino::SocketID;
+            using Ruzino::LinkId;
 
             struct ObjectId final : detail::SafePointerType<ObjectId>
             {
@@ -2080,7 +2080,7 @@ namespace ax
     }     // namespace Editor
 }         // namespace ax
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 //------------------------------------------------------------------------------
 # include "imgui_node_editor_internal.inl"

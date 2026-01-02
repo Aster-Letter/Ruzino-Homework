@@ -1,8 +1,8 @@
 //
 // Point/Sphere Geometry Support for Ray Tracing
 //
-#ifndef Hd_USTC_CG_POINTS_H
-#define Hd_USTC_CG_POINTS_H
+#ifndef Hd_RUZINO_POINTS_H
+#define Hd_RUZINO_POINTS_H
 
 #include "../DescriptorTableManager.h"
 #include "../api.h"
@@ -14,16 +14,16 @@
 // SceneTypes
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
 
-class HD_USTC_CG_API Hd_USTC_CG_Points final : public HdPoints {
+class HD_RUZINO_API Hd_RUZINO_Points final : public HdPoints {
    public:
-    HF_MALLOC_TAG_NEW("new Hd_USTC_CG_Points");
+    HF_MALLOC_TAG_NEW("new Hd_RUZINO_Points");
 
-    Hd_USTC_CG_Points(const SdfPath& id);
-    ~Hd_USTC_CG_Points() override;
+    Hd_RUZINO_Points(const SdfPath& id);
+    ~Hd_RUZINO_Points() override;
 
     HdDirtyBits GetInitialDirtyBitsMask() const override;
     void Sync(
@@ -50,9 +50,9 @@ class HD_USTC_CG_API Hd_USTC_CG_Points final : public HdPoints {
     VtArray<GfVec3f> points;
     VtFloatArray widths;
 
-    void create_gpu_resources(Hd_USTC_CG_RenderParam* render_param);
+    void create_gpu_resources(Hd_RUZINO_RenderParam* render_param);
     void updateTLAS(
-        Hd_USTC_CG_RenderParam* render_param,
+        Hd_RUZINO_RenderParam* render_param,
         HdSceneDelegate* sceneDelegate,
         HdDirtyBits* dirtyBits);
 
@@ -60,8 +60,8 @@ class HD_USTC_CG_API Hd_USTC_CG_Points final : public HdPoints {
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
     // This class does not support copying.
-    Hd_USTC_CG_Points(const Hd_USTC_CG_Points&) = delete;
-    Hd_USTC_CG_Points& operator=(const Hd_USTC_CG_Points&) = delete;
+    Hd_RUZINO_Points(const Hd_RUZINO_Points&) = delete;
+    Hd_RUZINO_Points& operator=(const Hd_RUZINO_Points&) = delete;
 
    private:
     bool _pointsValid;
@@ -77,6 +77,6 @@ class HD_USTC_CG_API Hd_USTC_CG_Points final : public HdPoints {
     TfHashMap<TfToken, PrimvarSource, TfToken::HashFunctor> _primvarSourceMap;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_POINTS_H
+#endif  // Hd_RUZINO_POINTS_H

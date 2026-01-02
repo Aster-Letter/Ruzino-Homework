@@ -8,22 +8,22 @@
 #include "GPUContext/program_vars.hpp"
 #include "RHI/ResourceManager/resource_allocator.hpp"
 #include "RHI/internal/resources.hpp"
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 #include "nodes/core/node_exec.hpp"
 #include "nvrhi/nvrhi.h"
 #include "utils/cam_to_view_contants.h"
 #include "utils/resource_cleaner.hpp"
 #include "utils/view_cb.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-inline Hd_USTC_CG_Camera* get_free_camera(
+RUZINO_NAMESPACE_OPEN_SCOPE
+inline Hd_RUZINO_Camera* get_free_camera(
     ExeParams& params,
     const std::string& camera_name = "Camera")
 {
     auto& cameras =
         params.get_global_payload<RenderGlobalPayload&>().get_cameras();
 
-    Hd_USTC_CG_Camera* free_camera = nullptr;
+    Hd_RUZINO_Camera* free_camera = nullptr;
     for (auto camera : cameras) {
         if (camera->GetId() != SdfPath::EmptyPath()) {
             free_camera = camera;
@@ -294,4 +294,4 @@ inline auto get_size(ExeParams& params)
 #define PROFILE_SCOPE(node_name)
 #endif
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

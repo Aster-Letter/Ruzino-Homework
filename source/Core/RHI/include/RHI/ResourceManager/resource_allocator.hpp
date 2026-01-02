@@ -13,7 +13,7 @@
 #endif
 #include "RHI/api.h"
 
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
 #include <nvrhi/nvrhi.h>
 
 #include "RHI/ShaderFactory/shader.hpp"
@@ -23,20 +23,20 @@
 
 #endif
 
-#ifdef USTC_CG_BACKEND_GL
+#ifdef RUZINO_BACKEND_GL
 #include "GL/GLresources.hpp"
 #include "GL/resources.hpp"
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
 
 MACRO_MAP(DESC_HANDLE_TRAIT, RESOURCE_LIST)
 MACRO_MAP(HANDLE_DESC_TRAIT, RESOURCE_LIST)
 #endif
 
-#ifdef USTC_CG_BACKEND_GL
+#ifdef RUZINO_BACKEND_GL
 MACRO_MAP(DESC_HANDLE_TRAIT, RESOURCE_LIST)
 MACRO_MAP(HANDLE_DESC_TRAIT, RESOURCE_LIST)
 #endif
@@ -185,7 +185,7 @@ class ResourceAllocator {
         return handle;
     }
 
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
     nvrhi::IDevice* device;
     ShaderFactory* shader_factory;
     void set_device(nvrhi::IDevice* device)
@@ -228,7 +228,7 @@ class ResourceAllocator {
     template<typename RESOURCE, typename... Args>
     RESOURCE create_resource(const desc<RESOURCE>& desc, Args&&... rest)
     {
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
         MACRO_MAP(CREATE_CONCRETE, NVRHI_RESOURCE_LIST)
 
         if constexpr (std::is_same_v<ProgramHandle, RESOURCE>) {
@@ -241,7 +241,7 @@ class ResourceAllocator {
             return device->createAccelStruct(desc, rest...);
         }
 #endif
-#ifdef USTC_CG_BACKEND_GL
+#ifdef RUZINO_BACKEND_GL
 #define CREATE_CONCRETE_GL(RESOURCE)            \
     JUDGE_RESOURCE(RESOURCE)                    \
     {                                           \
@@ -273,7 +273,7 @@ class ResourceAllocator {
         else {
             handle = create_resource<RESOURCE>(desc, rest...);
 
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
             if constexpr (std::is_same_v<BindingSetHandle, RESOURCE>) {
                 for (auto& resource : desc.bindings) {
                     mRelatedBindingSets.emplace(resource.resourceHandle, desc);
@@ -288,7 +288,7 @@ class ResourceAllocator {
     template<typename RESOURCE>
     auto calcSize(desc<RESOURCE>& key)
     {
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
         return gpu_resource_size(key);
 #endif
 
@@ -325,7 +325,7 @@ class ResourceAllocator {
     template<typename RESOURCE>
     void gc_type(auto& cacheSize, auto&& cache_in)
     {
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
         if ((cacheSize >= CACHE_CAPACITY)) {
             std::cout << "GC called!" << std::endl;
             using ContainerType = std::remove_cvref_t<decltype(cache_in)>;
@@ -479,7 +479,7 @@ class ResourceAllocator {
     size_t mAge = 0;
     static constexpr bool mEnabled = true;
 
-#ifdef USTC_CG_BACKEND_NVRHI
+#ifdef RUZINO_BACKEND_NVRHI
     std::unordered_map<nvrhi::IResource*, nvrhi::BindingSetDesc>
         mRelatedBindingSets;
 #endif
@@ -537,4 +537,4 @@ inline ResourceAllocator::ResourceAllocator() noexcept
 {
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -36,7 +36,7 @@
 #include <fstream>
 #include <iostream>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Opens a console window and redirects std::cout, std::cerr, and std::cin there.
@@ -117,6 +117,6 @@ private:
 
     bool mWaitForKey = true;
 };
-} // namespace USTC_CG
+} // namespace Ruzino
 
 #endif // FALCOR_WINDOWS

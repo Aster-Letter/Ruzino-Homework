@@ -30,7 +30,7 @@
 #include "Core/Macros.h"
 #include <bitset>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * A class that hold the state of the current inputs such as Keys and mouse events.
@@ -38,7 +38,7 @@ namespace USTC_CG
  * It is up to the user to tell Falcor that the input event was handled by returning true in the input event callbacks.
  */
 class Sample;
-class HD_USTC_CG_API InputState
+class HD_RUZINO_API InputState
 {
 public:
     bool isMouseMoving() const { return mMouseMoving; }
@@ -153,4 +153,4 @@ private:
 
     friend class SampleApp;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

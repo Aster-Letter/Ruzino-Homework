@@ -26,7 +26,7 @@
 
 struct ReadUsdCache {
     static constexpr bool has_storage = false;
-    USTC_CG::Geometry read_geometry;
+    Ruzino::Geometry read_geometry;
     std::string file_name;
     std::string prim_path;
 

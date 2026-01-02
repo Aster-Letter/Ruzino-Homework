@@ -31,13 +31,13 @@
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class DescriptorTableManager;
 typedef int DescriptorIndex;
 
 // Stores a descriptor index in a descriptor table. Releases the descriptor when
 // destroyed.
-class HD_USTC_CG_API DescriptorHandle {
+class HD_RUZINO_API DescriptorHandle {
    private:
     std::weak_ptr<DescriptorTableManager> m_Manager;
     DescriptorIndex m_DescriptorIndex;
@@ -72,7 +72,7 @@ class HD_USTC_CG_API DescriptorHandle {
     DescriptorHandle& operator=(DescriptorHandle&&) = default;
 };
 
-class HD_USTC_CG_API DescriptorTableManager
+class HD_RUZINO_API DescriptorTableManager
     : public std::enable_shared_from_this<DescriptorTableManager> {
    protected:
     nvrhi::DeviceHandle m_Device;
@@ -100,4 +100,4 @@ class HD_USTC_CG_API DescriptorTableManager
     nvrhi::BindingSetItem GetDescriptor(DescriptorIndex index);
     void ReleaseDescriptor(DescriptorIndex index);
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

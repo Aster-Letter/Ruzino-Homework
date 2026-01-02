@@ -40,7 +40,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Describes a grid volume (heterogeneous) in the scene.
         The absorbing/scattering medium is defined by a density voxel grid and additional parameters.
@@ -48,7 +48,7 @@ namespace USTC_CG
         Grids are stored in grid slots (density, emission) and can either be static, using one grid per slot,
         or dynamic, using a sequence of grids per slot.
     */
-    class HD_USTC_CG_API GridVolume : public Animatable
+    class HD_RUZINO_API GridVolume : public Animatable
     {
         FALCOR_OBJECT(GridVolume)
     public:

@@ -9,11 +9,11 @@ endif()
 
 # Build CUDA libs list conditionally
 set(SOLVER_PUBLIC_LIBS RHI Eigen3::Eigen)
-if(USTC_CG_WITH_CUDA)
+if(RUZINO_WITH_CUDA)
     list(APPEND SOLVER_PUBLIC_LIBS CUDA::cublas CUDA::cusparse)
 endif()
 
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
     RZSolver
     SHARED
     WITH_CUDA

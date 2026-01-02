@@ -30,7 +30,7 @@
 #include "widgets/usdtree/usd_fileviewer.h"
 #include "widgets/usdview/usdview_widget.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 namespace mx = MaterialX;
 
 class MaterialXNodeSystem : public NodeSystem {

@@ -115,7 +115,7 @@ float4 main(PS_INPUT input) : SV_Target
 }
 )";
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 struct VERTEX_CONSTANT_BUFFER {
     float mvp[4][4];
@@ -518,4 +518,4 @@ void ImGui_NVRHI::backbufferResizing()
 {
     pso = nullptr;
 }
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

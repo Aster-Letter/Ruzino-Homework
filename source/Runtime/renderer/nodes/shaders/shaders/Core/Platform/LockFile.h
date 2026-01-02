@@ -31,14 +31,14 @@
 
 #include <filesystem>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
  * Helper class abstracting lock files.
  * Uses LockFileEx() on Windows systems and flock() on POSIX systems.
  */
-class HD_USTC_CG_API LockFile
+class HD_RUZINO_API LockFile
 {
 public:
     enum class LockType
@@ -109,4 +109,4 @@ private:
     bool mIsOpen = false;
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

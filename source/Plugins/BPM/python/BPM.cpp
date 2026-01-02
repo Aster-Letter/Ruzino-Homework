@@ -6,7 +6,7 @@
 #include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
-using namespace USTC_CG;
+using namespace Ruzino;
 
 NB_MODULE(BPM_py, m)
 {

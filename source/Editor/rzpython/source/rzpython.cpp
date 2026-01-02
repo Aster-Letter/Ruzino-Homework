@@ -8,7 +8,7 @@
 
 namespace nb = nanobind;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace python {
 
@@ -238,4 +238,4 @@ void call<void>(const std::string& code)
 
 }  // namespace python
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

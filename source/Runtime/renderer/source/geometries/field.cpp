@@ -28,26 +28,26 @@
 #include <spdlog/spdlog.h>
 #include "pxr/imaging/hd/tokens.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_Field::Hd_USTC_CG_Field(const SdfPath& id)
+Hd_RUZINO_Field::Hd_RUZINO_Field(const SdfPath& id)
     : HdField(id),
       _isLoaded(false)
 {
     spdlog::info("Creating field: {}", id.GetText());
 }
 
-Hd_USTC_CG_Field::~Hd_USTC_CG_Field()
+Hd_RUZINO_Field::~Hd_RUZINO_Field()
 {
 }
 
-HdDirtyBits Hd_USTC_CG_Field::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Field::GetInitialDirtyBitsMask() const
 {
     return HdField::DirtyTransform | HdField::DirtyParams | HdField::AllDirty;
 }
 
-void Hd_USTC_CG_Field::Sync(
+void Hd_RUZINO_Field::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
@@ -97,7 +97,7 @@ void Hd_USTC_CG_Field::Sync(
     *dirtyBits &= ~HdField::AllDirty;
 }
 
-void Hd_USTC_CG_Field::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Field::Finalize(HdRenderParam* renderParam)
 {
     // Reset state
     _filePath.clear();
@@ -105,4 +105,4 @@ void Hd_USTC_CG_Field::Finalize(HdRenderParam* renderParam)
     _isLoaded = false;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

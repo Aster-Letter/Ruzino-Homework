@@ -16,7 +16,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Syntax class for SLANG (OpenGL Shading Language)
-class HD_USTC_CG_API SlangSyntax : public Syntax {
+class HD_RUZINO_API SlangSyntax : public Syntax {
    public:
     SlangSyntax(TypeSystemPtr typeSystem);
 

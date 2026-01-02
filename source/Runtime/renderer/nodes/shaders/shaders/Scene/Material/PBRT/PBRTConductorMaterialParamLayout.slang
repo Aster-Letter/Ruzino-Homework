@@ -27,7 +27,7 @@
  **************************************************************************/
 #include "../MaterialParamLayout.slangh"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 static constexpr float2 kPBRTConductorMinRoughness = float2(0.05f);
 
@@ -40,4 +40,4 @@ DEFINE_MATERIAL_PARAM_LAYOUT(PBRTConductorMaterial, MATERIAL_PARAMS)
 
 #undef MATERIAL_PARAMS
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

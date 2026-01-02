@@ -2,7 +2,7 @@
 
 #include "stage/stage.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 StageListener::StageListener(Stage* stage) : stage_(stage)
 {
@@ -95,4 +95,4 @@ void StageListener::OnObjectsChanged(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

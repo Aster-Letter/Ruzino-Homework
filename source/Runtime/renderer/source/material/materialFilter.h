@@ -7,7 +7,7 @@
 #include "material.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/usd/sdr/registry.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace mx = MaterialX;
 
 TfToken _FixSingleType(TfToken const& nodeType);
@@ -61,4 +61,4 @@ HdMaterialNode2 const* _GetTerminalNode(
     HdMaterialNetwork2 const& network,
     TfToken const& terminalName,
     SdfPath* terminalNodePath);
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

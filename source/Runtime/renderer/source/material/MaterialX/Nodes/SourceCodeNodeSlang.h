@@ -17,7 +17,7 @@ MATERIALX_NAMESPACE_BEGIN
 /// Implemention for a node using data-driven static source code.
 /// This is the default implementation used for all nodes that
 /// do not have a custom ShaderNodeImpl class.
-class HD_USTC_CG_API SourceCodeNodeSlang : public ShaderNodeImpl {
+class HD_RUZINO_API SourceCodeNodeSlang : public ShaderNodeImpl {
    public:
     static ShaderNodeImplPtr create();
 

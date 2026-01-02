@@ -29,7 +29,7 @@
 #include "BasicMaterialData.slang"
 #include "Material.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 /** Base class for basic non-layered materials.
 
     Texture channel layout:
@@ -40,7 +40,7 @@ namespace USTC_CG {
 
     See additional texture channels defined in derived classes.
 */
-class HD_USTC_CG_API BasicMaterial : public Material {
+class HD_RUZINO_API BasicMaterial : public Material {
     FALCOR_OBJECT(BasicMaterial)
    public:
     /** Render the UI.
@@ -383,4 +383,4 @@ inline std::string to_string(ShadingModel model)
         default: FALCOR_UNREACHABLE(); return "";
     }
 }
-}  // namespace USTC_CG
+}  // namespace Ruzino

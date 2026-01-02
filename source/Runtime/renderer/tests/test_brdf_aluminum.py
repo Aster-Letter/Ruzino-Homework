@@ -32,7 +32,7 @@ sys.path.insert(0, str(binary_dir))
 from pxr import Usd, UsdGeom, UsdShade, Sdf, UsdMtlx
 
 # Import modules
-import hd_USTC_CG_py as renderer
+import hd_RUZINO_py as renderer
 import nodes_core_py as core
 import nodes_system_py as system
 

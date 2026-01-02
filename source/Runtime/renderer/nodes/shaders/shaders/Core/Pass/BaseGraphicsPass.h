@@ -35,8 +35,8 @@
 #include "Core/Program/ShaderVar.h"
 #include "Core/State/GraphicsState.h"
 
-namespace USTC_CG {
-class HD_USTC_CG_API BaseGraphicsPass : public Object {
+namespace Ruzino {
+class HD_RUZINO_API BaseGraphicsPass : public Object {
     FALCOR_OBJECT(BaseGraphicsPass)
    public:
     virtual ~BaseGraphicsPass() = default;
@@ -109,4 +109,4 @@ class HD_USTC_CG_API BaseGraphicsPass : public Object {
     ref<ProgramVars> mpVars;
     ref<GraphicsState> mpState;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

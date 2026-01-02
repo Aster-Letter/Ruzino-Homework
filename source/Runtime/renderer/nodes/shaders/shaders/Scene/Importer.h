@@ -38,13 +38,13 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Base class for importers.
         Importers are bound to a set of file extensions. This allows the right importer to
         be called when importing an asset file.
     */
-    class HD_USTC_CG_API Importer
+    class HD_RUZINO_API Importer
     {
     public:
         using PluginCreate = std::function<std::unique_ptr<Importer>()>;

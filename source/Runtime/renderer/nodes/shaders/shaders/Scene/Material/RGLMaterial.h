@@ -30,7 +30,7 @@
 #include "RGLMaterialData.slang"
 #include <filesystem>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Class representing a measured material from the RGL BRDF database.
 
@@ -39,7 +39,7 @@ namespace USTC_CG
         "An Adaptive Parameterization for Efficient Material Acquisition and Rendering".
         Transactions on Graphics (Proc. SIGGRAPH Asia 2018)
     */
-    class HD_USTC_CG_API RGLMaterial : public Material
+    class HD_RUZINO_API RGLMaterial : public Material
     {
         FALCOR_OBJECT(RGLMaterial)
     public:

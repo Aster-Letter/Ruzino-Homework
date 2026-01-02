@@ -12,7 +12,7 @@
 #include "stage/stage.hpp"
 #include "stage_listener/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class STAGE_LISTENER_API StageListener : public pxr::TfWeakBase {
    public:
@@ -40,4 +40,4 @@ class STAGE_LISTENER_API StageListener : public pxr::TfWeakBase {
     DirtyPathSet previousPrimPaths_;  // 上一帧的Prim路径集合
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

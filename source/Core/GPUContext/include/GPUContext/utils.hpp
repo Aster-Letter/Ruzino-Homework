@@ -2,7 +2,7 @@
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 template<typename T>
 inline nvrhi::BufferHandle create_buffer(
@@ -156,4 +156,4 @@ inline void initialize_texture(
     resource_allocator.destroy(command_list);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

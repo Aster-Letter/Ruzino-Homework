@@ -2,7 +2,7 @@
 #include "blueprints/drawing.h"
 
 #include <imgui_internal.h>
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 void ax::Drawing::DrawIcon(
     ImDrawList* drawList,
     const ImVec2& a,
@@ -265,4 +265,4 @@ void ax::Drawing::DrawIcon(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

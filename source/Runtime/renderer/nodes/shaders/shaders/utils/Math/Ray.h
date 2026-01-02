@@ -28,7 +28,7 @@
 #pragma once
 #include "Vector.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Ray type.
@@ -53,4 +53,4 @@ static_assert(offsetof(Ray, tMin) == sizeof(float3));
 static_assert(offsetof(Ray, dir) == offsetof(Ray, tMin) + sizeof(float));
 static_assert(offsetof(Ray, tMax) == offsetof(Ray, dir) + sizeof(float3));
 static_assert(sizeof(Ray) == 32);
-} // namespace USTC_CG
+} // namespace Ruzino

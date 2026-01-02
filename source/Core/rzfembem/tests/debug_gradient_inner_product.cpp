@@ -7,7 +7,7 @@
 #include "fem_bem/api.h"
 #include "fem_bem/fem_bem.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 int main()
 {
     // Create a simple triangle: (0,0), (0,5), (1,0)

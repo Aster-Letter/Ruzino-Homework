@@ -15,7 +15,7 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Custom Blob implementation to hold shader binary data loaded from cache
 class CustomBlob : public ISlangBlob {
@@ -1319,4 +1319,4 @@ void ShaderFactory::save_to_cache(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

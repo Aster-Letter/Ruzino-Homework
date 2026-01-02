@@ -31,13 +31,13 @@
 #include "pxr/imaging/hd/renderPassState.h"
 #include "renderBuffer.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-Hd_USTC_CG_RenderPass::Hd_USTC_CG_RenderPass(
+Hd_RUZINO_RenderPass::Hd_RUZINO_RenderPass(
     HdRenderIndex* index,
     const HdRprimCollection& collection,
     HdRenderThread* renderThread,
-    Hd_USTC_CG_Renderer* renderer,
+    Hd_RUZINO_Renderer* renderer,
     std::atomic<int>* sceneVersion)
     : HdRenderPass(index, collection),
       _renderThread(renderThread),
@@ -48,7 +48,7 @@ Hd_USTC_CG_RenderPass::Hd_USTC_CG_RenderPass(
 {
 }
 
-Hd_USTC_CG_RenderPass::~Hd_USTC_CG_RenderPass()
+Hd_RUZINO_RenderPass::~Hd_RUZINO_RenderPass()
 {
     std::cout << "Destroying renderPass" << std::endl;
 }
@@ -66,7 +66,7 @@ static GfRect2i _GetDataWindow(
     }
 }
 
-void Hd_USTC_CG_RenderPass::_Execute(
+void Hd_RUZINO_RenderPass::_Execute(
     const HdRenderPassStateSharedPtr& renderPassState,
     const TfTokenVector& renderTags)
 {
@@ -142,7 +142,7 @@ void Hd_USTC_CG_RenderPass::_Execute(
     }
 }
 
-bool Hd_USTC_CG_RenderPass::IsConverged() const
+bool Hd_RUZINO_RenderPass::IsConverged() const
 {
     // Otherwise, check the convergence of all attachments.
     for (size_t i = 0; i < _aovBindings.size(); ++i) {
@@ -154,4 +154,4 @@ bool Hd_USTC_CG_RenderPass::IsConverged() const
     return true;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

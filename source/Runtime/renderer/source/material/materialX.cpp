@@ -14,21 +14,21 @@
 #include "bindlessContext.h"
 #include "hdMtlxFast.h"
 #include "materialFilter.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(_tokens, (file)(sourceColorSpace)(raw)(srgb));
 
 namespace mx = MaterialX;
 
-MaterialX::GenContextPtr Hd_USTC_CG_MaterialX::shader_gen_context_ =
+MaterialX::GenContextPtr Hd_RUZINO_MaterialX::shader_gen_context_ =
     std::make_shared<mx::GenContext>(mx::SlangShaderGenerator::create());
-MaterialX::DocumentPtr Hd_USTC_CG_MaterialX::libraries = mx::createDocument();
+MaterialX::DocumentPtr Hd_RUZINO_MaterialX::libraries = mx::createDocument();
 
-std::mutex Hd_USTC_CG_MaterialX::shadergen_mutex;
-std::once_flag Hd_USTC_CG_MaterialX::shader_gen_initialized_;
+std::mutex Hd_RUZINO_MaterialX::shadergen_mutex;
+std::once_flag Hd_RUZINO_MaterialX::shader_gen_initialized_;
 
-Hd_USTC_CG_MaterialX::Hd_USTC_CG_MaterialX(SdfPath const& id)
-    : Hd_USTC_CG_Material(id)
+Hd_RUZINO_MaterialX::Hd_RUZINO_MaterialX(SdfPath const& id)
+    : Hd_RUZINO_Material(id)
 {
     std::call_once(shader_gen_initialized_, []() {
         mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
@@ -37,11 +37,11 @@ Hd_USTC_CG_MaterialX::Hd_USTC_CG_MaterialX(SdfPath const& id)
         searchPath.append(
             mx::FilePath(std::filesystem::current_path().string()));
 
-        searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
+        searchPath.append(mx::FileSearchPath("usd/hd_RUZINO/resources"));
 
         loadLibraries({ "libraries" }, searchPath, libraries);
         mx::loadLibraries(
-            { "usd/hd_USTC_CG/resources/libraries" }, searchPath, libraries);
+            { "usd/hd_RUZINO/resources/libraries" }, searchPath, libraries);
         shader_gen_context_->registerSourceCodeSearchPath(searchPath);
 
         shader_gen_context_->pushUserData(
@@ -49,15 +49,15 @@ Hd_USTC_CG_MaterialX::Hd_USTC_CG_MaterialX(SdfPath const& id)
     });
 }
 
-void Hd_USTC_CG_MaterialX::Sync(
+void Hd_RUZINO_MaterialX::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
-    Hd_USTC_CG_Material::Sync(sceneDelegate, renderParam, dirtyBits);
+    Hd_RUZINO_Material::Sync(sceneDelegate, renderParam, dirtyBits);
     spdlog::info("MaterialX::Sync called for material '{}'", GetId().GetText());
 
-    auto param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
 
     ensure_material_data_handle(param);
 
@@ -161,7 +161,7 @@ void Hd_USTC_CG_MaterialX::Sync(
     *dirtyBits = HdChangeTracker::Clean;
 }
 
-void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
+void Hd_RUZINO_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
 {
     if (shader_ready) {
         return;
@@ -181,7 +181,7 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
     // Otherwise, process MaterialX shader generation
     // Call base class but temporarily disable shader_ready flag
     // because MaterialX needs additional processing
-    Hd_USTC_CG_Material::ensure_shader_ready(factory);
+    Hd_RUZINO_Material::ensure_shader_ready(factory);
     shader_ready = false;  // Reset since MaterialX needs more work
 
     if (!eval_shader_source.empty()) {
@@ -532,8 +532,8 @@ void Hd_USTC_CG_MaterialX::ensure_shader_ready(const ShaderFactory& factory)
     // Note: shader_generation was already incremented by base class
 }
 
-void Hd_USTC_CG_MaterialX::BuildGPUTextures(
-    Hd_USTC_CG_RenderParam* render_param)
+void Hd_RUZINO_MaterialX::BuildGPUTextures(
+    Hd_RUZINO_RenderParam* render_param)
 {
     auto descriptor_table =
         render_param->InstanceCollection->get_texture_descriptor_table();
@@ -633,7 +633,7 @@ void Hd_USTC_CG_MaterialX::BuildGPUTextures(
     }
 }
 
-void Hd_USTC_CG_MaterialX::CollectTextures(
+void Hd_RUZINO_MaterialX::CollectTextures(
     HdMaterialNetwork2Interface netInterface,
     HdMtlxTexturePrimvarData hdMtlxData)
 {
@@ -691,7 +691,7 @@ void Hd_USTC_CG_MaterialX::CollectTextures(
     }
 }
 
-HdMaterialNetwork2Interface Hd_USTC_CG_MaterialX::FetchMaterialNetwork(
+HdMaterialNetwork2Interface Hd_RUZINO_MaterialX::FetchMaterialNetwork(
     HdSceneDelegate* sceneDelegate,
     HdMaterialNetwork2& hdNetwork,
     SdfPath& materialPath,
@@ -710,7 +710,7 @@ HdMaterialNetwork2Interface Hd_USTC_CG_MaterialX::FetchMaterialNetwork(
     return netInterface;
 }
 
-void Hd_USTC_CG_MaterialX::MtlxGenerateShader(
+void Hd_RUZINO_MaterialX::MtlxGenerateShader(
     MaterialX::DocumentPtr mtlx_document,
     HdMaterialNetwork2Interface netInterface,
     HdMtlxTexturePrimvarData& hdMtlxData)
@@ -863,4 +863,4 @@ void Hd_USTC_CG_MaterialX::MtlxGenerateShader(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

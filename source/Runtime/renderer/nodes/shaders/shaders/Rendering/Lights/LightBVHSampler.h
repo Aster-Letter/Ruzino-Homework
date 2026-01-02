@@ -36,7 +36,7 @@
 #include "Scene/Lights/LightCollection.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** The CPU pointer to the lighting system's acceleration structure is
         passed to RenderPass::execute() via a field with this name in the
@@ -49,7 +49,7 @@ namespace USTC_CG
         This class wraps a LightCollection object, which holds the set of lights to sample.
         Internally, the class build a BVH over the light sources.
     */
-    class HD_USTC_CG_API LightBVHSampler : public EmissiveLightSampler
+    class HD_RUZINO_API LightBVHSampler : public EmissiveLightSampler
     {
     public:
         /** LightBVHSampler configuration.

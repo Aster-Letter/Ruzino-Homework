@@ -58,7 +58,7 @@ function(_copy_headers LIBRARY_NAME)
             add_custom_command(
                 OUTPUT ${outfile}
                 COMMAND ${CMAKE_COMMAND} -E make_directory ${dir_to_create}
-                COMMAND ${CMAKE_COMMAND} -Dinfile=${infile} -Doutfile=${outfile} -P "${USTC_CG_ROOT_DIR}/cmake/macros/copyHeaderForBuild.cmake"
+                COMMAND ${CMAKE_COMMAND} -Dinfile=${infile} -Doutfile=${outfile} -P "${RUZINO_ROOT_DIR}/cmake/macros/copyHeaderForBuild.cmake"
                 MAIN_DEPENDENCY ${infile}
                 COMMENT "Copying ${f} ..."
                 VERBATIM
@@ -293,7 +293,7 @@ function(__pxr_library NAME)
     target_compile_definitions(${NAME} PUBLIC NOMINMAX=1)
     string(TOUPPER ${NAME} CAPITAL_NAME)
     target_compile_definitions(${NAME} PRIVATE ${CAPITAL_NAME}_EXPORTS=1)
-    target_compile_definitions(${NAME} PRIVATE -DUSTC_CG_BUILD_MODULE=1)
+    target_compile_definitions(${NAME} PRIVATE -DRUZINO_BUILD_MODULE=1)
     target_include_directories(${NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
 endfunction()

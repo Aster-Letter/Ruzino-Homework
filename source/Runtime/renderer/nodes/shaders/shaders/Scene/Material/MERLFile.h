@@ -33,14 +33,14 @@
 #include <filesystem>
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
     class Device;
 
     /** Class for loading a measured material from the MERL BRDF database.
         Additional metadata is loaded along with the BRDF if available.
     */
-    class HD_USTC_CG_API MERLFile
+    class HD_RUZINO_API MERLFile
     {
     public:
         struct Desc

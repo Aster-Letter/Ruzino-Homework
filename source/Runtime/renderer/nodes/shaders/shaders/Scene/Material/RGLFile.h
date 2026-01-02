@@ -32,7 +32,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Class representing a measured material file from the RGL BRDF database.
     */
@@ -75,7 +75,7 @@ namespace USTC_CG
 
         RGLFile() = default;
 
-        /** Loads RGL measured BRDF file and validates contents. Throws USTC_CG::Exception on failure.
+        /** Loads RGL measured BRDF file and validates contents. Throws Ruzino::Exception on failure.
         */
         RGLFile(std::ifstream& in);
 
@@ -95,7 +95,7 @@ namespace USTC_CG
 
         /** Make sure all required fields are present and have correct shape and dimensions,
             then populates mMeasurement field if all fields are correct.
-            Throws USTC_CG::Exception on validation error.
+            Throws Ruzino::Exception on validation error.
         */
         void validate();
 

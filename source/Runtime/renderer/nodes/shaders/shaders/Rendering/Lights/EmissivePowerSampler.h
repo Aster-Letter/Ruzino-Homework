@@ -32,14 +32,14 @@
 #include <random>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     class RenderContext;
     struct ShaderVar;
 
     /** Sample geometry proportionally to its emissive power.
     */
-    class HD_USTC_CG_API EmissivePowerSampler : public EmissiveLightSampler
+    class HD_RUZINO_API EmissivePowerSampler : public EmissiveLightSampler
     {
     public:
         struct AliasTable

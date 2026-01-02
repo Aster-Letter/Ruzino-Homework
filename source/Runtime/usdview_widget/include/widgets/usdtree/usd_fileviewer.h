@@ -7,7 +7,7 @@
 #include "GUI/widget.h"
 #include "widgets/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class Stage;
 class NodeSystem;
 
@@ -73,4 +73,4 @@ class USDVIEW_WIDGET_API UsdFileViewer : public IWidget {
     std::vector<pxr::SdfPath> all_materials_cache;
     bool materials_cache_dirty = true;
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

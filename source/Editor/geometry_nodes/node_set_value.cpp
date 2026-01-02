@@ -8,8 +8,8 @@
 #include "nodes/core/def/node_def.hpp"
 
 
-using namespace USTC_CG;
-using namespace USTC_CG::fem_bem;
+using namespace Ruzino;
+using namespace Ruzino::fem_bem;
 
 NODE_DEF_OPEN_SCOPE
 

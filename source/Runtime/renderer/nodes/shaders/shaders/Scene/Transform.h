@@ -31,13 +31,13 @@
 #include "utils/Math/Matrix.h"
 #include "utils/Math/Quaternion.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Helper to create transformation matrices based on translation,
         rotation and scaling. These operations are applied in order of
         scaling, rotation, and translation last.
     */
-    class HD_USTC_CG_API Transform
+    class HD_RUZINO_API Transform
     {
     public:
         enum class CompositionOrder

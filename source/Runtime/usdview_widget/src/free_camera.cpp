@@ -9,7 +9,7 @@
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 void BaseCamera::UpdateWorldToView()
 {
     auto m_MatTranslatedWorldToView = pxr::GfMatrix4d(
@@ -525,4 +525,4 @@ void ThirdPersonCamera::CartesianToSpherical(
     azimuth = std::atan2(cartesian[2], cartesian[0]);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

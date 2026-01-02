@@ -2,7 +2,7 @@
 
 #include "nvrhi/utils.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 ComputeContext::ComputeContext(ResourceAllocator& r, ProgramVars& vars)
     : GPUContext(r, vars)
 
@@ -62,4 +62,4 @@ ComputeContext& ComputeContext::finish_setting_pso()
 }
 
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -35,14 +35,14 @@
 
 // clang-format off
 #define IM_VEC2_CLASS_EXTRA                                                             \
-    constexpr ImVec2(const ::USTC_CG::float2& f) : x(f.x), y(f.y) {}                     \
-    operator ::USTC_CG::float2() const { return ::USTC_CG::float2(x, y); }
+    constexpr ImVec2(const ::Ruzino::float2& f) : x(f.x), y(f.y) {}                     \
+    operator ::Ruzino::float2() const { return ::Ruzino::float2(x, y); }
 
 #define IM_VEC3_CLASS_EXTRA                                                             \
-    constexpr ImVec3(const ::USTC_CG::float3& f) : x(f.x), y(f.y), z(f.z) {}             \
-    operator ::USTC_CG::float3() const { return ::USTC_CG::float3(x, y, z); }
+    constexpr ImVec3(const ::Ruzino::float3& f) : x(f.x), y(f.y), z(f.z) {}             \
+    operator ::Ruzino::float3() const { return ::Ruzino::float3(x, y, z); }
 
 #define IM_VEC4_CLASS_EXTRA                                                             \
-    constexpr ImVec4(const ::USTC_CG::float4& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}     \
-    operator ::USTC_CG::float4() const { return ::USTC_CG::float4(x, y, z, w); }
+    constexpr ImVec4(const ::Ruzino::float4& f) : x(f.x), y(f.y), z(f.z), w(f.w) {}     \
+    operator ::Ruzino::float4() const { return ::Ruzino::float4(x, y, z, w); }
 // clang-format on

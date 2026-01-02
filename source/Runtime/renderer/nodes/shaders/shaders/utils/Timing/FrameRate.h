@@ -32,12 +32,12 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Helper class for calculating framerate.
  */
-class HD_USTC_CG_API FrameRate
+class HD_RUZINO_API FrameRate
 {
 public:
     FrameRate()
@@ -106,4 +106,4 @@ inline std::string to_string(const FrameRate& fr, bool vsyncOn = false)
 {
     return fr.getMsg(vsyncOn);
 }
-} // namespace USTC_CG
+} // namespace Ruzino

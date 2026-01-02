@@ -5,7 +5,7 @@
 #include "program_vars.hpp"
 #include "pxr/base/gf/vec2f.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 struct GraphicsRenderState {
     nvrhi::
         static_vector<nvrhi::VertexBufferBinding, nvrhi::c_MaxVertexAttributes>
@@ -95,4 +95,4 @@ class GPUCONTEXT_API GraphicsContext : public GPUContext {
     nvrhi::ViewportState viewport;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

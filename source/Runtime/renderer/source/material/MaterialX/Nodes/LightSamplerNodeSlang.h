@@ -11,7 +11,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Utility node for sampling lights for SLANG.
-class HD_USTC_CG_API LightSamplerNodeSlang : public SlangImplementation
+class HD_RUZINO_API LightSamplerNodeSlang : public SlangImplementation
 {
   public:
     LightSamplerNodeSlang();

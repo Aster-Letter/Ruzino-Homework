@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-using namespace USTC_CG::fem_bem;
+using namespace Ruzino::fem_bem;
 
 // Test Expression class specific functionality - Factory methods
 TEST(ExpressionFocusedTest, FactoryMethods)

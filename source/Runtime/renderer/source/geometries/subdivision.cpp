@@ -30,7 +30,7 @@
 #include "pxr/imaging/pxOsd/tokens.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 using namespace pxr;
 
@@ -1434,4 +1434,4 @@ void _EvalStencilsCPU(
 }
 }  // namespace
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

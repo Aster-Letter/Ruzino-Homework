@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 
-using namespace USTC_CG::Solver;
+using namespace Ruzino::Solver;
 
 class SolverComparisonTest : public ::testing::Test {
    protected:

@@ -12,7 +12,7 @@
 #include "pxr/base/gf/quatf.h"
 #include "pxr/base/gf/vec3f.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
 // Define the macro locally if not available
@@ -357,4 +357,4 @@ void GPUSceneAssember::compute_sphere_aabbs(
     spdlog::info("GPUSceneAssember::compute_sphere_aabbs: AABB computation complete");
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

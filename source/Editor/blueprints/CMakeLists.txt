@@ -1,5 +1,5 @@
 
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	blueprints
 	PUBLIC_LIBS GUI nodes_core RHI
 	PRIVATE_LIBS glfw spdlog::spdlog stb_image nodes_system test_nodes

@@ -17,7 +17,7 @@ MATERIALX_NAMESPACE_BEGIN
 class SlangShaderGenerator;
 
 /// LightCompound node implementation for SLANG
-class HD_USTC_CG_API LightCompoundNodeSlang : public CompoundNode {
+class HD_RUZINO_API LightCompoundNodeSlang : public CompoundNode {
    public:
     LightCompoundNodeSlang();
 

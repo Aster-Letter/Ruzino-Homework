@@ -53,7 +53,7 @@ SOFTWARE.
 #include "RHI/DeviceManager/DeviceManager.h"
 #include "imgui_nvrhi.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 // base class to build IRenderPass-based UIs using ImGui through NVRHI
 class ImGui_Renderer : public IRenderPass {
    protected:
@@ -96,4 +96,4 @@ class ImGui_Renderer : public IRenderPass {
     bool contextInitialized = false;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -11,7 +11,7 @@
 #include "nodes/system/node_system.hpp"
 #include "nodes/ui/imgui.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 struct FooExecutor : public NodeTreeExecutor {
     void prepare_tree(NodeTree* tree, Node* required_node) override

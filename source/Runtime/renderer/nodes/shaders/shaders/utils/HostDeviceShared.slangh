@@ -62,7 +62,7 @@
 #include "utils/Math/Matrix.h"
 #include <algorithm>
 
-namespace USTC_CG
+namespace Ruzino
 {
     using math::sign;
     using math::f16tof32;
@@ -81,8 +81,8 @@ namespace USTC_CG
 *******************************************************************/
 #define inline
 #define constexpr const
-#define USTC_CG_NAMESPACE_OPEN_SCOPE
-#define USTC_CG_NAMESPACE_CLOSE_SCOPE
+#define RUZINO_NAMESPACE_OPEN_SCOPE
+#define RUZINO_NAMESPACE_CLOSE_SCOPE
 #define BEGIN_NAMESPACE(name)
 #define END_NAMESPACE
 #define SETTER_DECL [mutating]

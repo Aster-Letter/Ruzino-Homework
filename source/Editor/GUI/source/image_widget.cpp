@@ -4,7 +4,7 @@
 
 #include "imgui.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 ImageWidget::ImageWidget(nvrhi::ITexture* texture)
     : texture_(texture),
@@ -97,4 +97,4 @@ const char* ImageWidget::GetWindowName()
     return "Image Viewer";
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

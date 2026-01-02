@@ -20,7 +20,7 @@
 
 //------------------------------------------------------------------------------
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace ax
 {
     namespace NodeEditor
@@ -62,7 +62,7 @@ namespace ax
         } // namespace Detail
     }     // namespace Editor
 }         // namespace ax
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 //------------------------------------------------------------------------------
 # endif // __IMGUI_NODE_EDITOR_INTERNAL_INL__

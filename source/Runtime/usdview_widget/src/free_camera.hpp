@@ -17,7 +17,7 @@
 #include "GLFW/glfw3.h"
 #include "pxr/usd/usdGeom/camera.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class BaseCamera : public pxr::UsdGeomCamera {
    public:
@@ -301,4 +301,4 @@ class ThirdPersonCamera : public BaseCamera {
     };
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

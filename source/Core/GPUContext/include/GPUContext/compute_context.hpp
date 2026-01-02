@@ -5,7 +5,7 @@
 #include "nvrhi/nvrhi.h"
 #include "program_vars.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 struct GraphicsComputeState {
     nvrhi::IBuffer* indirectParams;
 };
@@ -34,4 +34,4 @@ class GPUCONTEXT_API ComputeContext : public GPUContext {
     nvrhi::ComputeState compute_state;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

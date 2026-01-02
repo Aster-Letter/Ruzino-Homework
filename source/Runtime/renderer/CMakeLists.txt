@@ -4,31 +4,31 @@ target_include_directories(shaders_interface INTERFACE ${CMAKE_CURRENT_SOURCE_DI
 target_include_directories(shaders_interface INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/nodes/)
 target_compile_definitions(shaders_interface INTERFACE RENDERER_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/nodes/shaders/" NOMINMAX)
 
-USTC_CG_ADD_LIB(
-	hd_USTC_CG
+RUZINO_ADD_LIB(
+	hd_RUZINO
 	SHARED
 	PUBLIC_LIBS spdlog::spdlog GPUContext usdMtlx MCore usdImaging usdImagingGL
 	PRIVATE_LIBS usd usdVol RHI hdx nodes_system shaders_interface usdVol usdVolImaging hioOpenVDB
 	COMPILE_DEFS
-		NOMINMAX USTC_CG_DIRECT_VK_DISPLAY
+		NOMINMAX RUZINO_DIRECT_VK_DISPLAY
 	USD_RESOURCE_DIRS resources nodes/shaders
 	SKIP_DIRS nodes
-	RESOURCE_COPY_TARGET ${OUT_BINARY_DIR}/usd/hd_USTC_CG/resources
+	RESOURCE_COPY_TARGET ${OUT_BINARY_DIR}/usd/hd_RUZINO/resources
 	PYTHON_WRAP_DIR python
 )
 
-target_compile_definitions(hd_USTC_CG PRIVATE HOST_CODE=1)
-target_compile_definitions(hd_USTC_CG PRIVATE GPU_ASSEMBLER_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/source/shaders/")
-target_compile_definitions(hd_USTC_CG PUBLIC USTC_CG_BACKEND_NVRHI)
-target_include_directories(hd_USTC_CG PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nodes/shaders/shaders)
-target_include_directories(hd_USTC_CG PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source)
+target_compile_definitions(hd_RUZINO PRIVATE HOST_CODE=1)
+target_compile_definitions(hd_RUZINO PRIVATE GPU_ASSEMBLER_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/source/shaders/")
+target_compile_definitions(hd_RUZINO PUBLIC RUZINO_BACKEND_NVRHI)
+target_include_directories(hd_RUZINO PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nodes/shaders/shaders)
+target_include_directories(hd_RUZINO PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/source)
 
 
 add_nodes(
 	TARGET_NAME render_nodes 
 	SRC_DIRS nodes
 	CONVERSION_DIRS nodes/conversion
-	DEP_LIBS usd RHI hd_USTC_CG usdImaging shaders_interface
+	DEP_LIBS usd RHI hd_RUZINO usdImaging shaders_interface
 	COMPILE_DEFS NOMINMAX 
 	EXTRA_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/source
 )

@@ -36,8 +36,8 @@
 #include "Core/Program/ShaderVar.h"
 #include "Core/State/ComputeState.h"
 
-namespace USTC_CG {
-class HD_USTC_CG_API ComputePass : public Object {
+namespace Ruzino {
+class HD_RUZINO_API ComputePass : public Object {
     FALCOR_OBJECT(ComputePass)
    public:
     /**
@@ -192,4 +192,4 @@ class HD_USTC_CG_API ComputePass : public Object {
     ref<ProgramVars> mpVars;
     ref<ComputeState> mpState;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

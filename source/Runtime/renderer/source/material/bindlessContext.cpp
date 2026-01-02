@@ -14,7 +14,7 @@
 #include "materialFilter.h"
 #include "pxr/base/arch/fileSystem.h"
 #include "pxr/usd/ar/resolver.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //
 // BindlessContext
 //
@@ -432,4 +432,4 @@ void BindlessContext::emitStructuredResourceBindings(
     generator.emitScopeEnd(stage, true);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

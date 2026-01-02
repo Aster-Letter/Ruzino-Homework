@@ -87,11 +87,11 @@
 // source file of the executable.
 #define FALCOR_EXPORT_D3D12_AGILITY_SDK                               \
     extern "C" {                                                      \
-    HD_USTC_CG_API_EXPORT extern const unsigned int D3D12SDKVersion = \
+    HD_RUZINO_API_EXPORT extern const unsigned int D3D12SDKVersion = \
         FALCOR_D3D12_AGILITY_SDK_VERSION;                             \
     }                                                                 \
     extern "C" {                                                      \
-    HD_USTC_CG_API_EXPORT extern const char* D3D12SDKPath =           \
+    HD_RUZINO_API_EXPORT extern const char* D3D12SDKPath =           \
         FALCOR_D3D12_AGILITY_SDK_PATH;                                \
     }
 #else

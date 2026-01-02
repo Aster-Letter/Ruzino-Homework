@@ -50,21 +50,21 @@ freely, subject to the following restrictions:
 #pragma once
 #include "RHI/api.h"
 
-#if USTC_CG_WITH_DX11 || USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX11 || RUZINO_WITH_DX12
 #include <DXGI.h>
 #endif
 
-#if USTC_CG_WITH_DX11
+#if RUZINO_WITH_DX11
 #include <d3d11.h>
 #endif
 
-#if USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX12
 #include <d3d12.h>
 #endif
 
 #include <nvrhi/vulkan.h>
 
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
 #include "AftermathCrashDump.h"
 #endif
 
@@ -80,7 +80,7 @@ freely, subject to the following restrictions:
 #include <functional>
 #include <list>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 struct DefaultMessageCallback : public nvrhi::IMessageCallback {
     static DefaultMessageCallback& GetInstance();
 
@@ -91,7 +91,7 @@ struct DefaultMessageCallback : public nvrhi::IMessageCallback {
 struct InstanceParameters {
     bool enableDebugRuntime = false;
     bool headlessDevice = false;
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     bool enableAftermath = false;
 #endif
 
@@ -145,7 +145,7 @@ struct DeviceCreationParameters : public InstanceParameters {
     // explicitly
     bool enablePerMonitorDPI = false;
 
-#if USTC_CG_WITH_DX11 || USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX11 || RUZINO_WITH_DX12
     DXGI_USAGE swapChainUsage =
         DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT;
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
@@ -174,7 +174,7 @@ struct AdapterInfo {
     uint32_t vendorID = 0;
     uint32_t deviceID = 0;
     uint64_t dedicatedVideoMemory = 0;
-#if USTC_CG_WITH_DX11 || USTC_CG_WITH_DX12
+#if RUZINO_WITH_DX11 || RUZINO_WITH_DX12
     nvrhi::RefCountPtr<IDXGIAdapter> dxgiAdapter;
 #endif
     VkPhysicalDevice vkPhysicalDevice = nullptr;
@@ -396,7 +396,7 @@ class RHI_API DeviceManager {
     static DeviceManager* CreateVK();
 
     std::string m_WindowTitle;
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     AftermathCrashDump m_AftermathCrashDumper;
 #endif
 };
@@ -475,4 +475,4 @@ class IRenderPass {
         return m_DeviceManager->GetFrameIndex();
     }
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

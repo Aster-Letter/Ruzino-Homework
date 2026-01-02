@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_RENDERER_PLUGIN_H
-#define Hd_USTC_CG_RENDERER_PLUGIN_H
+#ifndef Hd_RUZINO_RENDERER_PLUGIN_H
+#define Hd_RUZINO_RENDERER_PLUGIN_H
 #include "api.h"
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/pxr.h"
@@ -31,7 +31,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
 ///
-/// \class Hd_USTC_CG_RendererPlugin
+/// \class Hd_RUZINO_RendererPlugin
 ///
 /// A registered child of HdRendererPlugin, this is the class that gets
 /// loaded when a Hydra application asks to draw with a certain renderer.
@@ -41,16 +41,16 @@ using namespace pxr;
 /// prims (which translate scene data into drawable representations) and Hydra
 /// renderpasses (which draw the scene to the framebuffer).
 ///
-class HD_USTC_CG_API Hd_USTC_CG_RendererPlugin final
+class HD_RUZINO_API Hd_RUZINO_RendererPlugin final
     : public HdRendererPlugin {
    public:
-    Hd_USTC_CG_RendererPlugin() = default;
-    virtual ~Hd_USTC_CG_RendererPlugin() = default;
+    Hd_RUZINO_RendererPlugin() = default;
+    virtual ~Hd_RUZINO_RendererPlugin() = default;
 
-    /// Construct a new render delegate of type Hd_USTC_CG_RenderDelegate.
+    /// Construct a new render delegate of type Hd_RUZINO_RenderDelegate.
     virtual HdRenderDelegate *CreateRenderDelegate() override;
 
-    /// Construct a new render delegate of type Hd_USTC_CG_RenderDelegate.
+    /// Construct a new render delegate of type Hd_RUZINO_RenderDelegate.
     virtual HdRenderDelegate *CreateRenderDelegate(
         HdRenderSettingsMap const &settingsMap) override;
 
@@ -64,11 +64,11 @@ class HD_USTC_CG_API Hd_USTC_CG_RendererPlugin final
 
    private:
     // This class does not support copying.
-    Hd_USTC_CG_RendererPlugin(const Hd_USTC_CG_RendererPlugin &) = delete;
-    Hd_USTC_CG_RendererPlugin &operator=(
-        const Hd_USTC_CG_RendererPlugin &) = delete;
+    Hd_RUZINO_RendererPlugin(const Hd_RUZINO_RendererPlugin &) = delete;
+    Hd_RUZINO_RendererPlugin &operator=(
+        const Hd_RUZINO_RendererPlugin &) = delete;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_RENDERER_PLUGIN_H
+#endif  // Hd_RUZINO_RENDERER_PLUGIN_H

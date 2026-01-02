@@ -5,7 +5,7 @@
 
 #include <RHI/internal/cuda_extension.hpp>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace cuda {
 class CUDALinearBuffer : public nvrhi::RefCounter<cuda::ICUDALinearBuffer> {
    public:
@@ -220,4 +220,4 @@ void copy_surface_to_linear_buffer(
 }
 }  // namespace cuda
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

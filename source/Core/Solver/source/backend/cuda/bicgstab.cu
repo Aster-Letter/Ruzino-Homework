@@ -7,7 +7,7 @@
 #include <RZSolver/Solver.hpp>
 #include <iostream>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace Solver {
 
 // 在 namespace 级别定义静态函数
@@ -18,15 +18,15 @@ namespace {
         const SolverConfig& config,
         int n,
         cusparseSpMatDescr_t matA_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r0,
-        USTC_CG::cuda::CUDALinearBufferHandle d_p,
-        USTC_CG::cuda::CUDALinearBufferHandle d_v,
-        USTC_CG::cuda::CUDALinearBufferHandle d_s,
-        USTC_CG::cuda::CUDALinearBufferHandle d_t,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_r0,
+        Ruzino::cuda::CUDALinearBufferHandle d_p,
+        Ruzino::cuda::CUDALinearBufferHandle d_v,
+        Ruzino::cuda::CUDALinearBufferHandle d_s,
+        Ruzino::cuda::CUDALinearBufferHandle d_t,
         cusparseDnVecDescr_t vecX_desc,
         cusparseDnVecDescr_t vecP_desc,
         cusparseDnVecDescr_t vecV_desc,
@@ -467,19 +467,19 @@ class CudaBiCGStabSolver : public LinearSolver {
 
             // GPU setup
             auto d_csrValues =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrValues);
+                Ruzino::cuda::create_cuda_linear_buffer(csrValues);
             auto d_csrRowPtr =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrRowPtr);
+                Ruzino::cuda::create_cuda_linear_buffer(csrRowPtr);
             auto d_csrColInd =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrColInd);
-            auto d_b = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_x = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_r = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_r0 = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_p = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_v = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_s = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_t = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
+                Ruzino::cuda::create_cuda_linear_buffer(csrColInd);
+            auto d_b = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_x = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_r = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_r0 = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_p = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_v = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_s = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_t = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
 
             // Copy input data
             d_b->assign_host_vector(
@@ -546,7 +546,7 @@ class CudaBiCGStabSolver : public LinearSolver {
                 CUSPARSE_SPMV_ALG_DEFAULT,
                 &bufferSize);
             auto dBuffer =
-                USTC_CG::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
+                Ruzino::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
 
             auto iteration_start_time =
                 std::chrono::high_resolution_clock::now();
@@ -602,15 +602,15 @@ class CudaBiCGStabSolver : public LinearSolver {
         const SolverConfig& config,
         int n,
         cusparseSpMatDescr_t matA_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r0,
-        USTC_CG::cuda::CUDALinearBufferHandle d_p,
-        USTC_CG::cuda::CUDALinearBufferHandle d_v,
-        USTC_CG::cuda::CUDALinearBufferHandle d_s,
-        USTC_CG::cuda::CUDALinearBufferHandle d_t,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_r0,
+        Ruzino::cuda::CUDALinearBufferHandle d_p,
+        Ruzino::cuda::CUDALinearBufferHandle d_v,
+        Ruzino::cuda::CUDALinearBufferHandle d_s,
+        Ruzino::cuda::CUDALinearBufferHandle d_t,
         cusparseDnVecDescr_t vecX_desc,
         cusparseDnVecDescr_t vecP_desc,
         cusparseDnVecDescr_t vecV_desc,
@@ -649,4 +649,4 @@ std::unique_ptr<LinearSolver> createCudaBiCGStabSolver()
 
 }  // namespace Solver
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

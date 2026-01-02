@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a conductor material. This means the
         surface is purely reflective, and its albedo is dictated by
@@ -55,7 +55,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTConductorMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTConductorMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTConductorMaterial)
     public:

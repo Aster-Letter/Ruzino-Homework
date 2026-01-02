@@ -40,12 +40,12 @@ struct CUstream_st;
 typedef CUstream_st* cudaStream_t;
 #endif
 
-namespace USTC_CG {
+namespace Ruzino {
 class Profiler;
 
-class HD_USTC_CG_API CopyContext {
+class HD_RUZINO_API CopyContext {
    public:
-    class HD_USTC_CG_API ReadTextureTask {
+    class HD_RUZINO_API ReadTextureTask {
        public:
         using SharedPtr = std::shared_ptr<ReadTextureTask>;
         static SharedPtr
@@ -251,4 +251,4 @@ class HD_USTC_CG_API CopyContext {
     Device* mpDevice;
     nvrhi::CommandListHandle mpLowLevelData;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

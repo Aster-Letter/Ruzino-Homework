@@ -6,7 +6,7 @@
 #include "GUI/api.h"
 #include "GUI/widget.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class GUI_API ImageWidget : public IWidget {
    public:
@@ -30,4 +30,4 @@ class GUI_API ImageWidget : public IWidget {
     bool use_handle_;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

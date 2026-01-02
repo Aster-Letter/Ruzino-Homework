@@ -23,7 +23,7 @@ NODE_DECLARATION_FUNCTION(ssao)
 
 NODE_EXECUTION_FUNCTION(ssao)
 {
-#ifdef USTC_CG_BACKEND_OPENGL  // Temporarily only enable opengl. Later it can be refactored to
+#ifdef RUZINO_BACKEND_OPENGL  // Temporarily only enable opengl. Later it can be refactored to
                                // support nvrhi
     auto color = params.get_input<TextureHandle>("Color");
 

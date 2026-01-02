@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef HD_USTC_CG_MESH_TOPOLOGY_H
-#define HD_USTC_CG_MESH_TOPOLOGY_H
+#ifndef HD_RUZINO_MESH_TOPOLOGY_H
+#define HD_RUZINO_MESH_TOPOLOGY_H
 
 #include <memory>
 
@@ -17,7 +17,7 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class HdSt_Subdivision;
 
 using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
@@ -53,30 +53,30 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
         INTERPOLATE_FACEVARYING,
     };
 
-    HD_USTC_CG_API
+    HD_RUZINO_API
     static HdSt_MeshTopologySharedPtr New(
         const HdMeshTopology &src,
         int refineLevel,
         RefineMode refineMode = RefineModeUniform,
         QuadsMode quadsMode = QuadsUntriangulated);
 
-    HD_USTC_CG_API
+    HD_RUZINO_API
     virtual ~HdSt_MeshTopology();
 
     /// Equality check between two mesh topologies.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     bool operator==(HdSt_MeshTopology const &other) const;
 
     /// \name Triangulation
     /// @{
 
     /// Returns the triangle indices (for drawing) buffer source computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetTriangleIndexBuilderComputation(
         pxr::SdfPath const &id);
 
     /// Returns the CPU face-varying triangulate computation
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetTriangulateFaceVaryingComputation(
         pxr::HdBufferSourceSharedPtr const &source,
         pxr::SdfPath const &id);
@@ -103,30 +103,30 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
     /// quadrangulation.
     /// If gpu is true, the quadrangulate table will be transferred to GPU
     /// via the resource registry.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     HdSt_QuadInfoBuilderComputationSharedPtr GetQuadInfoBuilderComputation(
         pxr::SdfPath const &id);
 
     /// Returns the quad indices (for drawing) buffer source computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetQuadIndexBuilderComputation(
         pxr::SdfPath const &id);
 
     /// Returns the CPU quadrangulated buffer source.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetQuadrangulateComputation(
         pxr::HdBufferSourceSharedPtr const &source,
         pxr::SdfPath const &id);
 
     /// Returns the CPU face-varying quadrangulate computation
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetQuadrangulateFaceVaryingComputation(
         pxr::HdBufferSourceSharedPtr const &source,
         pxr::SdfPath const &id);
 
     /// Sets the quadrangulation struct. HdMeshTopology takes an
     /// ownership of quadInfo (caller shouldn't free)
-    HD_USTC_CG_API
+    HD_RUZINO_API
     void SetQuadInfo(pxr::HdQuadInfo const *quadInfo);
 
     /// Returns the quadrangulation struct.
@@ -142,7 +142,7 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
     /// @{
 
     /// Returns the point indices buffer source computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetPointsIndexBuilderComputation();
 
     /// @}
@@ -165,38 +165,38 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
 
     /// Returns true if the subdivision on this mesh produces
     /// triangles (otherwise quads)
-    HD_USTC_CG_API
+    HD_RUZINO_API
     bool RefinesToTriangles() const;
 
     /// Returns true if the subdivision of this mesh produces bspline patches
-    HD_USTC_CG_API
+    HD_RUZINO_API
     bool RefinesToBSplinePatches() const;
 
     /// Returns true if the subdivision of this mesh produces box spline
     /// triangle patches
-    HD_USTC_CG_API
+    HD_RUZINO_API
     bool RefinesToBoxSplineTrianglePatches() const;
 
     /// Returns the subdivision topology computation. It computes
     /// far mesh and produces refined quad-indices buffer.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetOsdTopologyComputation(
         pxr::SdfPath const &debugId);
 
     /// Returns the refined indices builder computation.
     /// This just returns index and primitive buffer, and should be preceded by
     /// topology computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetOsdIndexBuilderComputation();
 
     /// Returns the refined face-varying indices builder computation.
     /// This just returns the index and patch param buffer for a face-varying
     /// channel, and should be preceded by topology computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetOsdFvarIndexBuilderComputation(int channel);
 
     /// Returns the subdivision primvar refine computation on CPU.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetOsdRefineComputation(
         pxr::HdBufferSourceSharedPtr const &source,
         Interpolation interpolation,
@@ -210,30 +210,30 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
 
     /// Processes geom subsets to remove those with empty indices or empty
     /// material id. Will initialize _nonSubsetFaces if there are geom subsets.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     void SanitizeGeomSubsets();
 
     /// Returns the indices subset computation for unrefined indices.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetIndexSubsetComputation(
         pxr::HdBufferSourceSharedPtr indexBuilderSource,
         pxr::HdBufferSourceSharedPtr faceIndicesSource);
 
     /// Returns the indices subset computation for refined indices.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetRefinedIndexSubsetComputation(
         pxr::HdBufferSourceSharedPtr indexBuilderSource,
         pxr::HdBufferSourceSharedPtr faceIndicesSource);
 
     /// Returns the triangulated/quadrangulated face indices computation.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetGeomSubsetFaceIndexBuilderComputation(
         pxr::HdBufferSourceSharedPtr geomSubsetFaceIndexHelperSource,
         pxr::VtIntArray const &faceIndices);
 
     /// Returns computation creating buffer sources used in mapping authored
     /// face indices to triangulated/quadrangulated face indices.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     pxr::HdBufferSourceSharedPtr GetGeomSubsetFaceIndexHelperComputation(
         bool refined,
         bool quadrangulated);
@@ -296,6 +296,6 @@ class HdSt_MeshTopology final : public pxr::HdMeshTopology {
     HdSt_MeshTopology &operator=(const HdSt_MeshTopology &) = delete;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // HD_USTC_CG_MESH_TOPOLOGY_H
+#endif  // HD_RUZINO_MESH_TOPOLOGY_H

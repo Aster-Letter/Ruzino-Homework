@@ -21,7 +21,7 @@ NODE_DECLARATION_FUNCTION(camera_info)
 
 NODE_EXECUTION_FUNCTION(camera_info)
 {
-    Hd_USTC_CG_Camera* camera = get_free_camera(params);
+    Hd_RUZINO_Camera* camera = get_free_camera(params);
 
     using namespace pxr;
 

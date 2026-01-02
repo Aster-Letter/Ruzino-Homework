@@ -9,7 +9,7 @@
 #include "pxr/usd/usdGeom/sphere.h"
 #include "stage/stage.hpp"
 #include "widgets/usdtree/usd_fileviewer.h"
-using namespace USTC_CG;
+using namespace Ruzino;
 int main()
 {
     // Currently this is not runnable on my CI machine.

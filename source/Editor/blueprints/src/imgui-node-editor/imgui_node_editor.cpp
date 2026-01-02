@@ -37,7 +37,7 @@
         static bool const value = sizeof(test<T>(0)) == sizeof(yes); \
     };
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace ax {
 namespace NodeEditor {
     namespace Detail {
@@ -6114,4 +6114,4 @@ void ed::Config::EndSave()
         EndSaveSession(UserPointer);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -37,10 +37,10 @@
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/smoothNormals.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
-Hd_USTC_CG_Mesh::Hd_USTC_CG_Mesh(const SdfPath& id)
+Hd_RUZINO_Mesh::Hd_RUZINO_Mesh(const SdfPath& id)
     : HdMesh(id),
       _cullStyle(HdCullStyleDontCare),
       _doubleSided(false),
@@ -60,11 +60,11 @@ Hd_USTC_CG_Mesh::Hd_USTC_CG_Mesh(const SdfPath& id)
             .setDebugName("modelBuffer");
 }
 
-Hd_USTC_CG_Mesh::~Hd_USTC_CG_Mesh()
+Hd_RUZINO_Mesh::~Hd_RUZINO_Mesh()
 {
 }
 
-HdDirtyBits Hd_USTC_CG_Mesh::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Mesh::GetInitialDirtyBitsMask() const
 {
     int mask =
         HdChangeTracker::Clean | HdChangeTracker::InitRepr |
@@ -78,12 +78,12 @@ HdDirtyBits Hd_USTC_CG_Mesh::GetInitialDirtyBitsMask() const
     return (HdDirtyBits)mask;
 }
 
-HdDirtyBits Hd_USTC_CG_Mesh::_PropagateDirtyBits(HdDirtyBits bits) const
+HdDirtyBits Hd_RUZINO_Mesh::_PropagateDirtyBits(HdDirtyBits bits) const
 {
     return bits;
 }
 
-TfTokenVector Hd_USTC_CG_Mesh::_UpdateComputedPrimvarSources(
+TfTokenVector Hd_RUZINO_Mesh::_UpdateComputedPrimvarSources(
     HdSceneDelegate* sceneDelegate,
     HdDirtyBits dirtyBits)
 {
@@ -130,7 +130,7 @@ TfTokenVector Hd_USTC_CG_Mesh::_UpdateComputedPrimvarSources(
     return compPrimvarNames;
 }
 
-void Hd_USTC_CG_Mesh::_UpdatePrimvarSources(
+void Hd_RUZINO_Mesh::_UpdatePrimvarSources(
     HdSceneDelegate* sceneDelegate,
     HdDirtyBits dirtyBits,
     HdRenderParam* param)
@@ -153,7 +153,7 @@ void Hd_USTC_CG_Mesh::_UpdatePrimvarSources(
     }
 }
 
-void Hd_USTC_CG_Mesh::create_gpu_resources(Hd_USTC_CG_RenderParam* render_param)
+void Hd_RUZINO_Mesh::create_gpu_resources(Hd_RUZINO_RenderParam* render_param)
 {
     auto device = RHI::get_device();
 
@@ -326,8 +326,8 @@ void Hd_USTC_CG_Mesh::create_gpu_resources(Hd_USTC_CG_RenderParam* render_param)
     mesh_desc_buffer->write_data(&mesh_desc);
 }
 
-void Hd_USTC_CG_Mesh::updateTLAS(
-    Hd_USTC_CG_RenderParam* render_param,
+void Hd_RUZINO_Mesh::updateTLAS(
+    Hd_RUZINO_RenderParam* render_param,
     HdSceneDelegate* sceneDelegate,
     HdDirtyBits* dirtyBits)
 {
@@ -363,7 +363,7 @@ void Hd_USTC_CG_Mesh::updateTLAS(
             has_subset_materials ? " with GeomSubset overrides" : "");
     }
 
-    Hd_USTC_CG_Material* material = (*render_param->material_map)[material_id];
+    Hd_RUZINO_Material* material = (*render_param->material_map)[material_id];
     if (!material && !has_subset_materials) {
         spdlog::warn(
             "Material {} not found for mesh {}. Using default material.",
@@ -404,7 +404,7 @@ void Hd_USTC_CG_Mesh::updateTLAS(
         // GPU path: Let instancer compute transforms on GPU
         HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
         HdInstancer* instancer = renderIndex.GetInstancer(GetInstancerId());
-        static_cast<Hd_USTC_CG_Instancer*>(instancer)
+        static_cast<Hd_RUZINO_Instancer*>(instancer)
             ->ComputeInstanceTransforms(
                 GetId(),
                 instanceBuffer,
@@ -458,15 +458,15 @@ void Hd_USTC_CG_Mesh::updateTLAS(
     draw_indirect->write_data(&args);
 }
 
-void Hd_USTC_CG_Mesh::_InitRepr(
+void Hd_RUZINO_Mesh::_InitRepr(
     const TfToken& reprToken,
     HdDirtyBits* dirtyBits)
 {
 }
 
-void Hd_USTC_CG_Mesh::_SetMaterialId(
+void Hd_RUZINO_Mesh::_SetMaterialId(
     HdSceneDelegate* delegate,
-    Hd_USTC_CG_Mesh* rprim)
+    Hd_RUZINO_Mesh* rprim)
 {
     SdfPath const& newMaterialId = delegate->GetMaterialId(rprim->GetId());
     if (rprim->GetMaterialId() != newMaterialId) {
@@ -474,7 +474,7 @@ void Hd_USTC_CG_Mesh::_SetMaterialId(
     }
 }
 
-void Hd_USTC_CG_Mesh::Sync(
+void Hd_RUZINO_Mesh::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits,
@@ -594,7 +594,7 @@ void Hd_USTC_CG_Mesh::Sync(
             if (!geom_subsets.empty()) {
                 std::unordered_map<int, int> subset_material_id_map;
                 auto material_map =
-                    static_cast<Hd_USTC_CG_RenderParam*>(renderParam)
+                    static_cast<Hd_RUZINO_RenderParam*>(renderParam)
                         ->material_map;
 
                 // Get mesh-level material for faces not in any subset
@@ -1030,13 +1030,13 @@ void Hd_USTC_CG_Mesh::Sync(
         if (!points.empty()) {
             if (requires_rebuild_blas) {
                 create_gpu_resources(
-                    static_cast<Hd_USTC_CG_RenderParam*>(renderParam));
+                    static_cast<Hd_RUZINO_RenderParam*>(renderParam));
             }
 
             if (requires_rebuild_tlas) {
                 if (IsVisible()) {
                     updateTLAS(
-                        static_cast<Hd_USTC_CG_RenderParam*>(renderParam),
+                        static_cast<Hd_RUZINO_RenderParam*>(renderParam),
                         sceneDelegate,
                         dirtyBits);
                 }
@@ -1045,14 +1045,14 @@ void Hd_USTC_CG_Mesh::Sync(
 
         *dirtyBits &= ~HdChangeTracker::AllSceneDirtyBits;
     }
-    static_cast<Hd_USTC_CG_RenderParam*>(renderParam)
+    static_cast<Hd_RUZINO_RenderParam*>(renderParam)
         ->InstanceCollection->mark_geometry_dirty();
 }
 
-void Hd_USTC_CG_Mesh::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Mesh::Finalize(HdRenderParam* renderParam)
 {
     // Mark the geom flag as dirty
-    auto render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     render_param->InstanceCollection->mark_geometry_dirty();
 
     vertexBuffer = nullptr;
@@ -1063,4 +1063,4 @@ void Hd_USTC_CG_Mesh::Finalize(HdRenderParam* renderParam)
     draw_indirect = nullptr;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

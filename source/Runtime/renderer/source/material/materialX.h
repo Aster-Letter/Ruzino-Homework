@@ -6,15 +6,15 @@ namespace pxr {
 class Hio_OpenEXRImage;
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class Shader;
 using namespace pxr;
 
 class Hio_StbImage;
-class HD_USTC_CG_API Hd_USTC_CG_MaterialX : public Hd_USTC_CG_Material {
+class HD_RUZINO_API Hd_RUZINO_MaterialX : public Hd_RUZINO_Material {
    public:
-    explicit Hd_USTC_CG_MaterialX(SdfPath const& id);
+    explicit Hd_RUZINO_MaterialX(SdfPath const& id);
 
     void Sync(
         HdSceneDelegate* sceneDelegate,
@@ -24,7 +24,7 @@ class HD_USTC_CG_API Hd_USTC_CG_MaterialX : public Hd_USTC_CG_Material {
     void ensure_shader_ready(const ShaderFactory& factory) override;
 
    protected:
-    void BuildGPUTextures(Hd_USTC_CG_RenderParam* render_param);
+    void BuildGPUTextures(Hd_RUZINO_RenderParam* render_param);
     void CollectTextures(
         HdMaterialNetwork2Interface netInterface,
         HdMtlxTexturePrimvarData hdMtlxData);
@@ -49,4 +49,4 @@ class HD_USTC_CG_API Hd_USTC_CG_MaterialX : public Hd_USTC_CG_Material {
     static std::mutex shadergen_mutex;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

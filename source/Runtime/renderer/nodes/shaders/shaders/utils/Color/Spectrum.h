@@ -36,13 +36,13 @@
 #include <optional>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Represents a piecewise linearly interpolated spectrum.
  * Stores wavelengths (in increasing order) and a value for each wavelength.
  */
-class HD_USTC_CG_API PiecewiseLinearSpectrum
+class HD_RUZINO_API PiecewiseLinearSpectrum
 {
 public:
     /**
@@ -122,7 +122,7 @@ private:
 /**
  * Represents a denseley sampled spectrum.
  */
-class HD_USTC_CG_API DenseleySampledSpectrum
+class HD_RUZINO_API DenseleySampledSpectrum
 {
 public:
     DenseleySampledSpectrum(float minWavelength, float maxWavelength, std::span<const float> values)
@@ -190,12 +190,12 @@ private:
  * @param[in] temperature Temperature in K.
  * @return The emitted radiance.
  */
-HD_USTC_CG_API float blackbodyEmission(float wavelength, float temperature);
+HD_RUZINO_API float blackbodyEmission(float wavelength, float temperature);
 
 /**
  * Represents a blackbody emission spectrum.
  */
-class HD_USTC_CG_API BlackbodySpectrum
+class HD_RUZINO_API BlackbodySpectrum
 {
 public:
     /**
@@ -233,7 +233,7 @@ private:
 /**
  * Collection of useful spectra.
  */
-struct HD_USTC_CG_API Spectra
+struct HD_RUZINO_API Spectra
 {
     // CIE 1931
     static const DenseleySampledSpectrum kCIE_X;
@@ -285,4 +285,4 @@ float3 spectrumToRGB(const S& s)
 {
     return XYZtoRGB_Rec709(spectrumToXYZ(s));
 }
-} // namespace USTC_CG
+} // namespace Ruzino

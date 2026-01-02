@@ -33,7 +33,7 @@
 
 #include <limits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -219,4 +219,4 @@ using float2x4 = math::float2x4;
 using float3x4 = math::float3x4;
 using float4x4 = math::float4x4;
 
-} // namespace USTC_CG
+} // namespace Ruzino

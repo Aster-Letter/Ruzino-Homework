@@ -30,12 +30,12 @@
 #include "Core/Macros.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Sample pattern generator for the Direct3D 8x MSAA/SSAA pattern.
  */
-class HD_USTC_CG_API DxSamplePattern : public CPUSampleGenerator
+class HD_RUZINO_API DxSamplePattern : public CPUSampleGenerator
 {
 public:
     /**
@@ -59,4 +59,4 @@ protected:
     static constexpr uint32_t kSampleCount = 8;
     static const float2 kPattern[kSampleCount];
 };
-} // namespace USTC_CG
+} // namespace Ruzino

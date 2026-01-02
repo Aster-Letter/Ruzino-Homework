@@ -32,7 +32,7 @@
 
 #include <type_traits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -78,4 +78,4 @@ using quatf = quat<float>;
 
 using quatf = math::quatf;
 
-} // namespace USTC_CG
+} // namespace Ruzino

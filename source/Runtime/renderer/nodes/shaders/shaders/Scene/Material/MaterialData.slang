@@ -36,7 +36,7 @@ __exported import MaterialTypes;
 __exported import TextureHandle;
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /** This is a host/device structure for material header data for all material types (16B).
 */
@@ -217,4 +217,4 @@ struct MaterialDataBlob
     MaterialPayload payload; // 112B
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

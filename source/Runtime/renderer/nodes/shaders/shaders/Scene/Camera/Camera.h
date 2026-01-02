@@ -36,12 +36,12 @@
 #include "utils/Math/Vector.h"
 #include "utils/SampleGenerators/CPUSampleGenerator.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 struct ShaderVar;
 
 /** Camera class.
  */
-class HD_USTC_CG_API Camera : public Object {
+class HD_RUZINO_API Camera : public Object {
     FALCOR_OBJECT(Camera)
    public:
     // Default dimensions of full frame cameras and 35mm film
@@ -453,4 +453,4 @@ class HD_USTC_CG_API Camera : public Object {
 };
 
 FALCOR_ENUM_CLASS_OPERATORS(Camera::Changes);
-}  // namespace USTC_CG
+}  // namespace Ruzino

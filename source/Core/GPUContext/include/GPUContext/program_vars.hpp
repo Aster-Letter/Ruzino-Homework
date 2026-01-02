@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <string_view>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 using BindingSetItemArray = std::vector<nvrhi::BindingSetItem>;
 
@@ -148,4 +148,4 @@ ProgramVars::ProgramVars(
     final_reflection_info += program.Get()->get_reflection_info();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

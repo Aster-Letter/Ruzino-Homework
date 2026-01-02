@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a Lambertian diffuse transmission material.
         The material has both reflective and transmissive lobes, both of
@@ -49,7 +49,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTDiffuseTransmissionMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTDiffuseTransmissionMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTDiffuseTransmissionMaterial)
     public:

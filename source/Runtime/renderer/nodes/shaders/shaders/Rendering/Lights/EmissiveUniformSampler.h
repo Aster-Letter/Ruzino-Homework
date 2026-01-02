@@ -31,13 +31,13 @@
 #include "utils/Properties.h"
 #include "Scene/Lights/LightCollection.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Emissive light sampler using uniform sampling of the lights.
 
         This class wraps a LightCollection object, which holds the set of lights to sample.
     */
-    class HD_USTC_CG_API EmissiveUniformSampler : public EmissiveLightSampler
+    class HD_RUZINO_API EmissiveUniformSampler : public EmissiveLightSampler
     {
     public:
         /** EmissiveUniformSampler configuration.

@@ -32,7 +32,7 @@
 #define IMGUI_NODE_EDITOR_API
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //------------------------------------------------------------------------------
 struct NodeId;
 struct LinkId;
@@ -498,7 +498,7 @@ namespace NodeEditor {
 }  // namespace NodeEditor
 }  // namespace ax
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 //------------------------------------------------------------------------------
 #endif  // __IMGUI_NODE_EDITOR_H__

@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a dielectric material. This means the
         surface has both (uncolored) reflection and refraction lobes.
@@ -49,7 +49,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTDielectricMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTDielectricMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTDielectricMaterial)
     public:

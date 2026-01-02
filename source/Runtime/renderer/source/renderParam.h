@@ -36,30 +36,30 @@
 #include "pxr/pxr.h"
 #include "renderTLAS.h"
 
-namespace USTC_CG {
-class Hd_USTC_CG_Material;
+namespace Ruzino {
+class Hd_RUZINO_Material;
 class NodeSystem;
 class LensSystem;
-using MaterialMap = pxr::TfHashMap<SdfPath, Hd_USTC_CG_Material *, TfHash>;
-}  // namespace USTC_CG
+using MaterialMap = pxr::TfHashMap<SdfPath, Hd_RUZINO_Material *, TfHash>;
+}  // namespace Ruzino
 
-namespace USTC_CG {
+namespace Ruzino {
 struct RenderGlobalPayload;
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
 ///
-/// \class Hd_USTC_CG_RenderParam
+/// \class Hd_RUZINO_RenderParam
 ///
 /// The render delegate can create an object of type HdRenderParam, to pass
-/// to each prim during Sync(). Hd_USTC_CG uses this class to pass top-level
+/// to each prim during Sync(). Hd_RUZINO uses this class to pass top-level
 /// embree state around.
 ///
-class Hd_USTC_CG_RenderParam final : public HdRenderParam {
+class Hd_RUZINO_RenderParam final : public HdRenderParam {
    public:
-    Hd_USTC_CG_RenderParam(
+    Hd_RUZINO_RenderParam(
         HdRenderThread *renderThread,
         std::atomic<int> *sceneVersion,
         NodeSystem *node_system,
@@ -71,10 +71,10 @@ class Hd_USTC_CG_RenderParam final : public HdRenderParam {
 
     {
         InstanceCollection =
-            std::make_unique<Hd_USTC_CG_RenderInstanceCollection>();
+            std::make_unique<Hd_RUZINO_RenderInstanceCollection>();
     }
 
-    ~Hd_USTC_CG_RenderParam()
+    ~Hd_RUZINO_RenderParam()
     {
     }
 
@@ -83,7 +83,7 @@ class Hd_USTC_CG_RenderParam final : public HdRenderParam {
     MaterialMap *material_map;
 
     NodeSystem *node_system;
-    std::unique_ptr<Hd_USTC_CG_RenderInstanceCollection> InstanceCollection;
+    std::unique_ptr<Hd_RUZINO_RenderInstanceCollection> InstanceCollection;
 
     // Support multiple named output textures from present nodes
     std::map<std::string, nvrhi::TextureHandle> presented_textures;
@@ -103,4 +103,4 @@ class Hd_USTC_CG_RenderParam final : public HdRenderParam {
     std::atomic<int> *_sceneVersion;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

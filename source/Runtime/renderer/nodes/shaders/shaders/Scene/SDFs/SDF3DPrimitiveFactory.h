@@ -33,9 +33,9 @@
 #include "utils/SDF/SDFOperationType.slang"
 #include "Scene/Transform.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
-    class HD_USTC_CG_API SDF3DPrimitiveFactory
+    class HD_RUZINO_API SDF3DPrimitiveFactory
     {
     public:
         static SDF3DPrimitive initCommon(SDF3DShapeType shapeType, const float3& shapeData, float blobbing, float operationSmoothing, SDFOperationType operationType, const Transform& transform);

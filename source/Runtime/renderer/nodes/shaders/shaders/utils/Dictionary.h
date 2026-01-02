@@ -32,7 +32,7 @@
 #include <memory>
 #include <string>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class Dictionary
 {
@@ -98,4 +98,4 @@ public:
 private:
     Container mContainer;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

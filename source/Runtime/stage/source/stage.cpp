@@ -20,7 +20,7 @@
 #include "MaterialXFormat/Util.h"
 #include "animation.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 #define SAVE_ALL_THE_TIME 0
 
 Stage::Stage()
@@ -484,4 +484,4 @@ bool Stage::OpenStage(const std::string& path)
     return true;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

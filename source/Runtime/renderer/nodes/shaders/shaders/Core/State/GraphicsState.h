@@ -36,7 +36,7 @@
 #include "Core/Program/Program.h"
 #include "StateGraph.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class ProgramVars;
 
 /**
@@ -46,7 +46,7 @@ class ProgramVars;
  * recommended way to use it is to create multiple PipelineState objects
  * (ideally, a single object per render-pass)
  */
-class HD_USTC_CG_API GraphicsState : public Object {
+class HD_RUZINO_API GraphicsState : public Object {
     FALCOR_OBJECT(GraphicsState)
    public:
     virtual ~GraphicsState();
@@ -360,4 +360,4 @@ class HD_USTC_CG_API GraphicsState : public Object {
     using GraphicsStateGraph = StateGraph<ref<GraphicsStateObject>, void*>;
     std::unique_ptr<GraphicsStateGraph> mpGsoGraph;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

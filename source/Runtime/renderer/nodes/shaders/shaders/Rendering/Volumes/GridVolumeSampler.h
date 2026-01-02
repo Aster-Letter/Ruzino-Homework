@@ -32,7 +32,7 @@
 #include "utils/Properties.h"
 #include "Scene/Scene.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     class RenderContext;
     struct ShaderVar;
@@ -40,7 +40,7 @@ namespace USTC_CG
     /** Grid volume sampler.
         Utily class for evaluating transmittance and sampling scattering in grid volumes.
     */
-    class HD_USTC_CG_API GridVolumeSampler
+    class HD_RUZINO_API GridVolumeSampler
     {
     public:
         /** Grid volume sampler configuration options.

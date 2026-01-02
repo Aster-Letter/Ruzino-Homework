@@ -39,7 +39,7 @@
 #include "pxr/usd/usdShade/material.h"
 #include "stb_image.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // [0]: left Ctrl + left mouse button, [1]: left mouse button, [2]: middle mouse
 // button
@@ -1133,4 +1133,4 @@ void PolyscopeRenderer::ProcessInputEvents()
 // {
 // }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

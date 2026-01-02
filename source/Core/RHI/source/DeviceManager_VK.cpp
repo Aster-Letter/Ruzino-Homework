@@ -60,7 +60,7 @@ freely, subject to the following restrictions:
 #include <sstream>
 #include <vulkan/vulkan.hpp>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class DeviceManager_VK : public DeviceManager {
    public:
@@ -203,7 +203,7 @@ class DeviceManager_VK : public DeviceManager {
             VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
             VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
             VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME,
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
             VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
             VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
 #endif
@@ -890,7 +890,7 @@ bool DeviceManager_VK::createDevice()
         physicalDeviceProperties.apiVersion < VK_API_VERSION_1_3 &&
             maintenance4Supported,
         maintenance4Features);
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     if (aftermathPhysicalFeatures.diagnosticsConfig &&
         m_DeviceParams.enableAftermath)
         APPEND_EXTENSION(aftermathSupported, aftermathFeatures);
@@ -1114,7 +1114,7 @@ bool DeviceManager_VK::CreateInstanceInternal()
         enabledExtensions.instance.insert("VK_EXT_debug_report");
         enabledExtensions.layers.insert("VK_LAYER_KHRONOS_validation");
     }
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     if (m_DeviceParams.enableAftermath) {
         enabledExtensions.instance.insert("VK_EXT_debug_utils");
     }
@@ -1224,7 +1224,7 @@ bool DeviceManager_VK::CreateDevice()
     deviceDesc.deviceExtensions = vecDeviceExt.data();
     deviceDesc.numDeviceExtensions = vecDeviceExt.size();
     deviceDesc.bufferDeviceAddressSupported = m_BufferDeviceAddressSupported;
-#if USTC_CG_WITH_AFTERMATH
+#if RUZINO_WITH_AFTERMATH
     deviceDesc.aftermathEnabled = m_DeviceParams.enableAftermath;
 #endif
 
@@ -1421,4 +1421,4 @@ DeviceManager* DeviceManager::CreateVK()
     return new DeviceManager_VK();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

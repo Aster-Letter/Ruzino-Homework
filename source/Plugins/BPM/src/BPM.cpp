@@ -6,7 +6,7 @@
 #include <numeric>
 #include <stdexcept>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Helper functions
 std::vector<float> getGridArray(int N, float delta, uint8_t symmetry)
@@ -594,4 +594,4 @@ std::vector<BPMSolver::Mode> BPMSolver::findModes(int nModes, bool sortByLoss)
         "then import the modes using setE()");
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

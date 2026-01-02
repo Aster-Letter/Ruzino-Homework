@@ -2,9 +2,9 @@
 
 #include "RHI/rhi.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-Hd_USTC_CG_RenderInstanceCollection::Hd_USTC_CG_RenderInstanceCollection()
+Hd_RUZINO_RenderInstanceCollection::Hd_RUZINO_RenderInstanceCollection()
     : rt_instance_pool(
           BufferDesc{}.setIsAccelStructBuildInput(true).setCanHaveRawViews(
               true)),
@@ -16,11 +16,11 @@ Hd_USTC_CG_RenderInstanceCollection::Hd_USTC_CG_RenderInstanceCollection()
     TLAS = RHI::get_device()->createAccelStruct(tlasDesc);
 }
 
-Hd_USTC_CG_RenderInstanceCollection::~Hd_USTC_CG_RenderInstanceCollection()
+Hd_RUZINO_RenderInstanceCollection::~Hd_RUZINO_RenderInstanceCollection()
 {
 }
 
-nvrhi::rt::IAccelStruct* Hd_USTC_CG_RenderInstanceCollection::get_tlas()
+nvrhi::rt::IAccelStruct* Hd_RUZINO_RenderInstanceCollection::get_tlas()
 {
     if (rt_instance_pool.compress()) {
         require_rebuild_tlas = true;
@@ -33,7 +33,7 @@ nvrhi::rt::IAccelStruct* Hd_USTC_CG_RenderInstanceCollection::get_tlas()
     return TLAS;
 }
 
-Hd_USTC_CG_RenderInstanceCollection::BindlessData::BindlessData()
+Hd_RUZINO_RenderInstanceCollection::BindlessData::BindlessData()
 {
     auto device = RHI::get_device();
     nvrhi::BindlessLayoutDesc buffer_layout_desc;
@@ -56,7 +56,7 @@ Hd_USTC_CG_RenderInstanceCollection::BindlessData::BindlessData()
         std::make_shared<DescriptorTableManager>(device, textureBindlessLayout);
 }
 
-void Hd_USTC_CG_RenderInstanceCollection::rebuild_tlas()
+void Hd_RUZINO_RenderInstanceCollection::rebuild_tlas()
 {
     auto nvrhi_device = RHI::get_device();
 
@@ -75,4 +75,4 @@ void Hd_USTC_CG_RenderInstanceCollection::rebuild_tlas()
     nvrhi_device->waitForIdle();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

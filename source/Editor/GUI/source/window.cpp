@@ -14,7 +14,7 @@
 #include "imgui_renderer.h"
 #include "vulkan/vulkan.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // WindowEventSystem implementation
 void WindowEventSystem::subscribe(const std::string& event_name, EventCallback callback)
@@ -553,4 +553,4 @@ void Window::trigger_menu_action(const std::string& action_name)
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

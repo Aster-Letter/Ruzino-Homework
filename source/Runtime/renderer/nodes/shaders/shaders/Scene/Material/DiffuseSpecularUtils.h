@@ -30,7 +30,7 @@
 #include <Utils/json.hpp>
 #include <filesystem>
 
-namespace USTC_CG
+namespace Ruzino
 {
     struct DiffuseSpecularData;
 

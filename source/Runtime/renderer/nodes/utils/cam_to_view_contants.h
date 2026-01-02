@@ -2,13 +2,13 @@
 
 #include "utils/view_cb.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-inline PlanarViewConstants camera_to_view_constants(Hd_USTC_CG_Camera* camera)
+inline PlanarViewConstants camera_to_view_constants(Hd_RUZINO_Camera* camera)
 {
     PlanarViewConstants constants;
 
-    // Extract matrices and other data from Hd_USTC_CG_Camera
+    // Extract matrices and other data from Hd_RUZINO_Camera
     constants.matWorldToView = GfMatrix4f(camera->viewMatrix);
     constants.matViewToClip = GfMatrix4f(camera->projMatrix);
     constants.matWorldToClip =
@@ -42,4 +42,4 @@ inline PlanarViewConstants camera_to_view_constants(Hd_USTC_CG_Camera* camera)
     return constants;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

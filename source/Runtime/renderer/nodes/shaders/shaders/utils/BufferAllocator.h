@@ -32,7 +32,7 @@
 
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Utility class for memory management of a GPU buffer.
@@ -50,7 +50,7 @@ namespace USTC_CG
  * cache line. The implementation doesn't provide any alignment
  * guarantees for the CPU side buffer (where it doesn't matter anyway).
  */
-class HD_USTC_CG_API BufferAllocator
+class HD_RUZINO_API BufferAllocator
 {
 public:
     /**
@@ -231,4 +231,4 @@ private:
     std::vector<uint8_t> mBuffer; ///< CPU buffer holding a copy of the data.
     nvrhi::BufferHandle mpGpuBuffer;      ///< GPU buffer holding the data.
 };
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -11,7 +11,7 @@ MATERIALX_NAMESPACE_BEGIN
 
 /// @class ClosureSourceCodeNode
 /// Implementation for a closure node using data-driven static source code.
-class HD_USTC_CG_API ClosureSourceCodeNodeSlang : public SourceCodeNodeSlang {
+class HD_RUZINO_API ClosureSourceCodeNodeSlang : public SourceCodeNodeSlang {
    public:
     static ShaderNodeImplPtr create();
 

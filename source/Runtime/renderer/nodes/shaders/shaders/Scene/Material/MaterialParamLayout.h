@@ -29,7 +29,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 struct MaterialParamLayoutEntry
@@ -42,4 +42,4 @@ struct MaterialParamLayoutEntry
 
 using MaterialParamLayout = std::vector<MaterialParamLayoutEntry>;
 
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -7,9 +7,9 @@
 #include "pxr/base/gf/rect2i.h"
 #include "pxr/imaging/cameraUtil/framing.h"
 #include "pxr/imaging/hd/renderPassState.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-void Hd_USTC_CG_Camera::Sync(
+void Hd_RUZINO_Camera::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
@@ -36,7 +36,7 @@ static GfRect2i _GetDataWindow(
     }
 }
 
-void Hd_USTC_CG_Camera::update(
+void Hd_RUZINO_Camera::update(
     const HdRenderPassStateSharedPtr& renderPassState) const
 {
     dataWindow = _GetDataWindow(renderPassState);
@@ -47,4 +47,4 @@ void Hd_USTC_CG_Camera::update(
     inverseViewMatrix = viewMatrix.GetInverse();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

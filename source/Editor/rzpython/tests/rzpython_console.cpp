@@ -11,7 +11,7 @@
 #include <rzpython/interpreter.hpp>
 #include <rzpython/rzpython.hpp>
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 class PythonConsoleWidgetFactory : public IWidgetFactory {
    public:

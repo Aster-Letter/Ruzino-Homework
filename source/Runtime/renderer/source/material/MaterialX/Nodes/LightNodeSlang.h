@@ -11,7 +11,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Light node implementation for SLANG
-class HD_USTC_CG_API LightNodeSlang : public SlangImplementation {
+class HD_RUZINO_API LightNodeSlang : public SlangImplementation {
    public:
     LightNodeSlang();
 

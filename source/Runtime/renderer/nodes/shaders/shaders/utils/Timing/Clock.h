@@ -33,12 +33,12 @@
 #include <string>
 #include <cstdint>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * A clock. This class supports both real-time clock (based on the system's clock) and a fixed time-step clock (based on tick count)
  */
-class HD_USTC_CG_API Clock
+class HD_RUZINO_API Clock
 {
 public:
     Clock();
@@ -243,4 +243,4 @@ private:
         return (mEndTime < 0 || time < mEndTime) ? time : mStartTime + time - mEndTime;
     }
 };
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -1,6 +1,6 @@
 #pragma once
 #include "optix/WorkQueue.cuh"
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 
 #include <RHI/api.h>
 #include <cuda.h>
@@ -19,7 +19,7 @@
 #include "cuda_extension_utils.h"
 #include "optix/ShaderNameAbbre.h"
 #include "optix/optix.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace cuda {
 RHI_API int cuda_init();
@@ -519,6 +519,6 @@ RHI_API CUDALinearBufferHandle copy_texture_to_linear_buffer_with_cleanup(
 
 }  // namespace cuda
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif

@@ -61,11 +61,11 @@ def generate_main_header(package_name, package_path):
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Add your API functions here
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 """
 
     header_file = package_path / "include" / package_name / f"{package_name}.h"
@@ -92,7 +92,7 @@ def generate_main_cmake(
 
     skip_str = " ".join(skip_dirs) if skip_dirs else ""
 
-    cmake_content = f"""USTC_CG_ADD_LIB(
+    cmake_content = f"""RUZINO_ADD_LIB(
 \t{package_name}
 \tSHARED
 """

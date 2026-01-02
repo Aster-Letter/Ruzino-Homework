@@ -12,7 +12,7 @@
 
 #include <math.h>
 
-#if USTC_CG_WITH_TORCH
+#if RUZINO_WITH_TORCH
 #include <cuda_runtime_api.h>
 
 #include <stdio.h>

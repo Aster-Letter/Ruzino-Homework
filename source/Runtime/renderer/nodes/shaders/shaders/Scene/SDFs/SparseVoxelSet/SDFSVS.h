@@ -32,11 +32,11 @@
 
 #include "Core/Pass/ComputePass.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** A single SDF Sparse Voxel Set. Can only be utilized on the GPU.
     */
-    class HD_USTC_CG_API SDFSVS : public SDFGrid
+    class HD_RUZINO_API SDFSVS : public SDFGrid
     {
     public:
         static ref<SDFSVS> create(ref<Device> pDevice) { return make_ref<SDFSVS>(pDevice); }

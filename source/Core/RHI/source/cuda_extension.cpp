@@ -1,4 +1,4 @@
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 #include <cuda_runtime.h>
 
 #ifdef _WIN64
@@ -37,7 +37,7 @@
                 std::string(nvrtcGetErrorString(code))); \
     } while (0)
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Here the resourcetype could be texture or buffer now.
 template<typename ResourceType>
@@ -1636,6 +1636,6 @@ CUDALinearBufferHandle nvrhi_texture_to_cuda_linear_buffer(
 }
 }  // namespace cuda
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif

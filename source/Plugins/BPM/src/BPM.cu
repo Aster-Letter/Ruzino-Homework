@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <thrust/complex.h>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 #define TILE_DIM 32
 
@@ -303,4 +303,4 @@ namespace cuda {
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

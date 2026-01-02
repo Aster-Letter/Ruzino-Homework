@@ -32,7 +32,7 @@
 #include <memory>
 #include <mutex>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
@@ -72,4 +72,4 @@ struct SharedCache
     std::map<Key, std::weak_ptr<T>> cache;
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

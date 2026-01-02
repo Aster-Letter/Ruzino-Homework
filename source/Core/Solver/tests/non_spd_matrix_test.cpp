@@ -5,7 +5,7 @@
 #include <RZSolver/Solver.hpp>
 #include <random>
 
-using namespace USTC_CG::Solver;
+using namespace Ruzino::Solver;
 
 class NonSPDMatrixTest : public ::testing::Test {
    protected:

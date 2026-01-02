@@ -55,7 +55,7 @@
 
 namespace nb = nanobind;
 namespace bp = pxr::pxr_boost::python;  // USD uses renamed Boost
-using namespace USTC_CG;
+using namespace Ruzino;
 
 /**
  * CRITICAL FUNCTION: Extract UsdStageRefPtr from pxr.Usd.Stage (Boost.Python
@@ -284,7 +284,7 @@ NB_MODULE(stage_py, m)
     m.def(
         "register_geom_payload_type",
         []() {
-            USTC_CG::register_cpp_type<GeomPayload>();
+            Ruzino::register_cpp_type<GeomPayload>();
         },
         "Register GeomPayload type in entt meta system for node graph usage");
 
@@ -296,11 +296,11 @@ NB_MODULE(stage_py, m)
         "create_meta_any_from_payload",
         [](const GeomPayload& payload) -> entt::meta_any {
             // Ensure type is registered with the correct context
-            USTC_CG::register_cpp_type<GeomPayload>();
+            Ruzino::register_cpp_type<GeomPayload>();
             
             // Create meta_any with the GeomPayload using the same context
             // CRITICAL: Must use the same entt context as the node system!
-            auto& ctx = USTC_CG::get_entt_ctx();
+            auto& ctx = Ruzino::get_entt_ctx();
             auto type = entt::resolve<GeomPayload>(ctx);
             
             if (!type) {

@@ -7,7 +7,7 @@
 #include <string>
 #include <chrono>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace Solver {
 
@@ -63,4 +63,4 @@ public:
 
 } // namespace Solver
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

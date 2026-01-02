@@ -95,7 +95,7 @@ void SourceCodeNodeSlang::initialize(
 
         _sourceFilename = getRelative(
             _sourceFilename,
-            current / FilePath("usd/hd_USTC_CG/resources/libraries"));
+            current / FilePath("usd/hd_RUZINO/resources/libraries"));
     }
 
     // Find the function name to use

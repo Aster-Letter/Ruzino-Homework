@@ -12,7 +12,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Unlit surface node implementation for SLANG
-class HD_USTC_CG_API UnlitSurfaceNodeSlang : public SlangImplementation
+class HD_RUZINO_API UnlitSurfaceNodeSlang : public SlangImplementation
 {
   public:
     static ShaderNodeImplPtr create();

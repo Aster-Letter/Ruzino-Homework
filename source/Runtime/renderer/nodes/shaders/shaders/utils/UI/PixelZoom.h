@@ -30,7 +30,7 @@
 #include "utils/Math/Vector.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class RenderContext;
 struct MouseEvent;
@@ -81,4 +81,4 @@ private:
     float2 mMousePos = {};
     bool mShouldZoom = false;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

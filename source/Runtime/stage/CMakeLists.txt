@@ -1,4 +1,4 @@
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	stage
 	SHARED
 	PUBLIC_LIBS
@@ -15,7 +15,7 @@ USTC_CG_ADD_LIB(
 		usdLux
 	COMPILE_DEFS
 		NOMINMAX=1
-		USTC_CG_BUILD_MODULE=1
+		RUZINO_BUILD_MODULE=1
 )
 
 # Link Boost.Python and USD Python bindings using CMake targets

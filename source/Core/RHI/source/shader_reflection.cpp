@@ -3,7 +3,7 @@
 #include <spdlog/spdlog.h>
 #include "RHI/ShaderFactory/shader.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 const nvrhi::BindingLayoutDescVector&
 ShaderReflectionInfo::get_binding_layout_descs() const
@@ -261,4 +261,4 @@ std::ostream& operator<<(std::ostream& os, const ShaderReflectionInfo& info)
     return os;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

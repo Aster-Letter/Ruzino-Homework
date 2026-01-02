@@ -33,7 +33,7 @@
 #include "Core/Object.h"
 #include "Core/Program/ProgramVersion.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 
 struct RtStateObjectDesc {
     ref<const ProgramKernels> pProgramKernels;
@@ -49,7 +49,7 @@ struct RtStateObjectDesc {
     }
 };
 
-class HD_USTC_CG_API RtStateObject : public Object {
+class HD_RUZINO_API RtStateObject : public Object {
     FALCOR_OBJECT(RtStateObject)
    public:
     RtStateObject(ref<Device> pDevice, const RtStateObjectDesc& desc);
@@ -83,4 +83,4 @@ class HD_USTC_CG_API RtStateObject : public Object {
     nvrhi::rt::PipelineHandle mGfxPipelineState;
     std::vector<std::string> mEntryPointGroupExportNames;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

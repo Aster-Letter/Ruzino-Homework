@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_VOLUME_H
-#define Hd_USTC_CG_VOLUME_H
+#ifndef Hd_RUZINO_VOLUME_H
+#define Hd_RUZINO_VOLUME_H
 // OpenVDB and NanoVDB headers - assume available
 
 #include <openvdb/io/File.h>
@@ -41,8 +41,8 @@
 #include "pxr/imaging/hd/volume.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
 
 // Volume field data structure
@@ -87,12 +87,12 @@ enum class VolumeFormat {
     Unknown
 };
 
-class HD_USTC_CG_API Hd_USTC_CG_Volume final : public HdVolume {
+class HD_RUZINO_API Hd_RUZINO_Volume final : public HdVolume {
    public:
-    HF_MALLOC_TAG_NEW("new Hd_USTC_CG_Volume");
+    HF_MALLOC_TAG_NEW("new Hd_RUZINO_Volume");
 
-    Hd_USTC_CG_Volume(const SdfPath& id);
-    ~Hd_USTC_CG_Volume() override;
+    Hd_RUZINO_Volume(const SdfPath& id);
+    ~Hd_RUZINO_Volume() override;
 
     HdDirtyBits GetInitialDirtyBitsMask() const override;
 
@@ -104,7 +104,7 @@ class HD_USTC_CG_API Hd_USTC_CG_Volume final : public HdVolume {
     void Finalize(HdRenderParam* renderParam) override;
 
     // GPU resource creation
-    void CreateGPUResources(class Hd_USTC_CG_RenderParam* renderParam);
+    void CreateGPUResources(class Hd_RUZINO_RenderParam* renderParam);
 
     // Convenience methods for later integration
     const GfBBox3d& GetBoundingBox() const
@@ -169,10 +169,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Volume final : public HdVolume {
     bool _boundingBoxValid;
 
     // This class does not support copying
-    Hd_USTC_CG_Volume(const Hd_USTC_CG_Volume&) = delete;
-    Hd_USTC_CG_Volume& operator=(const Hd_USTC_CG_Volume&) = delete;
+    Hd_RUZINO_Volume(const Hd_RUZINO_Volume&) = delete;
+    Hd_RUZINO_Volume& operator=(const Hd_RUZINO_Volume&) = delete;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_VOLUME_H
+#endif  // Hd_RUZINO_VOLUME_H

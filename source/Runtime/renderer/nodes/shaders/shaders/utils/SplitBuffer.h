@@ -35,7 +35,7 @@
 #include "Core/Program/DefineList.h"
 #include "Core/Program/ShaderVar.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 
 /**
  * @brief Represents a cpu/gpu buffer, that handles the GPU limit on 4GB
@@ -366,4 +366,4 @@ class SplitBuffer {
     friend class SceneCache;
 };
 
-}  // namespace USTC_CG
+}  // namespace Ruzino

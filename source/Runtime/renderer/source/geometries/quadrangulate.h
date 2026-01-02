@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef HD_USTC_CG_QUADRANGULATE_H
-#define HD_USTC_CG_QUADRANGULATE_H
+#ifndef HD_RUZINO_QUADRANGULATE_H
+#define HD_RUZINO_QUADRANGULATE_H
 
 #include "computation.h"
 #include "pxr/base/tf/token.h"
@@ -14,7 +14,7 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 using HdSt_QuadInfoBuilderComputationSharedPtr =
     std::shared_ptr<class HdSt_QuadInfoBuilderComputation>;
@@ -198,6 +198,6 @@ class HdSt_QuadrangulateFaceVaryingComputation : public HdComputedBufferSource {
     HdBufferSourceSharedPtr _source;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // HD_USTC_CG_QUADRANGULATE_H
+#endif  // HD_RUZINO_QUADRANGULATE_H

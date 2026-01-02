@@ -34,13 +34,13 @@
 #include <filesystem>
 #include <limits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
  * Utility class for reading memory-mapped files.
  */
-class HD_USTC_CG_API MemoryMappedFile
+class HD_RUZINO_API MemoryMappedFile
 {
 public:
     enum class AccessHint
@@ -127,4 +127,4 @@ private:
     size_t mMappedSize = 0;
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -9,7 +9,7 @@
 
 #include "api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace python {
 
@@ -49,4 +49,4 @@ RZPYTHON_API std::shared_ptr<console::Interpreter> CreatePythonInterpreter();
 
 }  // namespace python
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -35,7 +35,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 //
@@ -106,23 +106,23 @@ namespace detail
 /// Overload to allow FALCOR_THROW to be called with a message only.
 [[noreturn]] inline void throwException(const std::source_location& loc, std::string_view msg)
 {
-    ::USTC_CG::throwException(loc, msg);
+    ::Ruzino::throwException(loc, msg);
 }
 
 /// Overload to allow FALCOR_THROW to be called with a format string and arguments.
 template<typename... Args>
 [[noreturn]] inline void throwException(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
 {
-    ::USTC_CG::throwException(loc, std::format(fmt, std::forward<Args>(args)...));
+    ::Ruzino::throwException(loc, std::format(fmt, std::forward<Args>(args)...));
 }
 } // namespace detail
-} // namespace USTC_CG
+} // namespace Ruzino
 
 /// Helper for throwing a RuntimeError exception.
 /// Accepts either a string or a format string and arguments:
 /// FALCOR_THROW("This is an error message.");
 /// FALCOR_THROW("Expected {} items, got {}.", expectedCount, actualCount);
-#define FALCOR_THROW(...) ::USTC_CG::detail::throwException(std::source_location::current(), __VA_ARGS__)
+#define FALCOR_THROW(...) ::Ruzino::detail::throwException(std::source_location::current(), __VA_ARGS__)
 
 /// Helper for throwing a RuntimeError exception if condition isn't met.
 /// Accepts either a string or a format string and arguments.
@@ -145,7 +145,7 @@ template<typename... Args>
 // Assertions.
 //
 
-namespace USTC_CG
+namespace Ruzino
 {
 /// Report an assertion.
 /// If ErrorDiagnosticFlags::AppendStackTrace is set, a stack trace will be appended to the exception message.
@@ -157,13 +157,13 @@ namespace detail
 /// Overload to allow FALCOR_ASSERT to be called without a message.
 [[noreturn]] inline void reportAssertion(const std::source_location& loc, std::string_view cond)
 {
-    ::USTC_CG::reportAssertion(loc, cond);
+    ::Ruzino::reportAssertion(loc, cond);
 }
 
 /// Overload to allow FALCOR_ASSERT to be called with a message only.
 [[noreturn]] inline void reportAssertion(const std::source_location& loc, std::string_view cond, std::string_view msg)
 {
-    ::USTC_CG::reportAssertion(loc, cond, msg);
+    ::Ruzino::reportAssertion(loc, cond, msg);
 }
 
 /// Overload to allow FALCOR_ASSERT to be called with a format string and arguments.
@@ -175,10 +175,10 @@ template<typename... Args>
     Args&&... args
 )
 {
-    ::USTC_CG::reportAssertion(loc, cond, std::format(fmt, std::forward<Args>(args)...));
+    ::Ruzino::reportAssertion(loc, cond, std::format(fmt, std::forward<Args>(args)...));
 }
 } // namespace detail
-} // namespace USTC_CG
+} // namespace Ruzino
 
 #if FALCOR_ENABLE_ASSERTS
 
@@ -190,7 +190,7 @@ template<typename... Args>
 #define FALCOR_ASSERT(cond, ...)                                                                   \
     if (!(cond))                                                                                   \
     {                                                                                              \
-        ::USTC_CG::detail::reportAssertion(std::source_location::current(), #cond, ##__VA_ARGS__); \
+        ::Ruzino::detail::reportAssertion(std::source_location::current(), #cond, ##__VA_ARGS__); \
     }
 
 /// Helper for asserting a binary comparison between two variables.
@@ -198,7 +198,7 @@ template<typename... Args>
 #define FALCOR_ASSERT_OP(a, b, OP)                                                                                                       \
     if (!(a OP b))                                                                                                                       \
     {                                                                                                                                    \
-        ::USTC_CG::detail::reportAssertion(std::source_location::current(), std::format("{} {} {} ({} {} {})", #a, #OP, #b, a, #OP, b)); \
+        ::Ruzino::detail::reportAssertion(std::source_location::current(), std::format("{} {} {} ({} {} {})", #a, #OP, #b, a, #OP, b)); \
     }
 
 #define FALCOR_ASSERT_EQ(a, b) FALCOR_ASSERT_OP(a, b, ==)
@@ -227,7 +227,7 @@ template<typename... Args>
 // Error reporting.
 //
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /// Flags controlling the error diagnostic behavior.
@@ -303,4 +303,4 @@ int catchAndReportAllExceptions(CallbackT callback, ResultT errorResult = 1)
     return result;
 }
 
-} // namespace USTC_CG
+} // namespace Ruzino

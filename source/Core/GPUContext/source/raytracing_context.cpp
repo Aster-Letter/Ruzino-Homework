@@ -1,6 +1,6 @@
 #include "GPUContext/raytracing_context.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 RaytracingContext::RaytracingContext(ResourceAllocator& r, ProgramVars& vars)
     : GPUContext(r, vars)
 {
@@ -340,4 +340,4 @@ void RaytracingContext::finish_announcing_shader_names()
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -7,7 +7,7 @@
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec3d.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 
 namespace fem_bem {
 
@@ -96,4 +96,4 @@ namespace fem_bem {
 
 }  // namespace fem_bem
 
-}  // namespace USTC_CG
+}  // namespace Ruzino

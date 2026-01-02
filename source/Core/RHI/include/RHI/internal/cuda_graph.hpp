@@ -1,13 +1,13 @@
 #pragma once
 
 #include "RHI/internal/cuda_extension_utils.h"
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 
 #include <RHI/api.h>
 #include <cuda_runtime.h>
 #include <nvrhi/nvrhi.h>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace cuda {
 
@@ -275,6 +275,6 @@ class RHI_API CUDAGraphMemoryPool {
 
 }  // namespace cuda
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // USTC_CG_WITH_CUDA
+#endif  // RUZINO_WITH_CUDA

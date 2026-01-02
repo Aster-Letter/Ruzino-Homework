@@ -17,7 +17,7 @@ NODE_DECLARATION_FUNCTION(rng_buffer)
 
 NODE_EXECUTION_FUNCTION(rng_buffer)
 {
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
     auto size = free_camera->dataWindow.GetSize();
     auto length = size[0] * size[1];
 

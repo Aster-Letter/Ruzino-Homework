@@ -1,9 +1,9 @@
 #include "RHI/api.h"
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 
 #include <cuda_runtime.h>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Simple CUDA kernels for testing
 __global__ void vector_add(float* a, float* b, float* c, int n)
@@ -30,6 +30,6 @@ __global__ void vector_init(float* a, float value, int n)
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // USTC_CG_WITH_CUDA
+#endif  // RUZINO_WITH_CUDA

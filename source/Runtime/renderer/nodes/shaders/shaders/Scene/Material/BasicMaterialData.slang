@@ -36,7 +36,7 @@ __exported import Scene.Material.TextureHandle;
 __exported import Scene.Material.MaterialData;
 #endif
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 /** This is a host/device structure that describes the parameters for a basic material.
 
@@ -117,4 +117,4 @@ struct BasicMaterialData
     uint getDisplacementMaxSamplerID() CONST_FUNCTION { return EXTRACT_BITS(MaterialHeader::kSamplerIDBits, kMaxSamplerIDOffset, flags); }
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

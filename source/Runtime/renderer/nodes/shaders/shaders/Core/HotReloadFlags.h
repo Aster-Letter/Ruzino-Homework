@@ -28,7 +28,7 @@
 #pragma once
 #include "Macros.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Flags indicating what hot-reloadable resources have changed
@@ -40,4 +40,4 @@ enum class HotReloadFlags
 };
 
 FALCOR_ENUM_CLASS_OPERATORS(HotReloadFlags);
-} // namespace USTC_CG
+} // namespace Ruzino

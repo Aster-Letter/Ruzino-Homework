@@ -32,7 +32,7 @@
 #include <utility>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
@@ -165,4 +165,4 @@ private:
     size_t mCacheLineSize = 128;
     std::vector<uint8_t> mBuffer;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

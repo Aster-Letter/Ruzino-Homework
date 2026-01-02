@@ -28,7 +28,7 @@
 #include <map>
 #include <string>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 class SceneBuilder;
@@ -42,4 +42,4 @@ public:
     static std::map<std::string, std::string> getDebugContent(const SceneBuilder& sceneBuilder);
 };
 
-} // namespace USTC_CG
+} // namespace Ruzino

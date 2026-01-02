@@ -1,11 +1,11 @@
 #include "nodes/core/def/node_def.hpp"
 #include "render_node_base.h"
 
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 #include "RHI/internal/cuda_extension.hpp"
-#include "hd_USTC_CG/render_global_payload.hpp"
+#include "hd_RUZINO/render_global_payload.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 static void node_nvrhi_to_cuda_declare(NodeDeclarationBuilder& b)
 {
@@ -80,6 +80,6 @@ static void node_register()
 
 NOD_REGISTER_NODE(node_register)
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // USTC_CG_WITH_CUDA
+#endif  // RUZINO_WITH_CUDA

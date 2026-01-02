@@ -13,10 +13,10 @@
 #include "nvrhi/utils.h"
 #include "pxr/imaging/hd/instancer.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_Points::Hd_USTC_CG_Points(const SdfPath& id)
+Hd_RUZINO_Points::Hd_RUZINO_Points(const SdfPath& id)
     : HdPoints(id),
       _pointsValid(false)
 {
@@ -24,11 +24,11 @@ Hd_USTC_CG_Points::Hd_USTC_CG_Points(const SdfPath& id)
     copy_commandlist = device->createCommandList();
 }
 
-Hd_USTC_CG_Points::~Hd_USTC_CG_Points()
+Hd_RUZINO_Points::~Hd_RUZINO_Points()
 {
 }
 
-HdDirtyBits Hd_USTC_CG_Points::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Points::GetInitialDirtyBitsMask() const
 {
     int mask = HdChangeTracker::Clean | HdChangeTracker::InitRepr |
                HdChangeTracker::DirtyPoints | HdChangeTracker::DirtyTransform |
@@ -40,13 +40,13 @@ HdDirtyBits Hd_USTC_CG_Points::GetInitialDirtyBitsMask() const
     return (HdDirtyBits)mask;
 }
 
-HdDirtyBits Hd_USTC_CG_Points::_PropagateDirtyBits(HdDirtyBits bits) const
+HdDirtyBits Hd_RUZINO_Points::_PropagateDirtyBits(HdDirtyBits bits) const
 {
     return bits;
 }
 
-void Hd_USTC_CG_Points::create_gpu_resources(
-    Hd_USTC_CG_RenderParam* render_param)
+void Hd_RUZINO_Points::create_gpu_resources(
+    Hd_RUZINO_RenderParam* render_param)
 {
     auto device = RHI::get_device();
 
@@ -186,8 +186,8 @@ void Hd_USTC_CG_Points::create_gpu_resources(
     spdlog::info("Created sphere BLAS with {} points", points.size());
 }
 
-void Hd_USTC_CG_Points::updateTLAS(
-    Hd_USTC_CG_RenderParam* render_param,
+void Hd_RUZINO_Points::updateTLAS(
+    Hd_RUZINO_RenderParam* render_param,
     HdSceneDelegate* sceneDelegate,
     HdDirtyBits* dirtyBits)
 {
@@ -203,7 +203,7 @@ void Hd_USTC_CG_Points::updateTLAS(
         spdlog::warn("Points {} has no material assigned", id.GetText());
     }
 
-    Hd_USTC_CG_Material* material = (*render_param->material_map)[material_id];
+    Hd_RUZINO_Material* material = (*render_param->material_map)[material_id];
     if (!material) {
         spdlog::warn(
             "Material {} not found for points {}. Continuing without material.",
@@ -278,13 +278,13 @@ void Hd_USTC_CG_Points::updateTLAS(
         instance_count);
 }
 
-void Hd_USTC_CG_Points::_InitRepr(
+void Hd_RUZINO_Points::_InitRepr(
     const TfToken& reprToken,
     HdDirtyBits* dirtyBits)
 {
 }
 
-void Hd_USTC_CG_Points::Sync(
+void Hd_RUZINO_Points::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits,
@@ -294,8 +294,8 @@ void Hd_USTC_CG_Points::Sync(
     HF_MALLOC_TAG_FUNCTION();
 
     const SdfPath& id = GetId();
-    Hd_USTC_CG_RenderParam* render_param =
-        static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    Hd_RUZINO_RenderParam* render_param =
+        static_cast<Hd_RUZINO_RenderParam*>(renderParam);
 
     bool update_gpu_resources = false;
 
@@ -355,16 +355,16 @@ void Hd_USTC_CG_Points::Sync(
     if (_pointsValid && BLAS) {
         updateTLAS(render_param, sceneDelegate, dirtyBits);
     }
-    static_cast<Hd_USTC_CG_RenderParam*>(renderParam)
+    static_cast<Hd_RUZINO_RenderParam*>(renderParam)
         ->InstanceCollection->mark_geometry_dirty();
 
     *dirtyBits = HdChangeTracker::Clean;
 }
 
-void Hd_USTC_CG_Points::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Points::Finalize(HdRenderParam* renderParam)
 {
-    Hd_USTC_CG_RenderParam* render_param =
-        static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    Hd_RUZINO_RenderParam* render_param =
+        static_cast<Hd_RUZINO_RenderParam*>(renderParam);
 
     if (instanceBuffer)
         instanceBuffer.reset();
@@ -376,4 +376,4 @@ void Hd_USTC_CG_Points::Finalize(HdRenderParam* renderParam)
     spdlog::info("Finalized points {}", GetId().GetText());
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

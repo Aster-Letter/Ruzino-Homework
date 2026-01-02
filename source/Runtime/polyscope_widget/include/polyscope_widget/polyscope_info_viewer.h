@@ -4,7 +4,7 @@
 #include "polyscope/polyscope.h"
 #include "polyscope_widget/api.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class POLYSCOPE_WIDGET_API PolyscopeInfoViewer final : public IWidget {
    public:
@@ -45,4 +45,4 @@ class POLYSCOPE_WIDGET_API PolyscopeInfoViewer final : public IWidget {
     // Animate(float elapsed_time_seconds) override;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

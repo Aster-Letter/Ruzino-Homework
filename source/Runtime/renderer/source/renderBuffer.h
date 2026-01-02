@@ -30,12 +30,12 @@
 #include "pxr/pxr.h"
 
 #include <nvrhi/nvrhi.h>
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-class Hd_USTC_CG_RenderBuffer : public HdRenderBuffer {
+class Hd_RUZINO_RenderBuffer : public HdRenderBuffer {
    public:
-    Hd_USTC_CG_RenderBuffer(const SdfPath& id);
-    ~Hd_USTC_CG_RenderBuffer() override;
+    Hd_RUZINO_RenderBuffer(const SdfPath& id);
+    ~Hd_RUZINO_RenderBuffer() override;
 
     void Sync(
         HdSceneDelegate* sceneDelegate,
@@ -97,7 +97,7 @@ class Hd_USTC_CG_RenderBuffer : public HdRenderBuffer {
     void Clear();
     void Present(nvrhi::TextureHandle texture);
 
-#ifdef USTC_CG_BACKEND_OPENGL
+#ifdef RUZINO_BACKEND_OPENGL
     GLuint fbo = 0;
     GLuint tex = 0;
 #endif
@@ -137,6 +137,6 @@ private:
     std::atomic<bool> _converged;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif  // PXR_IMAGING_PLUGIN_HD_EMBREE_RENDER_BUFFER_H

@@ -1,5 +1,5 @@
 if(SLANG_FOUND)
-    USTC_CG_ADD_LIB(
+    RUZINO_ADD_LIB(
         RHI
         SHARED
         WITH_CUDA
@@ -10,7 +10,7 @@ if(SLANG_FOUND)
         NOMINMAX
         VULKAN_HPP_STORAGE_SHARED
         VULKAN_HPP_STORAGE_SHARED_IMPORT
-        USTC_CG_BACKEND_NVRHI
+        RUZINO_BACKEND_NVRHI
     )
 
     target_compile_definitions(RHI PRIVATE RELATIVE_TO_PROJROOT="${RELATIVE_TO_PROJROOT}")
@@ -21,7 +21,7 @@ if(SLANG_FOUND)
     endif()
 
     if(WIN32)
-        target_compile_definitions(RHI PUBLIC USTC_CG_WITH_DX12=1)
+        target_compile_definitions(RHI PUBLIC RUZINO_WITH_DX12=1)
         target_link_libraries(RHI PUBLIC d3d12 dxgi)
     endif()
 
@@ -29,13 +29,13 @@ if(SLANG_FOUND)
         target_link_libraries(RHI PUBLIC garch)
     endif()
 
-    if(USTC_CG_WITH_OPENUSD)
-        target_compile_definitions(RHI PUBLIC USTC_CG_WITH_OPENUSD=1)
+    if(RUZINO_WITH_OPENUSD)
+        target_compile_definitions(RHI PUBLIC RUZINO_WITH_OPENUSD=1)
     else()
-        target_compile_definitions(RHI PUBLIC USTC_CG_WITH_OPENUSD=0)
+        target_compile_definitions(RHI PUBLIC RUZINO_WITH_OPENUSD=0)
     endif()
 
-    if(USTC_CG_WITH_CUDA)
+    if(RUZINO_WITH_CUDA)
         include(nvrtc.cmake)
     endif()
 

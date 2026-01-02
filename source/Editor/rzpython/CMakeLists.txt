@@ -1,4 +1,4 @@
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	rzpython
 	SHARED
 	PUBLIC_LIBS GUI nanobind rzconsole

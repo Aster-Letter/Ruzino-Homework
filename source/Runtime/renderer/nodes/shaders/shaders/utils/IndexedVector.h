@@ -33,7 +33,7 @@
 #include <vector>
 #include <span>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /**
@@ -97,4 +97,4 @@ private:
     std::vector<T> mValues;
     std::vector<I> mIndices;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

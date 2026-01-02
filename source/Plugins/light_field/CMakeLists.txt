@@ -1,4 +1,4 @@
-USTC_CG_ADD_LIB(
+RUZINO_ADD_LIB(
 	light_field
 	SHARED
 	PUBLIC_LIBS GUI RHI shaders_interface glm::glm GUI spdlog::spdlog

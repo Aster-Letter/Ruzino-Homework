@@ -32,26 +32,26 @@ using namespace pxr;
 // Register the plugin with the renderer plugin system.
 TF_REGISTRY_FUNCTION(TfType)
 {
-    HdRendererPluginRegistry::Define<Hd_USTC_CG_RendererPlugin>();
+    HdRendererPluginRegistry::Define<Hd_RUZINO_RendererPlugin>();
 }
 
-HdRenderDelegate* Hd_USTC_CG_RendererPlugin::CreateRenderDelegate()
+HdRenderDelegate* Hd_RUZINO_RendererPlugin::CreateRenderDelegate()
 {
-    return new USTC_CG::Hd_USTC_CG_RenderDelegate();
+    return new Ruzino::Hd_RUZINO_RenderDelegate();
 }
 
-HdRenderDelegate* Hd_USTC_CG_RendererPlugin::CreateRenderDelegate(
+HdRenderDelegate* Hd_RUZINO_RendererPlugin::CreateRenderDelegate(
     HdRenderSettingsMap const& settingsMap)
 {
-    return new USTC_CG::Hd_USTC_CG_RenderDelegate(settingsMap);
+    return new Ruzino::Hd_RUZINO_RenderDelegate(settingsMap);
 }
 
-void Hd_USTC_CG_RendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)
+void Hd_RUZINO_RendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)
 {
     delete renderDelegate;
 }
 
-bool Hd_USTC_CG_RendererPlugin::IsSupported(bool /* gpuEnabled */) const
+bool Hd_RUZINO_RendererPlugin::IsSupported(bool /* gpuEnabled */) const
 {
     // Nothing more to check for now, we assume if the plugin loads correctly
     // it is supported.

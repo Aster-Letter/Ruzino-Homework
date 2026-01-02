@@ -10,16 +10,16 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/sdr/registry.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-std::mutex Hd_USTC_CG_Material::texture_mutex;
-std::mutex Hd_USTC_CG_Material::material_data_handle_mutex;
+std::mutex Hd_RUZINO_Material::texture_mutex;
+std::mutex Hd_RUZINO_Material::material_data_handle_mutex;
 
-Hd_USTC_CG_Material::Hd_USTC_CG_Material(SdfPath const& id) : HdMaterial(id)
+Hd_RUZINO_Material::Hd_RUZINO_Material(SdfPath const& id) : HdMaterial(id)
 {
 }
 
-HdMaterialNetwork2Interface Hd_USTC_CG_Material::FetchNetInterface(
+HdMaterialNetwork2Interface Hd_RUZINO_Material::FetchNetInterface(
     HdSceneDelegate* sceneDelegate,
     HdMaterialNetwork2& hdNetwork,
     SdfPath& materialPath)
@@ -37,30 +37,30 @@ HdMaterialNetwork2Interface Hd_USTC_CG_Material::FetchNetInterface(
     return netInterface;
 }
 
-HdDirtyBits Hd_USTC_CG_Material::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Material::GetInitialDirtyBitsMask() const
 {
     return HdChangeTracker::AllDirty;
 }
 
-void Hd_USTC_CG_Material::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Material::Finalize(HdRenderParam* renderParam)
 {
-    auto render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     render_param->InstanceCollection->mark_materials_dirty();
     material_header_handle = nullptr;
     HdMaterial::Finalize(renderParam);
 }
-void Hd_USTC_CG_Material::Sync(
+void Hd_RUZINO_Material::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
 {
     // Ensure material data handle is allocated
-    auto render_param = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto render_param = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     render_param->InstanceCollection->mark_materials_dirty();
 }
 
-void Hd_USTC_CG_Material::ensure_material_data_handle(
-    Hd_USTC_CG_RenderParam* render_param)
+void Hd_RUZINO_Material::ensure_material_data_handle(
+    Hd_RUZINO_RenderParam* render_param)
 {
     std::lock_guard<std::mutex> lock(material_data_handle_mutex);
     if (!material_data_handle) {
@@ -81,7 +81,7 @@ void Hd_USTC_CG_Material::ensure_material_data_handle(
     }
 }
 
-unsigned Hd_USTC_CG_Material::GetMaterialLocation() const
+unsigned Hd_RUZINO_Material::GetMaterialLocation() const
 {
     if (!material_data_handle) {
         return -1;
@@ -90,7 +90,7 @@ unsigned Hd_USTC_CG_Material::GetMaterialLocation() const
 }
 
 // HLSL callable shader
-std::string Hd_USTC_CG_Material::eval_source_code_fallback = R"(
+std::string Hd_RUZINO_Material::eval_source_code_fallback = R"(
 void fetch_shader_data(
     out float4 out1,
     in uint material_params_index, 
@@ -116,7 +116,7 @@ void fetch_shader_opacity(
 }
 )";
 
-std::string Hd_USTC_CG_Material::slang_source_code_template = R"(
+std::string Hd_RUZINO_Material::slang_source_code_template = R"(
 import Scene.VertexInfo;
 import Scene.BindlessMaterial;
 import Scene.MaterialParams;
@@ -146,7 +146,7 @@ void $getOpacity(inout FetchCallableData data)
 
 )";
 
-void Hd_USTC_CG_Material::ensure_shader_ready(const ShaderFactory& factory)
+void Hd_RUZINO_Material::ensure_shader_ready(const ShaderFactory& factory)
 {
     // Check if shader is already ready to avoid redundant generation
     if (shader_ready) {
@@ -189,14 +189,14 @@ void Hd_USTC_CG_Material::ensure_shader_ready(const ShaderFactory& factory)
     shader_ready = true;
 }
 
-std::string Hd_USTC_CG_Material::GetShader(const ShaderFactory& factory)
+std::string Hd_RUZINO_Material::GetShader(const ShaderFactory& factory)
 {
     ensure_shader_ready(factory);
     return final_shader_source;
 }
-std::string Hd_USTC_CG_Material::GetMaterialName() const
+std::string Hd_RUZINO_Material::GetMaterialName() const
 {
     return material_name;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

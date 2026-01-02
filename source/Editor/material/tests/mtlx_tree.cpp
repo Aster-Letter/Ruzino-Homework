@@ -3,7 +3,7 @@
 #include "MCore/MaterialXNodeTreeWidget.h"
 #include "MCore/MaterialXNodeTree.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 int main()
 {

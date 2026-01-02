@@ -58,7 +58,7 @@
 #include <mutex>
 #endif
 
-namespace USTC_CG {
+namespace Ruzino {
 
 /**
  * @brief Base class for reference counted objects.
@@ -85,7 +85,7 @@ namespace USTC_CG {
  * Finally, if we want to migrate from pybind11 to nanobind at some point in
  * the future, we will need to use a custom reference counting system.
  */
-class HD_USTC_CG_API Object {
+class HD_RUZINO_API Object {
    public:
     /// Default constructor.
     Object() = default;
@@ -589,21 +589,21 @@ class BreakableReference {
     T* mWeakRef = nullptr;
 };
 
-}  // namespace USTC_CG
+}  // namespace Ruzino
 
 template<typename T>
-struct std::formatter<USTC_CG::ref<T>> : formatter<const void*> {
+struct std::formatter<Ruzino::ref<T>> : formatter<const void*> {
     template<typename FormatContext>
-    auto format(const USTC_CG::ref<T>& ref, FormatContext& ctx) const
+    auto format(const Ruzino::ref<T>& ref, FormatContext& ctx) const
     {
         return formatter<const void*>::format(ref.get(), ctx);
     }
 };
 
 template<typename T>
-struct std::formatter<USTC_CG::BreakableReference<T>> : formatter<const void*> {
+struct std::formatter<Ruzino::BreakableReference<T>> : formatter<const void*> {
     template<typename FormatContext>
-    auto format(const USTC_CG::BreakableReference<T>& ref, FormatContext& ctx)
+    auto format(const Ruzino::BreakableReference<T>& ref, FormatContext& ctx)
         const
     {
         return formatter<const void*>::format(ref.get(), ctx);
@@ -612,14 +612,14 @@ struct std::formatter<USTC_CG::BreakableReference<T>> : formatter<const void*> {
 
 namespace std {
 template<typename T>
-void swap(::USTC_CG::ref<T>& x, ::USTC_CG::ref<T>& y) noexcept
+void swap(::Ruzino::ref<T>& x, ::Ruzino::ref<T>& y) noexcept
 {
     return x.swap(y);
 }
 
 template<typename T>
-struct hash<::USTC_CG::ref<T>> {
-    constexpr size_t operator()(const ::USTC_CG::ref<T>& r) const
+struct hash<::Ruzino::ref<T>> {
+    constexpr size_t operator()(const ::Ruzino::ref<T>& r) const
     {
         return std::hash<T*>()(r.get());
     }

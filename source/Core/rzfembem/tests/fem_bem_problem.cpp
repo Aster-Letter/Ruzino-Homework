@@ -9,8 +9,8 @@
 #include "GCore/algorithms/delauney.h"
 #include "GCore/create_geom.h"
 
-using namespace USTC_CG::fem_bem;
-using namespace USTC_CG;
+using namespace Ruzino::fem_bem;
+using namespace Ruzino;
 
 TEST(FEMBEMProblem, Laplacian)
 {

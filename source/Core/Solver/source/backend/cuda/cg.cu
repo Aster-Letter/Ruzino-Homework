@@ -7,7 +7,7 @@
 #include <RZSolver/Solver.hpp>
 #include <iostream>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace Solver {
 
@@ -25,14 +25,14 @@ namespace {
         cusparseDnVecDescr_t vecZ_desc,
         cusparseDnVecDescr_t vecP_desc,
         cusparseDnVecDescr_t vecAp_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle d_diagonal,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_z,
-        USTC_CG::cuda::CUDALinearBufferHandle d_p,
-        USTC_CG::cuda::CUDALinearBufferHandle d_Ap)
+        Ruzino::cuda::CUDALinearBufferHandle d_diagonal,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_z,
+        Ruzino::cuda::CUDALinearBufferHandle d_p,
+        Ruzino::cuda::CUDALinearBufferHandle d_Ap)
     {
         SolverResult result;
         const float one = 1.0f, zero = 0.0f, minus_one = -1.0f;
@@ -77,7 +77,7 @@ namespace {
             float* r_ptr = reinterpret_cast<float*>(d_r->get_device_ptr());
             float* diag_ptr = reinterpret_cast<float*>(d_diagonal->get_device_ptr());
             
-            USTC_CG::cuda::GPUParallelFor("CG_diagonal_precond", n, 
+            Ruzino::cuda::GPUParallelFor("CG_diagonal_precond", n, 
                 GPU_LAMBDA_Ex(int i) {
                     // z[i] = r[i] / diagonal[i]
                     z_ptr[i] = (diag_ptr[i] != 0.0f) ? r_ptr[i] / diag_ptr[i] : r_ptr[i];
@@ -195,7 +195,7 @@ namespace {
                 float* r_ptr = reinterpret_cast<float*>(d_r->get_device_ptr());
                 float* diag_ptr = reinterpret_cast<float*>(d_diagonal->get_device_ptr());
                 
-                USTC_CG::cuda::GPUParallelFor(
+                Ruzino::cuda::GPUParallelFor(
                     "CG_diagonal_precond", n, GPU_LAMBDA_Ex(int i) {
                         z_ptr[i] = (diag_ptr[i] != 0.0f) ? r_ptr[i] / diag_ptr[i] : r_ptr[i];
                     });
@@ -424,19 +424,19 @@ class CudaCGSolver : public LinearSolver {
 
             // GPU setup
             auto d_csrValues =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrValues);
+                Ruzino::cuda::create_cuda_linear_buffer(csrValues);
             auto d_csrRowPtr =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrRowPtr);
+                Ruzino::cuda::create_cuda_linear_buffer(csrRowPtr);
             auto d_csrColInd =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrColInd);
+                Ruzino::cuda::create_cuda_linear_buffer(csrColInd);
             auto d_diagonal =
-                USTC_CG::cuda::create_cuda_linear_buffer(diagonal);
-            auto d_b = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_x = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_r = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_z = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_p = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_Ap = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
+                Ruzino::cuda::create_cuda_linear_buffer(diagonal);
+            auto d_b = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_x = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_r = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_z = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_p = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_Ap = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
 
             // Copy data to GPU
             d_b->assign_host_vector(
@@ -507,7 +507,7 @@ class CudaCGSolver : public LinearSolver {
                 CUSPARSE_SPMV_ALG_DEFAULT,
                 &bufferSize);
             auto dBuffer =
-                USTC_CG::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
+                Ruzino::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
 
             auto iteration_start_time =
                 std::chrono::high_resolution_clock::now();
@@ -570,14 +570,14 @@ class CudaCGSolver : public LinearSolver {
         cusparseDnVecDescr_t vecZ_desc,
         cusparseDnVecDescr_t vecP_desc,
         cusparseDnVecDescr_t vecAp_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle d_diagonal,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_z,
-        USTC_CG::cuda::CUDALinearBufferHandle d_p,
-        USTC_CG::cuda::CUDALinearBufferHandle d_Ap)
+        Ruzino::cuda::CUDALinearBufferHandle d_diagonal,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_z,
+        Ruzino::cuda::CUDALinearBufferHandle d_p,
+        Ruzino::cuda::CUDALinearBufferHandle d_Ap)
     {
         // 委托给静态函数
         return performCGIterationsImpl(
@@ -595,4 +595,4 @@ std::unique_ptr<LinearSolver> createCudaCGSolver()
 
 }  // namespace Solver
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

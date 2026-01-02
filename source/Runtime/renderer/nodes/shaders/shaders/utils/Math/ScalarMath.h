@@ -31,7 +31,7 @@
 #include <bit> // TODO C++20: Replace with <bit>
 #include <cmath>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -273,4 +273,4 @@ template<typename T, std::enable_if_t<is_floating_point_v<T>, bool> = false>
 // clang-format on
 
 } // namespace math
-} // namespace USTC_CG
+} // namespace Ruzino

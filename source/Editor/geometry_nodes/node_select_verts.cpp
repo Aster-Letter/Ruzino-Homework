@@ -6,7 +6,7 @@
 #include "GCore/GOP.h"
 #include "nodes/core/def/node_def.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 NODE_DEF_OPEN_SCOPE
 

@@ -12,7 +12,7 @@
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 #include "internal/memory/DeviceMemoryPool.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 struct GPUSceneAssember {
     static void fill_instances(
@@ -63,4 +63,4 @@ struct GPUSceneAssember {
     static GPUSceneAssember instance;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

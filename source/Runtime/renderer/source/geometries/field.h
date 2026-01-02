@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_FIELD_H
-#define Hd_USTC_CG_FIELD_H
+#ifndef Hd_RUZINO_FIELD_H
+#define Hd_RUZINO_FIELD_H
 
 #include <memory>
 #include <string>
@@ -32,22 +32,22 @@
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
 
-/// \class Hd_USTC_CG_Field
+/// \class Hd_RUZINO_Field
 ///
-/// A placeholder implementation of HdField for the USTC CG renderer.
+/// A placeholder implementation of HdField for the RUZINO renderer.
 /// This serves as a basic field primitive that can be extended later
 /// with actual field data handling and GPU resource management.
 ///
-class HD_USTC_CG_API Hd_USTC_CG_Field final : public HdField {
+class HD_RUZINO_API Hd_RUZINO_Field final : public HdField {
    public:
-    HF_MALLOC_TAG_NEW("new Hd_USTC_CG_Field");
+    HF_MALLOC_TAG_NEW("new Hd_RUZINO_Field");
 
-    Hd_USTC_CG_Field(const SdfPath& id);
-    ~Hd_USTC_CG_Field()
+    Hd_RUZINO_Field(const SdfPath& id);
+    ~Hd_RUZINO_Field()
         override;  /// Return the initial dirty bits for the primitive
     HdDirtyBits GetInitialDirtyBitsMask() const override;
 
@@ -79,10 +79,10 @@ class HD_USTC_CG_API Hd_USTC_CG_Field final : public HdField {
     bool _isLoaded;
 
     // This class does not support copying
-    Hd_USTC_CG_Field(const Hd_USTC_CG_Field&) = delete;
-    Hd_USTC_CG_Field& operator=(const Hd_USTC_CG_Field&) = delete;
+    Hd_RUZINO_Field(const Hd_RUZINO_Field&) = delete;
+    Hd_RUZINO_Field& operator=(const Hd_RUZINO_Field&) = delete;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_FIELD_H
+#endif  // Hd_RUZINO_FIELD_H

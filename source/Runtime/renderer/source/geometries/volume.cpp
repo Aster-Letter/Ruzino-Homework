@@ -39,10 +39,10 @@
 
 // OpenVDB and NanoVDB - placeholder includes (adjust to your actual setup)
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_Volume::Hd_USTC_CG_Volume(const SdfPath& id)
+Hd_RUZINO_Volume::Hd_RUZINO_Volume(const SdfPath& id)
     : HdVolume(id),
       _fieldsLoaded(false),
       _boundingBoxValid(false)
@@ -50,18 +50,18 @@ Hd_USTC_CG_Volume::Hd_USTC_CG_Volume(const SdfPath& id)
     spdlog::info("Creating volume: %s", id.GetText());
 }
 
-Hd_USTC_CG_Volume::~Hd_USTC_CG_Volume()
+Hd_RUZINO_Volume::~Hd_RUZINO_Volume()
 {
 }
 
-HdDirtyBits Hd_USTC_CG_Volume::GetInitialDirtyBitsMask() const
+HdDirtyBits Hd_RUZINO_Volume::GetInitialDirtyBitsMask() const
 {
     return HdChangeTracker::DirtyTransform | HdChangeTracker::DirtyVisibility |
            HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyMaterialId |
            HdChangeTracker::AllDirty;
 }
 
-void Hd_USTC_CG_Volume::Sync(
+void Hd_RUZINO_Volume::Sync(
     HdSceneDelegate* sceneDelegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits,
@@ -129,16 +129,16 @@ void Hd_USTC_CG_Volume::Sync(
     _fieldsLoaded = true;
 
     // Create GPU resources after loading
-    if (auto* ustcRenderParam =
-            static_cast<Hd_USTC_CG_RenderParam*>(renderParam)) {
-        CreateGPUResources(ustcRenderParam);
+    if (auto* ruzinoRenderParam =
+            static_cast<Hd_RUZINO_RenderParam*>(renderParam)) {
+        CreateGPUResources(ruzinoRenderParam);
     }
 
     // Clear only the dirty bits that we actually handled
     *dirtyBits = HdChangeTracker::Clean;
 }
 
-void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
+void Hd_RUZINO_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
 {
     const SdfPath& id = GetId();
 
@@ -260,7 +260,7 @@ void Hd_USTC_CG_Volume::_LoadVolumeFields(HdSceneDelegate* sceneDelegate)
     _PrepareGPUData();
 }
 
-VolumeFormat Hd_USTC_CG_Volume::_DetectVolumeFormat(const std::string& filePath)
+VolumeFormat Hd_RUZINO_Volume::_DetectVolumeFormat(const std::string& filePath)
 {
     std::filesystem::path path(filePath);
     std::string extension = path.extension().string();
@@ -282,7 +282,7 @@ VolumeFormat Hd_USTC_CG_Volume::_DetectVolumeFormat(const std::string& filePath)
     return VolumeFormat::Unknown;
 }
 
-bool Hd_USTC_CG_Volume::_LoadOpenVDB(
+bool Hd_RUZINO_Volume::_LoadOpenVDB(
     const std::string& filePath,
     const std::string& gridName,
     VolumeFieldData& fieldData)
@@ -413,7 +413,7 @@ bool Hd_USTC_CG_Volume::_LoadOpenVDB(
     }
 }
 
-bool Hd_USTC_CG_Volume::_LoadField3D(
+bool Hd_RUZINO_Volume::_LoadField3D(
     const std::string& filePath,
     const std::string& fieldName,
     VolumeFieldData& fieldData)
@@ -437,7 +437,7 @@ bool Hd_USTC_CG_Volume::_LoadField3D(
     return true;
 }
 
-bool Hd_USTC_CG_Volume::_LoadRawVolume(
+bool Hd_RUZINO_Volume::_LoadRawVolume(
     const std::string& filePath,
     const GfVec3i& dimensions,
     VolumeFieldData& fieldData)
@@ -474,7 +474,7 @@ bool Hd_USTC_CG_Volume::_LoadRawVolume(
     return true;
 }
 
-void Hd_USTC_CG_Volume::_UpdateBoundingBox()
+void Hd_RUZINO_Volume::_UpdateBoundingBox()
 {
     if (_fields.empty()) {
         _boundingBox = GfBBox3d();
@@ -511,7 +511,7 @@ void Hd_USTC_CG_Volume::_UpdateBoundingBox()
         _boundingBox.GetRange().GetMax()[2]);
 }
 
-void Hd_USTC_CG_Volume::_PrepareGPUData()
+void Hd_RUZINO_Volume::_PrepareGPUData()
 {
     _gpuData.transform = _transform;
     _gpuData.boundingBox = _boundingBox;
@@ -577,12 +577,12 @@ void Hd_USTC_CG_Volume::_PrepareGPUData()
         _gpuData.densityFieldIndex);
 }
 
-void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
+void Hd_RUZINO_Volume::Finalize(HdRenderParam* renderParam)
 {
     spdlog::info("Finalizing volume: %s", GetId().GetText());
 
     // Clean up GPU resources properly
-    auto* ustcRenderParam = static_cast<Hd_USTC_CG_RenderParam*>(renderParam);
+    auto* ruzinoRenderParam = static_cast<Hd_RUZINO_RenderParam*>(renderParam);
     auto device = RHI::get_device();
 
     if (device) {
@@ -639,19 +639,19 @@ void Hd_USTC_CG_Volume::Finalize(HdRenderParam* renderParam)
     spdlog::info("Volume finalization complete: %s", GetId().GetText());
 }
 
-void Hd_USTC_CG_Volume::_InitRepr(
+void Hd_RUZINO_Volume::_InitRepr(
     const TfToken& reprToken,
     HdDirtyBits* dirtyBits)
 {
     // Volume representation initialization
 }
 
-HdDirtyBits Hd_USTC_CG_Volume::_PropagateDirtyBits(HdDirtyBits bits) const
+HdDirtyBits Hd_RUZINO_Volume::_PropagateDirtyBits(HdDirtyBits bits) const
 {
     return bits;
 }
 
-void Hd_USTC_CG_Volume::CreateGPUResources(Hd_USTC_CG_RenderParam* renderParam)
+void Hd_RUZINO_Volume::CreateGPUResources(Hd_RUZINO_RenderParam* renderParam)
 {
     auto device = RHI::get_device();
 
@@ -699,4 +699,4 @@ void Hd_USTC_CG_Volume::CreateGPUResources(Hd_USTC_CG_RenderParam* renderParam)
         "GPU resources created for volume with %zu fields", _fields.size());
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

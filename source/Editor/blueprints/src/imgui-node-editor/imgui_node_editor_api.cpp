@@ -14,7 +14,7 @@
 #include "blueprints/imgui_node_editor_internal.h"
 #include "nodes/core/id.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 //------------------------------------------------------------------------------
 static ax::NodeEditor::Detail::EditorContext* s_Editor = nullptr;
 
@@ -778,4 +778,4 @@ int ax::NodeEditor::GetOrderedNodeIds(NodeId* nodes, int size)
     return s_Editor->GetNodeIds(nodes, size);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -32,7 +32,7 @@
 #include "Core/Program/ProgramVars.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class RenderContext;
 
@@ -45,7 +45,7 @@ class RenderContext;
  *
  * This code requires an NVIDIA GPU and NVAPI.
  */
-class HD_USTC_CG_API BitonicSort
+class HD_RUZINO_API BitonicSort
 {
 public:
     /// Constructor. Throws an exception on error.
@@ -74,4 +74,4 @@ private:
         ref<ProgramVars> pVars;
     } mSort;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

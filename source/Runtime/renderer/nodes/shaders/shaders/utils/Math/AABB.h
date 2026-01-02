@@ -32,7 +32,7 @@
 #include "utils/Math/Matrix.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 /**
  * Axis-aligned bounding box (AABB) stored by its min/max points.
  *
@@ -244,4 +244,4 @@ struct AABB {
         return bb &= rhs;
     }
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

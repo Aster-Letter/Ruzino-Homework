@@ -17,7 +17,7 @@
 #include "pxr/imaging/hgi/buffer.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 using HdStBufferResourceSharedPtr = std::shared_ptr<class HdStBufferResource>;
 
@@ -31,14 +31,14 @@ using HdStBufferResourceNamedList = std::vector<HdStBufferResourceNamedPair>;
 ///
 class HdStBufferResource final {
    public:
-    HD_USTC_CG_API
+    HD_RUZINO_API
     HdStBufferResource(
         pxr::TfToken const &role,
         pxr::HdTupleType tupleType,
         int offset,
         int stride);
 
-    HD_USTC_CG_API
+    HD_RUZINO_API
     ~HdStBufferResource();
 
     /// Returns the role of the data in this resource.
@@ -72,7 +72,7 @@ class HdStBufferResource final {
     }
 
     /// Sets the HgiBufferHandle for this resource and its size.
-    HD_USTC_CG_API
+    HD_RUZINO_API
     void SetAllocation(pxr::HgiBufferHandle const &handle, size_t size);
 
     /// Returns the HgiBufferHandle for this GPU resource.
@@ -94,6 +94,6 @@ class HdStBufferResource final {
     int const _stride;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif  // PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H

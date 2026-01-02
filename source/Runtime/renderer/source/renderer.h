@@ -5,14 +5,14 @@
 #include "pxr/imaging/hd/renderThread.h"
 #include "pxr/pxr.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
-class Hd_USTC_CG_Renderer {
+class Hd_RUZINO_Renderer {
    public:
-    explicit Hd_USTC_CG_Renderer(Hd_USTC_CG_RenderParam* render_param);
+    explicit Hd_RUZINO_Renderer(Hd_RUZINO_RenderParam* render_param);
 
-    virtual ~Hd_USTC_CG_Renderer();
+    virtual ~Hd_RUZINO_Renderer();
     void SetAovBindings(const HdRenderPassAovBindingVector& aovBindings);
     virtual void Render(HdRenderThread* render_thread);
     void Clear();
@@ -47,9 +47,9 @@ class Hd_USTC_CG_Renderer {
     // Are the aov bindings valid?
     bool _aovBindingsValid = false;
 
-    const Hd_USTC_CG_Camera* camera_ = nullptr;
-    Hd_USTC_CG_RenderParam* render_param;
+    const Hd_RUZINO_Camera* camera_ = nullptr;
+    Hd_RUZINO_RenderParam* render_param;
 
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

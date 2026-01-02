@@ -19,7 +19,7 @@
 #include "nodes/core/node.hpp"
 #include "nodes/ui/node_editor_widget_base.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace ed = ax::NodeEditor;
 
 namespace mx = MaterialX;
@@ -304,6 +304,6 @@ class MCORE_API MaterialXNodeTreeWidget : public NodeEditorWidgetBase {
     bool _saveNodePositions;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif

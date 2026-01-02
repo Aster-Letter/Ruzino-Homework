@@ -24,7 +24,7 @@ NODE_EXECUTION_FUNCTION(motion_vec)
     auto world_position =
         params.get_input<nvrhi::TextureHandle>("World Position");
     auto texture_info = world_position->getDesc();
-    Hd_USTC_CG_Camera* current_camera = get_free_camera(params, "Camera");
+    Hd_RUZINO_Camera* current_camera = get_free_camera(params, "Camera");
 
     auto& prev_camera = params.get_storage<PrevCamStatus&>();
 

@@ -11,7 +11,7 @@
 #include "nodes/system/node_system.hpp"
 #include "nodes/ui/imgui.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 class MaterialXNodeSystem : public NodeSystem {
    public:

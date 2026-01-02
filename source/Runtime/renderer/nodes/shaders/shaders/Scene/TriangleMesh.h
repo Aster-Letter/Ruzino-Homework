@@ -36,13 +36,13 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** Simple indexed triangle mesh.
         Vertices have position, normal and texture coordinate attributes.
         This class is used as a utility to pass simple geometry to the SceneBuilder.
     */
-    class HD_USTC_CG_API TriangleMesh : public Object
+    class HD_RUZINO_API TriangleMesh : public Object
     {
         FALCOR_OBJECT(TriangleMesh)
     public:

@@ -36,7 +36,7 @@
 #include "utils/Math/AABB.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class LightBVHBuilder;
 
 /** Utility class representing a light sampling BVH.
@@ -55,7 +55,7 @@ class LightBVHBuilder;
     TODO: Rename all things 'triangle' to 'light' as the BVH can be used for
    other light types.
 */
-class HD_USTC_CG_API LightBVH {
+class HD_RUZINO_API LightBVH {
    public:
     struct NodeLocation {
         uint32_t nodeIndex;
@@ -214,4 +214,4 @@ class HD_USTC_CG_API LightBVH {
 
     friend LightBVHBuilder;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

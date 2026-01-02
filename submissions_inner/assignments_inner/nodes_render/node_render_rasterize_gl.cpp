@@ -23,7 +23,7 @@ NODE_DECLARATION_FUNCTION(rasterize_impl)
 
 NODE_EXECUTION_FUNCTION(rasterize_impl)
 {
-    Hd_USTC_CG_Camera* free_camera = get_free_camera(params);
+    Hd_RUZINO_Camera* free_camera = get_free_camera(params);
 
     auto size = free_camera->_dataWindow.GetSize();
 

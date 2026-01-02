@@ -28,7 +28,7 @@
 #pragma once
 
 
-namespace USTC_CG
+namespace Ruzino
 {
     struct BrickedGrid
     {

@@ -11,7 +11,7 @@
 #include "foo_socket_types.inl"
 
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 void MaterialXNodeTree::saveDocument(mx::FilePath filePath)
 {
@@ -1072,4 +1072,4 @@ void MaterialXNodeTree::deleteLinkInfo(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -33,7 +33,7 @@
 #include "Core/Program/ProgramVars.h"
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class RenderContext;
 
@@ -43,7 +43,7 @@ class RenderContext;
  * The prefix sum is computed in place using exclusive scan.
  * Each new element is y[i] = x[0] + ... + x[i-1], for i=1..N and y[0] = 0.
  */
-class HD_USTC_CG_API PrefixSum
+class HD_RUZINO_API PrefixSum
 {
 public:
     /// Constructor. Throws an exception if creation failed.
@@ -82,4 +82,4 @@ private:
     nvrhi::BufferHandle mpTotalSum;        ///< Temporary buffer for total sum of an iteration.
     nvrhi::BufferHandle mpPrevTotalSum;    ///< Temporary buffer for prev total sum of an iteration.
 };
-} // namespace USTC_CG
+} // namespace Ruzino

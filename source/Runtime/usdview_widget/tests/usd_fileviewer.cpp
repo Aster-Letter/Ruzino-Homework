@@ -9,7 +9,7 @@
 #include "pxr/usd/usdGeom/sphere.h"
 #include "stage/stage.hpp"
 #include "widgets/usdview/usdview_widget.hpp"
-using namespace USTC_CG;
+using namespace Ruzino;
 
 TEST(USDWIDGET, create_widget)
 {

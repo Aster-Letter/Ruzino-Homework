@@ -36,14 +36,14 @@
 #include "internal/memory/DeviceMemoryPool.hpp"
 #include "nvrhi/nvrhi.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-/// \class Hd_USTC_CG_Instancer
+/// \class Hd_RUZINO_Instancer
 ///
-/// Hd_USTC_CG implements instancing by adding prototype geometry to the BVH
-/// multiple times within Hd_USTC_CGMesh::Sync(). The only instance-varying
-/// attribute that Hd_USTC_CG supports is transform, so the natural
+/// Hd_RUZINO implements instancing by adding prototype geometry to the BVH
+/// multiple times within Hd_RUZINOMesh::Sync(). The only instance-varying
+/// attribute that Hd_RUZINO supports is transform, so the natural
 /// accessor to instancer data is ComputeInstanceTransforms(),
 /// which returns a list of transforms to apply to the given prototype
 /// (one instance per transform).
@@ -52,15 +52,15 @@ using namespace pxr;
 /// cartesian product of the transform arrays at each nesting level, to
 /// create a flattened transform array.
 ///
-class Hd_USTC_CG_Instancer : public HdInstancer {
+class Hd_RUZINO_Instancer : public HdInstancer {
    public:
     /// Constructor.
     ///   \param delegate The scene delegate backing this instancer's data.
     ///   \param id The unique id of this instancer.
-    Hd_USTC_CG_Instancer(HdSceneDelegate* delegate, SdfPath const& id);
+    Hd_RUZINO_Instancer(HdSceneDelegate* delegate, SdfPath const& id);
 
     /// Destructor.
-    ~Hd_USTC_CG_Instancer();
+    ~Hd_RUZINO_Instancer();
 
     /// Computes all instance transforms for the provided prototype id,
     /// taking into account the scene delegate's instancerTransform and the
@@ -103,6 +103,6 @@ class Hd_USTC_CG_Instancer : public HdInstancer {
     TfHashMap<TfToken, HdVtBufferSource*, TfToken::HashFunctor> _primvarMap;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif  // PXR_IMAGING_PLUGIN_HD_EMBREE_INSTANCER_H

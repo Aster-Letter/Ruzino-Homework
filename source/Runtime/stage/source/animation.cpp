@@ -4,7 +4,7 @@
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usdGeom/xform.h"
 #include "stage/stage.hpp"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 namespace animation {
 
 std::once_flag WithDynamicLogicPrim::init_once;
@@ -178,4 +178,4 @@ void WithDynamicLogicPrim::clear_time_samples(const pxr::UsdPrim& prim) const
 }
 }  // namespace animation
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

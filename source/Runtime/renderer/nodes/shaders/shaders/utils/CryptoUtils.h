@@ -32,12 +32,12 @@
 #include <cstdint>
 #include <cstdlib>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Helper to compute SHA-1 hash.
  */
-class HD_USTC_CG_API SHA1
+class HD_RUZINO_API SHA1
 {
 public:
     using MD = std::array<uint8_t, 20>; ///< Message digest.
@@ -100,4 +100,4 @@ private:
     uint32_t mState[5];
     uint8_t mBuf[64];
 };
-}; // namespace USTC_CG
+}; // namespace Ruzino

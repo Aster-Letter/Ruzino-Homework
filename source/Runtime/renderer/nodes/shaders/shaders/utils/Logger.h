@@ -32,7 +32,7 @@
 #include <string_view>
 #include <filesystem>
 
-namespace USTC_CG
+namespace Ruzino
 {
 /**
  * Container class for logging messages.
@@ -203,10 +203,10 @@ inline void logFatal(std::format_string<Args...> format, Args&&... args)
     Logger::log(Logger::Level::Fatal, std::format(format, std::forward<Args>(args)...));
 }
 
-} // namespace USTC_CG
+} // namespace Ruzino
 
 #define FALCOR_PRINT(x)                      \
     do                                       \
     {                                        \
-        ::USTC_CG::logInfo("{} = {}", #x, x); \
+        ::Ruzino::logInfo("{} = {}", #x, x); \
     } while (0)

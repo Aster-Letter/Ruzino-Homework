@@ -30,11 +30,11 @@
 #include "Scene/SDFs/SDFGrid.h"
 
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** A normalized dense SDF grid, represented as a set of textures. Can only be accessed on the GPU.
     */
-    class HD_USTC_CG_API NDSDFGrid : public SDFGrid
+    class HD_RUZINO_API NDSDFGrid : public SDFGrid
     {
     public:
         struct SharedData;

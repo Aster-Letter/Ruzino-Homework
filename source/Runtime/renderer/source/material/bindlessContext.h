@@ -7,7 +7,7 @@
 #include "MaterialXGenShader/Shader.h"
 #include "material.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace MaterialX;
 /// Shared pointer to a BindlessContext
 using BindlessContextPtr = std::shared_ptr<class BindlessContext>;
@@ -72,4 +72,4 @@ class BindlessContext : public HwResourceBindingContext {
     MaterialDataBlob material_data;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

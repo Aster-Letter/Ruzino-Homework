@@ -1,4 +1,4 @@
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 
 #include <RHI/internal/cuda_extension.hpp>
 #include <RHI/internal/cuda_graph.hpp>
@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-using namespace USTC_CG::cuda;
+using namespace Ruzino::cuda;
 
 __global__ void dynamic_kernel(float* data, float* temp, int n, float factor)
 {
@@ -481,4 +481,4 @@ int main()
     return 0;
 }
 
-#endif  // USTC_CG_WITH_CUDA
+#endif  // RUZINO_WITH_CUDA

@@ -50,9 +50,9 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
-    class HD_USTC_CG_API SceneBuilder
+    class HD_RUZINO_API SceneBuilder
     {
     public:
         /** Flags that control how the scene will be built. They can be combined together.

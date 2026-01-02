@@ -22,7 +22,7 @@ def process_cpp_file(file_path):
             in_register_function = True
             continue
 
-        match = re.match(r"namespace USTC_CG::node_(\w+) {", line)
+        match = re.match(r"namespace Ruzino::node_(\w+) {", line)
         if match:
             node_name = match.group(1)
             new_lines.append('#include "nodes/core/def/node_def.hpp"\n')

@@ -30,7 +30,7 @@
 #include "stage/stage.hpp"
 #include "widgets/usdtree/usd_fileviewer.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Macro for creating drag float component controls (X/Y/Z)
 #define DRAG_FLOAT_COMPONENT(label, var, index, modified_flag)               \
@@ -1424,4 +1424,4 @@ void UsdFileViewer::show_material_binding_ui(pxr::UsdPrim& prim)
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

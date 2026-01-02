@@ -19,7 +19,7 @@ using SlangShaderGeneratorPtr = shared_ptr<class SlangShaderGenerator>;
 
 /// Base class for SLANG (OpenGL Shading Language) code generation.
 /// A generator for a specific SLANG target should be derived from this class.
-class HD_USTC_CG_API SlangShaderGenerator : public HwShaderGenerator {
+class HD_RUZINO_API SlangShaderGenerator : public HwShaderGenerator {
    public:
     /// Constructor.
     SlangShaderGenerator(TypeSystemPtr typeSystem = nullptr);
@@ -137,7 +137,7 @@ class HD_USTC_CG_API SlangShaderGenerator : public HwShaderGenerator {
 };
 
 /// Base class for common SLANG node implementations
-class HD_USTC_CG_API SlangImplementation : public HwImplementation {
+class HD_RUZINO_API SlangImplementation : public HwImplementation {
    public:
     const string& getTarget() const override;
 

@@ -1,9 +1,9 @@
 
 #pragma once
 
-#ifndef USTC_CG_NAMESPACE_OPEN_SCOPE
-#define USTC_CG_NAMESPACE_OPEN_SCOPE namespace USTC_CG{
-#define USTC_CG_NAMESPACE_CLOSE_SCOPE }
+#ifndef RUZINO_NAMESPACE_OPEN_SCOPE
+#define RUZINO_NAMESPACE_OPEN_SCOPE namespace Ruzino{
+#define RUZINO_NAMESPACE_CLOSE_SCOPE }
 #endif
 
 #if defined(_MSC_VER)

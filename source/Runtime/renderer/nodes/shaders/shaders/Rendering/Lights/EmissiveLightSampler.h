@@ -31,7 +31,7 @@
 #include "Core/Program/DefineList.h"
 #include "Scene/Lights/LightCollection.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     class RenderContext;
     struct ShaderVar;
@@ -41,7 +41,7 @@ namespace USTC_CG
         All light samplers follows the same interface to make them interchangeable.
         If an unrecoverable error occurs, these functions may throw exceptions.
     */
-    class HD_USTC_CG_API EmissiveLightSampler
+    class HD_RUZINO_API EmissiveLightSampler
     {
     public:
         virtual ~EmissiveLightSampler() = default;

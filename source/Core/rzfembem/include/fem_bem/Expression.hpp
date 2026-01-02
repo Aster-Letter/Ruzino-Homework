@@ -9,7 +9,7 @@
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec3d.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 namespace fem_bem {
     using real = float;
 
@@ -362,4 +362,4 @@ namespace fem_bem {
         const std::vector<pxr::GfVec3d>& world_vertices);
 
 }  // namespace fem_bem
-}  // namespace USTC_CG
+}  // namespace Ruzino

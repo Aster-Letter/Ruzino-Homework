@@ -34,7 +34,7 @@
 
 #include <string>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -1748,13 +1748,13 @@ template<typename T, int N>
 }
 
 } // namespace math
-} // namespace USTC_CG
+} // namespace Ruzino
 
 // Specialize std::less to allow using vectors as key in std::map for example.
 template<typename T, int N>
-struct std::less<::USTC_CG::math::vector<T, N>>
+struct std::less<::Ruzino::math::vector<T, N>>
 {
-    constexpr bool operator()(const ::USTC_CG::math::vector<T, N>& lhs, const ::USTC_CG::math::vector<T, N>& rhs) const
+    constexpr bool operator()(const ::Ruzino::math::vector<T, N>& lhs, const ::Ruzino::math::vector<T, N>& rhs) const
     {
         for (int i = 0; i < N; ++i)
             if (lhs[i] != rhs[i])
@@ -1764,9 +1764,9 @@ struct std::less<::USTC_CG::math::vector<T, N>>
 };
 
 template<typename T, int N>
-struct std::equal_to<::USTC_CG::math::vector<T, N>>
+struct std::equal_to<::Ruzino::math::vector<T, N>>
 {
-    constexpr bool operator()(const ::USTC_CG::math::vector<T, N>& lhs, const ::USTC_CG::math::vector<T, N>& rhs) const
+    constexpr bool operator()(const ::Ruzino::math::vector<T, N>& lhs, const ::Ruzino::math::vector<T, N>& rhs) const
     {
         for (int i = 0; i < N; ++i)
             if (lhs[i] != rhs[i])
@@ -1775,9 +1775,9 @@ struct std::equal_to<::USTC_CG::math::vector<T, N>>
     }
 };
 template<typename T, int N>
-struct std::not_equal_to<::USTC_CG::math::vector<T, N>>
+struct std::not_equal_to<::Ruzino::math::vector<T, N>>
 {
-    constexpr bool operator()(const ::USTC_CG::math::vector<T, N>& lhs, const ::USTC_CG::math::vector<T, N>& rhs) const
+    constexpr bool operator()(const ::Ruzino::math::vector<T, N>& lhs, const ::Ruzino::math::vector<T, N>& rhs) const
     {
         for (int i = 0; i < N; ++i)
             if (lhs[i] == rhs[i])
@@ -1787,9 +1787,9 @@ struct std::not_equal_to<::USTC_CG::math::vector<T, N>>
 };
 
 template<typename T, int N>
-struct std::hash<::USTC_CG::math::vector<T, N>>
+struct std::hash<::Ruzino::math::vector<T, N>>
 {
-    constexpr int operator()(const ::USTC_CG::math::vector<T, N>& v) const
+    constexpr int operator()(const ::Ruzino::math::vector<T, N>& v) const
     {
         size_t result = 0;
         for (int i = 0; i < N; ++i)
@@ -1800,10 +1800,10 @@ struct std::hash<::USTC_CG::math::vector<T, N>>
 
 /// Vector string formatter.
 template<typename T, int N>
-struct std::formatter<USTC_CG::math::vector<T, N>> : formatter<T>
+struct std::formatter<Ruzino::math::vector<T, N>> : formatter<T>
 {
     template<typename FormatContext>
-    auto format(const USTC_CG::math::vector<T, N>& v, FormatContext& ctx) const
+    auto format(const Ruzino::math::vector<T, N>& v, FormatContext& ctx) const
     {
         auto out = ctx.out();
         for (int i = 0; i < N; ++i)

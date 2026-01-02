@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef Hd_USTC_CG_MESH_H
-#define Hd_USTC_CG_MESH_H
+#ifndef Hd_RUZINO_MESH_H
+#define Hd_RUZINO_MESH_H
 
 #include "../DescriptorTableManager.h"
 #include "../api.h"
@@ -36,17 +36,17 @@
 // SceneTypes
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 #include "internal/memory/DeviceMemoryPool.hpp"
-USTC_CG_NAMESPACE_OPEN_SCOPE
-class Hd_USTC_CG_RenderParam;
+RUZINO_NAMESPACE_OPEN_SCOPE
+class Hd_RUZINO_RenderParam;
 using namespace pxr;
 
-class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
+class HD_RUZINO_API Hd_RUZINO_Mesh final : public HdMesh {
    public:
-    HF_MALLOC_TAG_NEW("new Hd_USTC_CG_Mesh");
+    HF_MALLOC_TAG_NEW("new Hd_RUZINO_Mesh");
 
-    Hd_USTC_CG_Mesh(const SdfPath& id);
+    Hd_RUZINO_Mesh(const SdfPath& id);
 
-    ~Hd_USTC_CG_Mesh() override;
+    ~Hd_RUZINO_Mesh() override;
 
     HdDirtyBits GetInitialDirtyBitsMask() const override;
     void Sync(
@@ -79,9 +79,9 @@ class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
     static constexpr GLuint normalLocation = 1;
     static constexpr GLuint texcoordLocation = 2;
 
-    void create_gpu_resources(Hd_USTC_CG_RenderParam* render_param);
+    void create_gpu_resources(Hd_RUZINO_RenderParam* render_param);
     void updateTLAS(
-        Hd_USTC_CG_RenderParam* render_param,
+        Hd_RUZINO_RenderParam* render_param,
         HdSceneDelegate* sceneDelegate,
         HdDirtyBits* dirtyBits);
 
@@ -90,7 +90,7 @@ class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
     void _InitRepr(const TfToken& reprToken, HdDirtyBits* dirtyBits) override;
     void _SetMaterialId(
         HdSceneDelegate* scene_delegate,
-        Hd_USTC_CG_Mesh* hd_ustc_cg_mesh);
+        Hd_RUZINO_Mesh* hd_ruzino_cg_mesh);
 
     HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
     TfTokenVector _UpdateComputedPrimvarSources(
@@ -103,8 +103,8 @@ class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
         HdRenderParam* param);
 
     // This class does not support copying.
-    Hd_USTC_CG_Mesh(const Hd_USTC_CG_Mesh&) = delete;
-    Hd_USTC_CG_Mesh& operator=(const Hd_USTC_CG_Mesh&) = delete;
+    Hd_RUZINO_Mesh(const Hd_RUZINO_Mesh&) = delete;
+    Hd_RUZINO_Mesh& operator=(const Hd_RUZINO_Mesh&) = delete;
 
    private:
     HdCullStyle _cullStyle;
@@ -131,6 +131,6 @@ class HD_USTC_CG_API Hd_USTC_CG_Mesh final : public HdMesh {
     TfHashMap<TfToken, PrimvarSource, TfToken::HashFunctor> _primvarSourceMap;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
-#endif  // Hd_USTC_CG_MESH_H
+#endif  // Hd_RUZINO_MESH_H

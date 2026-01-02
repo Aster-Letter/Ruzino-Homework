@@ -8,7 +8,7 @@
 #include <cmath>
 #include <iostream>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace Solver {
 
@@ -21,12 +21,12 @@ namespace {
         int n,
         int restart,
         cusparseSpMatDescr_t matA_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_w,
-        USTC_CG::cuda::CUDALinearBufferHandle d_V,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_w,
+        Ruzino::cuda::CUDALinearBufferHandle d_V,
         cusparseDnVecDescr_t vecX_desc,
         cusparseDnVecDescr_t vecW_desc)
     {
@@ -442,16 +442,16 @@ class CudaGMRESSolver : public LinearSolver {
 
             // GPU setup
             auto d_csrValues =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrValues);
+                Ruzino::cuda::create_cuda_linear_buffer(csrValues);
             auto d_csrRowPtr =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrRowPtr);
+                Ruzino::cuda::create_cuda_linear_buffer(csrRowPtr);
             auto d_csrColInd =
-                USTC_CG::cuda::create_cuda_linear_buffer(csrColInd);
-            auto d_b = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_x = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_r = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_w = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-            auto d_V = USTC_CG::cuda::create_cuda_linear_buffer<float>(
+                Ruzino::cuda::create_cuda_linear_buffer(csrColInd);
+            auto d_b = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_x = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_r = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_w = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+            auto d_V = Ruzino::cuda::create_cuda_linear_buffer<float>(
                 n * (restart + 1));
 
             d_b->assign_host_vector(
@@ -499,7 +499,7 @@ class CudaGMRESSolver : public LinearSolver {
                 CUSPARSE_SPMV_ALG_DEFAULT,
                 &bufferSize);
             auto dBuffer =
-                USTC_CG::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
+                Ruzino::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
 
             auto iteration_start_time =
                 std::chrono::high_resolution_clock::now();
@@ -546,12 +546,12 @@ class CudaGMRESSolver : public LinearSolver {
         int n,
         int restart,
         cusparseSpMatDescr_t matA_desc,
-        USTC_CG::cuda::CUDALinearBufferHandle dBuffer,
-        USTC_CG::cuda::CUDALinearBufferHandle d_b,
-        USTC_CG::cuda::CUDALinearBufferHandle d_x,
-        USTC_CG::cuda::CUDALinearBufferHandle d_r,
-        USTC_CG::cuda::CUDALinearBufferHandle d_w,
-        USTC_CG::cuda::CUDALinearBufferHandle d_V,
+        Ruzino::cuda::CUDALinearBufferHandle dBuffer,
+        Ruzino::cuda::CUDALinearBufferHandle d_b,
+        Ruzino::cuda::CUDALinearBufferHandle d_x,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_w,
+        Ruzino::cuda::CUDALinearBufferHandle d_V,
         cusparseDnVecDescr_t vecX_desc,
         cusparseDnVecDescr_t vecW_desc)
     {
@@ -580,4 +580,4 @@ std::unique_ptr<LinearSolver> createCudaGMRESSolver()
 }
 
 }  // namespace Solver
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

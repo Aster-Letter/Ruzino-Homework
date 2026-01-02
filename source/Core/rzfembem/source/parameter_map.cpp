@@ -1,6 +1,6 @@
 #include "fem_bem/parameter_map.hpp"
 
-namespace USTC_CG {
+namespace Ruzino {
 namespace fem_bem {
 
     // Global counters for profiling
@@ -9,4 +9,4 @@ namespace fem_bem {
     std::size_t g_evaluate_calls{0};
 
 }  // namespace fem_bem
-}  // namespace USTC_CG
+}  // namespace Ruzino

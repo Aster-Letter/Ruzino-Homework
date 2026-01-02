@@ -31,7 +31,7 @@
 #include "ParameterBlock.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class Device;
 class FullScreenPass;
 
@@ -64,4 +64,4 @@ struct BlitContext {
 
     BlitContext(Device* pDevice);
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

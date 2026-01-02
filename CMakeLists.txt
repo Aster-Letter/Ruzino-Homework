@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.29.6)
 # Project details
 #
 project(
-  "USTC_CG_Framework3D"
+  "RUZINO_Framework3D"
   VERSION 1.0
   LANGUAGES C CXX
 )
@@ -12,7 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the relative path to the project root
 file(RELATIVE_PATH RELATIVE_TO_PROJROOT ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-set(USTC_CG_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "Root directory of the project")
+set(RUZINO_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "Root directory of the project")
 
 # Set Python variables BEFORE including any subdirectories
 set(Python3_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SDK/python")
@@ -75,16 +75,16 @@ set_target_properties(gmock_main PROPERTIES FOLDER "ThirdParty")
 set_target_properties(gtest PROPERTIES ${OUTPUT_DIR})
 set_target_properties(gtest_main PROPERTIES ${OUTPUT_DIR})
 
-option(USTC_CG_WITH_CUDA OFF)
-option(USTC_CG_WITH_TORCH OFF)
+option(RUZINO_WITH_CUDA OFF)
+option(RUZINO_WITH_TORCH OFF)
 
-if(USTC_CG_WITH_CUDA)
+if(RUZINO_WITH_CUDA)
     set(CMAKE_CUDA_ARCHITECTURES 86)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -allow-unsupported-compiler")
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 20)
 else()
-  add_compile_definitions(USTC_CG_WITH_CUDA=0)
+  add_compile_definitions(RUZINO_WITH_CUDA=0)
 endif()
 
 add_compile_definitions(BOOST_PYTHON_NO_LIB=1)
@@ -115,17 +115,17 @@ endif()
 
 message("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}. Selecting SDK from ${SDK_FOLDER}")
 
-if(USTC_CG_WITH_TORCH)
+if(RUZINO_WITH_TORCH)
   set(Torch_DIR SDK/${SDK_FOLDER}/libtorch/share/cmake/Torch)
   find_package(Torch REQUIRED)
-  add_compile_definitions(USTC_CG_WITH_TORCH=1)
+  add_compile_definitions(RUZINO_WITH_TORCH=1)
 else()
-  add_compile_definitions(USTC_CG_WITH_TORCH=0)
+  add_compile_definitions(RUZINO_WITH_TORCH=0)
 endif()
 
 
 set(pxr_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SDK/OpenUSD/${SDK_FOLDER})
-set(FRAMEWORK3D_DIR ${USTC_CG_ROOT_DIR})
+set(FRAMEWORK3D_DIR ${RUZINO_ROOT_DIR})
 message("Looking for OpenUSD in ${pxr_DIR}")
 set(PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SDK/python")
 set(OpenSubdiv_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SDK/OpenUSD/${SDK_FOLDER}/lib/cmake/OpenSubdiv)
@@ -138,7 +138,7 @@ endif()
 if(pxr_FOUND)
   message("Found OpenUSD version ${pxr_VERSION}")
   find_package(OpenGL REQUIRED)
-  set(USTC_CG_WITH_OPENUSD ON)
+  set(RUZINO_WITH_OPENUSD ON)
 
   if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
     if(Python3_LIBRARY MATCHES "_d.lib$")
@@ -149,7 +149,7 @@ if(pxr_FOUND)
   endif()
 else()
   message(WARNING "OpenUSD not found")
-  set(USTC_CG_WITH_OPENUSD OFF)
+  set(RUZINO_WITH_OPENUSD OFF)
 endif()
 
 # Include Slang

@@ -99,17 +99,17 @@ class CudaCGSolver {
         }
 
         // GPU setup
-        auto d_csrValues = USTC_CG::cuda::create_cuda_linear_buffer(csrValues);
-        auto d_csrRowPtr = USTC_CG::cuda::create_cuda_linear_buffer(csrRowPtr);
-        auto d_csrColInd = USTC_CG::cuda::create_cuda_linear_buffer(csrColInd);
-        auto d_diagonal = USTC_CG::cuda::create_cuda_linear_buffer(diagonal);
-        auto d_b = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-        auto d_x = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-        auto d_r = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-        auto d_z = USTC_CG::cuda::create_cuda_linear_buffer<float>(
+        auto d_csrValues = Ruzino::cuda::create_cuda_linear_buffer(csrValues);
+        auto d_csrRowPtr = Ruzino::cuda::create_cuda_linear_buffer(csrRowPtr);
+        auto d_csrColInd = Ruzino::cuda::create_cuda_linear_buffer(csrColInd);
+        auto d_diagonal = Ruzino::cuda::create_cuda_linear_buffer(diagonal);
+        auto d_b = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+        auto d_x = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+        auto d_r = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+        auto d_z = Ruzino::cuda::create_cuda_linear_buffer<float>(
             n);  // For preconditioning
-        auto d_p = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
-        auto d_Ap = USTC_CG::cuda::create_cuda_linear_buffer<float>(n);
+        auto d_p = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
+        auto d_Ap = Ruzino::cuda::create_cuda_linear_buffer<float>(n);
 
         // Copy data to GPU
         d_b->assign_host_vector(
@@ -181,7 +181,7 @@ class CudaCGSolver {
             CUSPARSE_SPMV_ALG_DEFAULT,
             &bufferSize);
         auto dBuffer =
-            USTC_CG::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
+            Ruzino::cuda::create_cuda_linear_buffer<uint8_t>(bufferSize);
 
         auto iteration_start_time = std::chrono::high_resolution_clock::now();
 

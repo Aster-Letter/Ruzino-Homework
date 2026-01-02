@@ -12,7 +12,7 @@
 MATERIALX_NAMESPACE_BEGIN
 
 /// Surface node implementation for SLANG
-class HD_USTC_CG_API SurfaceNodeSlang : public SlangImplementation {
+class HD_RUZINO_API SurfaceNodeSlang : public SlangImplementation {
    public:
     SurfaceNodeSlang();
 

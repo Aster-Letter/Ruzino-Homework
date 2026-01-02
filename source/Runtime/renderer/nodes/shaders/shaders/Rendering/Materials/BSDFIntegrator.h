@@ -33,10 +33,10 @@
 #include "Scene/SceneIDs.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 /** Utility class for BSDF integration.
  */
-class HD_USTC_CG_API BSDFIntegrator {
+class HD_RUZINO_API BSDFIntegrator {
    public:
     /// Constructor.
     BSDFIntegrator(ref<Device> pDevice);
@@ -86,4 +86,4 @@ class HD_USTC_CG_API BSDFIntegrator {
     uint32_t
         mResultCount;  ///< Number of intermediate results per integration grid.
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

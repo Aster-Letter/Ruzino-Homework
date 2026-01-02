@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
 
 /// Asset categories.
@@ -85,7 +85,7 @@ FALCOR_ENUM_REGISTER(SearchPathPriority);
  * for the specified category, and if that fails, it will try to resolve it for the \c AssetCategory::Any category.
  * If no asset category is specified, the \c AssetCategory::Any category is used by default.
  */
-class HD_USTC_CG_API AssetResolver
+class HD_RUZINO_API AssetResolver
 {
 public:
     /// Default constructor.
@@ -159,4 +159,4 @@ private:
 
     std::vector<SearchContext> mSearchContexts;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

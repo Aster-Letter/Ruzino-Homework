@@ -33,14 +33,14 @@
 #include "Core/Pass/RasterPass.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
 class Font;
 
 /**
  * Class that renders text into the screen.
  */
-class HD_USTC_CG_API TextRenderer
+class HD_RUZINO_API TextRenderer
 {
 public:
     enum class Flags
@@ -101,4 +101,4 @@ private:
 };
 
 FALCOR_ENUM_CLASS_OPERATORS(TextRenderer::Flags);
-} // namespace USTC_CG
+} // namespace Ruzino

@@ -33,7 +33,7 @@
 #include "Core/Macros.h"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class GraphicsStateObject;
 class GraphicsState;
 class ProgramVars;
@@ -61,7 +61,7 @@ FALCOR_ENUM_CLASS_OPERATORS(FboAttachmentType);
 /**
  * The rendering context. Use it to bind state and dispatch calls to the GPU
  */
-class HD_USTC_CG_API RenderContext : public ComputeContext {
+class HD_RUZINO_API RenderContext : public ComputeContext {
    public:
     /**
      * This flag control which aspects of the GraphicState will be bound into
@@ -387,4 +387,4 @@ class HD_USTC_CG_API RenderContext : public ComputeContext {
 };
 
 FALCOR_ENUM_CLASS_OPERATORS(RenderContext::StateBindFlags);
-}  // namespace USTC_CG
+}  // namespace Ruzino

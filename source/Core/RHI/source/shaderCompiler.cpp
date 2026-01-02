@@ -13,7 +13,7 @@
 #include "slang.h"
 
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 std::filesystem::path SlangShaderCompiler::find_root(
     const std::filesystem::path& p)
@@ -119,7 +119,7 @@ SlangResult SlangShaderCompiler::addHLSLSupportPreDefine(
     slangRequest->addPreprocessorDefine("NV_SHADER_EXTN_SLOT", "u127");
     return SLANG_OK;
 }
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 
 SlangResult SlangShaderCompiler::addCUDAPrelude(slang::IGlobalSession* session)
 {
@@ -141,7 +141,7 @@ SlangResult SlangShaderCompiler::addCUDAPrelude(slang::IGlobalSession* session)
 SlangResult SlangShaderCompiler::addOptiXHeaderInclude(
     SlangCompileRequest* slangRequest)
 {
-    auto optix_path = find_root(".") / "usd/hd_USTC_CG_GL/resources/optix/";
+    auto optix_path = find_root(".") / "usd/hd_RUZINO_GL/resources/optix/";
     auto optix_path_name = "-I" + optix_path.generic_string();
 
     // Inclusion in prelude should be passed to down stream compilers.....
@@ -177,4 +177,4 @@ void SlangShaderCompiler::save_file(
     file.close();
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

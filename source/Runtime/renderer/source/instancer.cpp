@@ -36,17 +36,17 @@
 #include "pxr/imaging/hd/tokens.h"
 
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_USTC_CG_Instancer::Hd_USTC_CG_Instancer(
+Hd_RUZINO_Instancer::Hd_RUZINO_Instancer(
     HdSceneDelegate* delegate,
     SdfPath const& id)
     : HdInstancer(delegate, id)
 {
 }
 
-Hd_USTC_CG_Instancer::~Hd_USTC_CG_Instancer()
+Hd_RUZINO_Instancer::~Hd_RUZINO_Instancer()
 {
     TF_FOR_ALL(it, _primvarMap)
     {
@@ -55,7 +55,7 @@ Hd_USTC_CG_Instancer::~Hd_USTC_CG_Instancer()
     _primvarMap.clear();
 }
 
-void Hd_USTC_CG_Instancer::Sync(
+void Hd_RUZINO_Instancer::Sync(
     HdSceneDelegate* delegate,
     HdRenderParam* renderParam,
     HdDirtyBits* dirtyBits)
@@ -67,7 +67,7 @@ void Hd_USTC_CG_Instancer::Sync(
     }
 }
 
-void Hd_USTC_CG_Instancer::_SyncPrimvars(
+void Hd_RUZINO_Instancer::_SyncPrimvars(
     HdSceneDelegate* delegate,
     HdDirtyBits dirtyBits)
 {
@@ -92,7 +92,7 @@ void Hd_USTC_CG_Instancer::_SyncPrimvars(
     }
 }
 
-VtMatrix4fArray Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
+VtMatrix4fArray Hd_RUZINO_Instancer::ComputeInstanceTransforms(
     SdfPath const& prototypeId)
 {
     HD_TRACE_FUNCTION();
@@ -190,7 +190,7 @@ VtMatrix4fArray Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
     }
 
     VtMatrix4fArray parentTransforms =
-        static_cast<Hd_USTC_CG_Instancer*>(parentInstancer)
+        static_cast<Hd_RUZINO_Instancer*>(parentInstancer)
             ->ComputeInstanceTransforms(GetId());
 
     VtMatrix4fArray final(parentTransforms.size() * transforms.size());
@@ -203,7 +203,7 @@ VtMatrix4fArray Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
     return final;
 }
 
-void Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
+void Hd_RUZINO_Instancer::ComputeInstanceTransforms(
     SdfPath const& prototypeId,
     DeviceMemoryPool<GeometryInstanceData>::MemoryHandle instance_buffer,
     DeviceMemoryPool<nvrhi::rt::InstanceDesc>::MemoryHandle rt_instance_buffer,
@@ -287,4 +287,4 @@ void Hd_USTC_CG_Instancer::ComputeInstanceTransforms(
         geometry_id);
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

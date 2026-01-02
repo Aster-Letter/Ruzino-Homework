@@ -47,7 +47,7 @@ SOFTWARE.
 #include "imgui_renderer.h"
 
 #include "GUI/api.h"
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 ImGui_Renderer::ImGui_Renderer(DeviceManager* devManager)
     : IRenderPass(devManager)
@@ -311,4 +311,4 @@ void ImGui_Renderer::EndFullScreenWindow()
     ImGui::End();
     ImGui::PopStyleVar();
 }
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -7,7 +7,7 @@
 
 #include "bufferResource.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 HdStBufferResource::HdStBufferResource(
     pxr::TfToken const &role,
@@ -32,4 +32,4 @@ void HdStBufferResource::SetAllocation(
     _size = size;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

@@ -12,13 +12,13 @@
 #ifndef CUDA_RASTERIZER_H_INCLUDED
 #define CUDA_RASTERIZER_H_INCLUDED
 
-#include <USTC_CG.h>
+#include <RUZINO.h>
 #include <functional>
 #include <vector>
 
 namespace CudaRasterizer {
 
-class USTC_CG_API Rasterizer {
+class RUZINO_API Rasterizer {
    public:
     static void markVisible(
         int P,

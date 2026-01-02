@@ -6,7 +6,7 @@
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (mtlx)
@@ -673,4 +673,4 @@ HdMaterialNode2 const* _GetTerminalNode(
     return &terminalIt->second;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

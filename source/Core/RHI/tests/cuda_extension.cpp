@@ -1,11 +1,11 @@
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 #include "RHI/internal/cuda_extension.hpp"
 
 #include <gtest/gtest.h>
 
 #include "RHI/rhi.hpp"
 
-using namespace USTC_CG::cuda;
+using namespace Ruzino::cuda;
 
 TEST(cuda_extension, cuda_init)
 {
@@ -121,7 +121,7 @@ TEST(cuda_extension, cuda_linear_buffer_to_nvrhi_texture)
     desc.isRenderTarget = false;
     desc.debugName = "test_texture";
 
-    auto device = USTC_CG::RHI::get_device();
+    auto device = Ruzino::RHI::get_device();
     auto texture = cuda_linear_buffer_to_nvrhi_texture(device, buffer, desc);
     EXPECT_NE(texture, nullptr);
     
@@ -145,7 +145,7 @@ TEST(cuda_extension, nvrhi_texture_to_cuda_linear_buffer)
     desc.keepInitialState = true;
     desc.initialState = nvrhi::ResourceStates::CopyDest;
 
-    auto device = USTC_CG::RHI::get_device();
+    auto device = Ruzino::RHI::get_device();
     auto source_texture = device->createTexture(desc);
     EXPECT_NE(source_texture, nullptr);
 
@@ -181,7 +181,7 @@ TEST(cuda_extension, texture_buffer_roundtrip)
     desc.isShaderResource = true;
     desc.debugName = "roundtrip_texture";
 
-    auto device = USTC_CG::RHI::get_device();
+    auto device = Ruzino::RHI::get_device();
     auto texture =
         cuda_linear_buffer_to_nvrhi_texture(device, original_buffer, desc);
     EXPECT_NE(texture, nullptr);

@@ -126,7 +126,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
     for (auto* light : all_lights) {
         if (light &&
             light->GetLightType() == pxr::HdPrimTypeTokens->domeLight) {
-            auto* dome_light = dynamic_cast<Hd_USTC_CG_Dome_Light*>(light);
+            auto* dome_light = dynamic_cast<Hd_RUZINO_Dome_Light*>(light);
             if (dome_light && dome_light->HasValidShader()) {
                 shader_dome_light_count++;
                 if (!found_dome_shader) {
@@ -382,7 +382,7 @@ void fetch_)" + material.second->GetMaterialName() +
 
         // Bind light buffer - only include lights with valid paths
         auto& all_lights = global_payload.get_lights();
-        std::vector<Hd_USTC_CG_Light*> valid_lights;
+        std::vector<Hd_RUZINO_Light*> valid_lights;
 
         for (auto* light : all_lights) {
             // Only include lights with non-empty paths (not fallback lights)

@@ -32,7 +32,7 @@
 #include "Core/Object.h"
 #include "Core/Program/ProgramVersion.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 
 struct GraphicsStateObjectDesc {
     static constexpr uint32_t kSampleMaskAll = -1;
@@ -72,7 +72,7 @@ struct GraphicsStateObjectDesc {
     }
 };
 
-class HD_USTC_CG_API GraphicsStateObject : public Object {
+class HD_RUZINO_API GraphicsStateObject : public Object {
     FALCOR_OBJECT(GraphicsStateObject)
    public:
     GraphicsStateObject(
@@ -105,4 +105,4 @@ class HD_USTC_CG_API GraphicsStateObject : public Object {
     static ref<DepthStencilState>
         spDefaultDepthStencilState;  // TODO: REMOVEGLOBAL
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino

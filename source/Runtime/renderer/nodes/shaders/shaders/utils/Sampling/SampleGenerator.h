@@ -35,7 +35,7 @@
 #include <functional>
 #include <memory>
 
-namespace USTC_CG
+namespace Ruzino
 {
 class RenderContext;
 
@@ -46,7 +46,7 @@ class RenderContext;
  * uploading the necessary lookup tables (if needed).
  * On the GPU, import SampleGenerator.slang in your shader program.
  */
-class HD_USTC_CG_API SampleGenerator : public Object
+class HD_RUZINO_API SampleGenerator : public Object
 {
     FALCOR_OBJECT(SampleGenerator)
 public:
@@ -112,4 +112,4 @@ private:
 
     friend struct RegisterSampleGenerators;
 };
-} // namespace USTC_CG
+} // namespace Ruzino

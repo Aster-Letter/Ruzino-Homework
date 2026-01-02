@@ -23,7 +23,7 @@ class FileSearchPath;
 using DocumentPtr = std::shared_ptr<class Document>;
 MATERIALX_NAMESPACE_END
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 // Create a MaterialX Document from the given HdMaterialNetwork2
 MaterialX::DocumentPtr HdMtlxCreateMtlxDocumentFromHdNetworkFast(
     pxr::HdMaterialNetwork2 const& hdNetwork,
@@ -34,7 +34,7 @@ MaterialX::DocumentPtr HdMtlxCreateMtlxDocumentFromHdNetworkFast(
     pxr::HdMtlxTexturePrimvarData* mxHdData);
 
 /// Implementation that uses the material network interface.
-HD_USTC_CG_API
+HD_RUZINO_API
 MaterialX::DocumentPtr
 HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterfaceFast(
     pxr::HdMaterialNetworkInterface* netInterface,
@@ -43,4 +43,4 @@ HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterfaceFast(
     MaterialX::DocumentPtr const& libraries,
     pxr::HdMtlxTexturePrimvarData* mxHdData = nullptr);
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

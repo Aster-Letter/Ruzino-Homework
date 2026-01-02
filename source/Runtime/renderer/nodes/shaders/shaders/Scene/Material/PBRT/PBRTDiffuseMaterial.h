@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a Lambertian diffuse material, where
         reflectance does not depend on wo.
@@ -45,7 +45,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTDiffuseMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTDiffuseMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTDiffuseMaterial)
     public:

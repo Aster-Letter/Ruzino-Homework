@@ -37,7 +37,7 @@
 #include "Core/Object.h"
 #include "CpuTimer.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 class RenderContext;
 
 /**
@@ -48,7 +48,7 @@ class RenderContext;
  * GPU profiling to avoid GPU stalls. ProfilerEvent is a wrapper class which
  * together with scoping can simplify event profiling.
  */
-class HD_USTC_CG_API Profiler {
+class HD_RUZINO_API Profiler {
    public:
     enum class Flags {
         None = 0x0,
@@ -337,7 +337,7 @@ FALCOR_ENUM_CLASS_OPERATORS(Profiler::Flags);
  * profiling is disabled, so should be used instead of directly creating
  * ProfilerEvent objects.
  */
-class HD_USTC_CG_API ScopedProfilerEvent {
+class HD_RUZINO_API ScopedProfilerEvent {
    public:
     ScopedProfilerEvent(
         RenderContext* pRenderContext,
@@ -350,14 +350,14 @@ class HD_USTC_CG_API ScopedProfilerEvent {
     const std::string mName;
     Profiler::Flags mFlags;
 };
-}  // namespace USTC_CG
+}  // namespace Ruzino
 
 #if FALCOR_ENABLE_PROFILER
 #define FALCOR_PROFILE(_pRenderContext, _name)         \
-    USTC_CG::ScopedProfilerEvent FALCOR_CONCAT_STRINGS( \
+    Ruzino::ScopedProfilerEvent FALCOR_CONCAT_STRINGS( \
         _profileEvent, __LINE__)(_pRenderContext, _name)
 #define FALCOR_PROFILE_CUSTOM(_pRenderContext, _name, _flags) \
-    USTC_CG::ScopedProfilerEvent FALCOR_CONCAT_STRINGS(        \
+    Ruzino::ScopedProfilerEvent FALCOR_CONCAT_STRINGS(        \
         _profileEvent, __LINE__)(_pRenderContext, _name, _flags)
 #else
 #define FALCOR_PROFILE(_pRenderContext, _name)

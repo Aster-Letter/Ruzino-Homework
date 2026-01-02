@@ -32,9 +32,9 @@
 #include "utils/fast_vector.h"
 #include <vector>
 
-namespace USTC_CG
+namespace Ruzino
 {
-    class HD_USTC_CG_API CurveTessellation
+    class HD_RUZINO_API CurveTessellation
     {
     public:
         // Swept spheres

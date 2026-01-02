@@ -6,7 +6,7 @@
 #include "GCore/GOP.h"
 #include "nodes/core/def/node_def.hpp"
 
-using namespace USTC_CG;
+using namespace Ruzino;
 
 // Colormap functions
 glm::vec3 viridis_colormap(float t)

@@ -28,7 +28,7 @@
 #pragma once
 #include "Scene/Material/BasicMaterial.h"
 
-namespace USTC_CG
+namespace Ruzino
 {
     /** This class implements a coated diffuse material, i.e. a
         dielectric coating on top of a Lamebrtian base.
@@ -51,7 +51,7 @@ namespace USTC_CG
 
         See additional texture channels defined in BasicMaterial.
     */
-    class HD_USTC_CG_API PBRTCoatedDiffuseMaterial : public BasicMaterial
+    class HD_RUZINO_API PBRTCoatedDiffuseMaterial : public BasicMaterial
     {
         FALCOR_OBJECT(PBRTCoatedDiffuseMaterial)
     public:

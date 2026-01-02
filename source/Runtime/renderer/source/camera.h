@@ -8,12 +8,12 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-class Hd_USTC_CG_Camera : public HdCamera {
+class Hd_RUZINO_Camera : public HdCamera {
    public:
-    explicit Hd_USTC_CG_Camera(SdfPath const& id) : HdCamera(id)
+    explicit Hd_RUZINO_Camera(SdfPath const& id) : HdCamera(id)
     {
     }
 
@@ -30,4 +30,4 @@ class Hd_USTC_CG_Camera : public HdCamera {
     mutable GfMatrix4f inverseViewMatrix;
     mutable GfRect2i dataWindow;
 };
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

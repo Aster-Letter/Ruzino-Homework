@@ -34,7 +34,7 @@
 #include <string>
 #include <cstdint>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace math
 {
@@ -135,14 +135,14 @@ using math::operator""h;
 #pragma warning(pop)
 #endif
 
-} // namespace USTC_CG
+} // namespace Ruzino
 
 // Formatter for the float16_t.
 template<>
-struct std::formatter<USTC_CG::math::float16_t> : formatter<float>
+struct std::formatter<Ruzino::math::float16_t> : formatter<float>
 {
     template<typename FormatContext>
-    auto format(USTC_CG::math::float16_t value, FormatContext& ctx) const
+    auto format(Ruzino::math::float16_t value, FormatContext& ctx) const
     {
         return formatter<float>::format(float(value), ctx);
     }

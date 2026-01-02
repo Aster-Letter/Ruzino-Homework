@@ -55,7 +55,7 @@
 
 #endif
 
-using namespace USTC_CG;
+using namespace Ruzino;
 using namespace pxr;
 
 // USD utilities
@@ -514,7 +514,7 @@ int main(int argc, char* argv[])
         params.driver = hd_driver;
 
         auto renderer = std::make_unique<UsdImagingGLEngine>(params);
-        renderer->SetRendererPlugin(TfToken("Hd_USTC_CG_RendererPlugin"));
+        renderer->SetRendererPlugin(TfToken("Hd_RUZINO_RendererPlugin"));
         renderer->SetEnablePresentation(false);
 
         // Configure render settings

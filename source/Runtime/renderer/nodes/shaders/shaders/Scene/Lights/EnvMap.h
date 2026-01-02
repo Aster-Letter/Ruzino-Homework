@@ -34,13 +34,13 @@
 #include "EnvMapData.slang"
 #include "utils/Math/Vector.h"
 
-namespace USTC_CG {
+namespace Ruzino {
 struct ShaderVar;
 
 /** Environment map based radiance probe.
     Utily class for evaluating radiance stored in an lat-long environment map.
 */
-class HD_USTC_CG_API EnvMap : public Object {
+class HD_RUZINO_API EnvMap : public Object {
     FALCOR_OBJECT(EnvMap)
    public:
     virtual ~EnvMap() = default;
@@ -167,4 +167,4 @@ class HD_USTC_CG_API EnvMap : public Object {
 };
 
 FALCOR_ENUM_CLASS_OPERATORS(EnvMap::Changes);
-}  // namespace USTC_CG
+}  // namespace Ruzino

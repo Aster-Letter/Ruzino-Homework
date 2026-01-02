@@ -28,77 +28,77 @@
 #include "pxr/pxr.h"
 #include "pxr/base/tf/singleton.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
-/// \class Hd_USTC_CG_Config
+/// \class Hd_RUZINO_Config
 ///
-/// This class is a singleton, holding configuration parameters for Hd_USTC_CG.
+/// This class is a singleton, holding configuration parameters for Hd_RUZINO.
 /// Everything is provided with a default, but can be overridden using
 /// environment variables before launching a hydra process.
 ///
 /// Many of the parameters can be used to control quality/performance
-/// tradeoffs, or to alter how Hd_USTC_CG takes advantage of parallelism.
+/// tradeoffs, or to alter how Hd_RUZINO takes advantage of parallelism.
 ///
 /// At startup, this class will print config parameters if
-/// *Hd_USTC_CG_PRINT_CONFIGURATION* is true. Integer values greater than zero
+/// *Hd_RUZINO_PRINT_CONFIGURATION* is true. Integer values greater than zero
 /// are considered "true".
 ///
-class Hd_USTC_CG_Config
+class Hd_RUZINO_Config
 {
 public:
     /// \brief Return the configuration singleton.
-    static const Hd_USTC_CG_Config& GetInstance();
+    static const Hd_RUZINO_Config& GetInstance();
 
     /// How many samples do we need before a pixel is considered
     /// converged?
     ///
-    /// Override with *Hd_USTC_CG_SAMPLES_TO_CONVERGENCE*.
+    /// Override with *Hd_RUZINO_SAMPLES_TO_CONVERGENCE*.
     unsigned int samplesToConvergence;
 
     /// How many pixels are in an atomic unit of parallel work?
     /// A work item is a square of size [tileSize x tileSize] pixels.
     ///
-    /// Override with *Hd_USTC_CG_TILE_SIZE*.
+    /// Override with *Hd_RUZINO_TILE_SIZE*.
     unsigned int tileSize;
 
     /// How many ambient occlusion rays should we generate per
     /// camera ray?
     ///
-    /// Override with *Hd_USTC_CG_AMBIENT_OCCLUSION_SAMPLES*.
+    /// Override with *Hd_RUZINO_AMBIENT_OCCLUSION_SAMPLES*.
     unsigned int ambientOcclusionSamples;
 
     /// Should the renderpass jitter camera rays for antialiasing?
     ///
-    /// Override with *Hd_USTC_CG_JITTER_CAMERA*. Integer values greater than
+    /// Override with *Hd_RUZINO_JITTER_CAMERA*. Integer values greater than
     /// zero are considered "true".
     bool jitterCamera;
 
     /// Should the renderpass use the color primvar, or flat white colors?
     /// (Flat white shows off ambient occlusion better).
     ///
-    /// Override with *Hd_USTC_CG_USE_FACE_COLORS*. Integer values greater than
+    /// Override with *Hd_RUZINO_USE_FACE_COLORS*. Integer values greater than
     /// zero are considered "true".
     bool useFaceColors;
 
     /// What should the intensity of the camera light be, specified as a
     /// percent of <1, 1, 1>.  For example, 300 would be <3, 3, 3>.
     ///
-    /// Override with *Hd_USTC_CG_CAMERA_LIGHT_INTENSITY*.
+    /// Override with *Hd_RUZINO_CAMERA_LIGHT_INTENSITY*.
     float cameraLightIntensity;
 
 private:
     // The constructor initializes the config variables with their
     // default or environment-provided override, and optionally prints
     // them.
-    Hd_USTC_CG_Config();
-    ~Hd_USTC_CG_Config() = default;
+    Hd_RUZINO_Config();
+    ~Hd_RUZINO_Config() = default;
 
-    Hd_USTC_CG_Config(const Hd_USTC_CG_Config&) = delete;
-    Hd_USTC_CG_Config& operator=(const Hd_USTC_CG_Config&) = delete;
+    Hd_RUZINO_Config(const Hd_RUZINO_Config&) = delete;
+    Hd_RUZINO_Config& operator=(const Hd_RUZINO_Config&) = delete;
 
-    friend class TfSingleton<Hd_USTC_CG_Config>;
+    friend class TfSingleton<Hd_RUZINO_Config>;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
 
 #endif // PXR_IMAGING_PLUGIN_HD_EMBREE_CONFIG_H

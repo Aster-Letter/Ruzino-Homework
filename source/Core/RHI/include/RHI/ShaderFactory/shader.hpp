@@ -6,11 +6,11 @@
 #include "RHI/rhi.hpp"
 #include "shader_reflection.hpp"
 
-namespace USTC_CG {
+namespace Ruzino {
 class ResourceAllocator;
 }
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 class RHI_API ShaderFactory {
    public:
     ShaderFactory() : device(RHI::get_device()), resource_allocator(nullptr)
@@ -119,4 +119,4 @@ class RHI_API ShaderFactory {
     friend struct ProgramDesc;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

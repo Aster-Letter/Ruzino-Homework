@@ -6,7 +6,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 bool IWidget::Begin()
 {
     FirstUseEver();
@@ -217,4 +217,4 @@ void IWidgetDrawable::DrawFunction(
     }
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

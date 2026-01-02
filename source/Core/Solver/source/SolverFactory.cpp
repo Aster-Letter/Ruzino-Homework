@@ -2,12 +2,12 @@
 #include <functional>
 #include <unordered_map>
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace Solver {
 
 // Forward declarations of factory functions
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
 std::unique_ptr<LinearSolver> createCudaCGSolver();
 std::unique_ptr<LinearSolver> createCudaBiCGStabSolver();  // 新增
 std::unique_ptr<LinearSolver> createCudaGMRESSolver();     // 新增
@@ -21,7 +21,7 @@ std::unique_ptr<LinearSolver> createEigenQRSolver();
 using SolverCreator = std::function<std::unique_ptr<LinearSolver>()>;
 
 static std::unordered_map<SolverType, SolverCreator> solverRegistry = {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
     { SolverType::CUDA_CG, createCudaCGSolver },
     { SolverType::CUDA_BICGSTAB, createCudaBiCGStabSolver },  // 新增
 #endif
@@ -33,7 +33,7 @@ static std::unordered_map<SolverType, SolverCreator> solverRegistry = {
 };
 
 static std::unordered_map<SolverType, std::string> solverNames = {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
     { SolverType::CUDA_CG, "CUDA Conjugate Gradient" },
     { SolverType::CUDA_BICGSTAB, "CUDA BiCGSTAB" },  // 新增
 #endif
@@ -48,7 +48,7 @@ std::unique_ptr<LinearSolver> SolverFactory::create(SolverType type)
 {
     try {
         switch (type) {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
             case SolverType::CUDA_CG: return createCudaCGSolver();
             case SolverType::CUDA_BICGSTAB:
                 return createCudaBiCGStabSolver();  // 新增
@@ -77,7 +77,7 @@ std::vector<SolverType> SolverFactory::getAvailableTypes()
 
     // Try to create each solver to check availability
     std::vector<SolverType> all_types = {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
                                           SolverType::CUDA_CG,
                                           SolverType::CUDA_BICGSTAB,  // 新增
                                           SolverType::CUDA_GMRES,     // 新增
@@ -108,7 +108,7 @@ std::vector<SolverType> SolverFactory::getAvailableTypes()
 std::string SolverFactory::getTypeName(SolverType type)
 {
     switch (type) {
-#if USTC_CG_WITH_CUDA
+#if RUZINO_WITH_CUDA
         case SolverType::CUDA_CG: return "CUDA Conjugate Gradient";
         case SolverType::CUDA_BICGSTAB: return "CUDA BiCGSTAB";
         case SolverType::CUDA_GMRES: return "CUDA GMRES";  // 新增
@@ -124,4 +124,4 @@ std::string SolverFactory::getTypeName(SolverType type)
 
 }  // namespace Solver
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

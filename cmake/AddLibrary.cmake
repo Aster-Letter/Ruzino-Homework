@@ -1,6 +1,6 @@
 
 
-if(USTC_CG_WITH_CUDA)
+if(RUZINO_WITH_CUDA)
     set(CMAKE_CUDA_ARCHITECTURES 86)
 endif()
 
@@ -8,7 +8,7 @@ function(Set_CUDA_Properties lib_name)
     # Set the cuda compiler to be nvcc 12.6
     find_package(CUDAToolkit REQUIRED)
     find_package(CCCL REQUIRED)
-    add_compile_definitions(USTC_CG_WITH_CUDA=1)
+    add_compile_definitions(RUZINO_WITH_CUDA=1)
     set(CMAKE_CUDA_STANDARD 20)
 
     set_target_properties(${lib_name}
@@ -53,7 +53,7 @@ function(UCG_ADD_TEST)
     target_compile_definitions(${test_name}_test PUBLIC NOMINMAX=1)
 
     # Check if the test source is a CUDA file and set CUDA properties if so
-    if(USTC_CG_WITH_CUDA AND UCG_TEST_SRC MATCHES "\\.cu$")
+    if(RUZINO_WITH_CUDA AND UCG_TEST_SRC MATCHES "\\.cu$")
         Set_CUDA_Properties(${test_name}_test)
     endif()
 
@@ -82,15 +82,15 @@ function(UCG_ADD_APP)
     target_compile_definitions(${app_name} PUBLIC NOMINMAX=1)
 
     # Check if the app source is a CUDA file and set CUDA properties if so
-    if(USTC_CG_WITH_CUDA AND UCG_APP_SRC MATCHES "\\.cu$")
+    if(RUZINO_WITH_CUDA AND UCG_APP_SRC MATCHES "\\.cu$")
         Set_CUDA_Properties(${app_name})
     endif()
 endfunction(UCG_ADD_APP)
-function(USTC_CG_ADD_LIB LIB_NAME)
+function(RUZINO_ADD_LIB LIB_NAME)
     set(options SHARED WITH_CUDA)
     set(oneValueArgs RESOURCE_COPY_TARGET)
     set(multiValueArgs LIB_FLAGS EXTRA_FILES INC_DIR PUBLIC_LIBS PRIVATE_LIBS COMPILE_OPTIONS COMPILE_DEFS USD_RESOURCE_DIRS USD_RESOURCE_FILES SKIP_DIRS PYTHON_WRAP_SRC PYTHON_WRAP_DIR)
-    cmake_parse_arguments(USTC_CG_ADD_LIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    cmake_parse_arguments(RUZINO_ADD_LIB "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(NOT LIB_NAME)
         get_filename_component(LIB_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
@@ -107,29 +107,29 @@ function(USTC_CG_ADD_LIB LIB_NAME)
     list(FILTER ${name}_src_headers EXCLUDE REGEX "${folder}/tests/.*")
     list(FILTER ${name}_cpp_sources EXCLUDE REGEX "${folder}/tests/.*")
 
-    foreach(resource_dir ${USTC_CG_ADD_LIB_USD_RESOURCE_DIRS})
+    foreach(resource_dir ${RUZINO_ADD_LIB_USD_RESOURCE_DIRS})
         list(FILTER ${name}_src_headers EXCLUDE REGEX "${resource_dir}/.*")
         list(FILTER ${name}_cpp_sources EXCLUDE REGEX "${resource_dir}/.*")
     endforeach()
 
-    if(USTC_CG_ADD_LIB_PYTHON_WRAP_DIR)
-        file(GLOB_RECURSE DIRED_PYTHON_WRAP_SRC ${USTC_CG_ADD_LIB_PYTHON_WRAP_DIR}/*.cpp)
-        list(APPEND USTC_CG_ADD_LIB_PYTHON_WRAP_SRC ${DIRED_PYTHON_WRAP_SRC})
+    if(RUZINO_ADD_LIB_PYTHON_WRAP_DIR)
+        file(GLOB_RECURSE DIRED_PYTHON_WRAP_SRC ${RUZINO_ADD_LIB_PYTHON_WRAP_DIR}/*.cpp)
+        list(APPEND RUZINO_ADD_LIB_PYTHON_WRAP_SRC ${DIRED_PYTHON_WRAP_SRC})
     endif()
 
-    if(USTC_CG_ADD_LIB_PYTHON_WRAP_SRC)
-        list(FILTER USTC_CG_ADD_LIB_PYTHON_WRAP_SRC EXCLUDE REGEX "${folder}/tests/.*")
+    if(RUZINO_ADD_LIB_PYTHON_WRAP_SRC)
+        list(FILTER RUZINO_ADD_LIB_PYTHON_WRAP_SRC EXCLUDE REGEX "${folder}/tests/.*")
 
-        foreach(skip_dir ${USTC_CG_ADD_LIB_SKIP_DIRS})
-            list(FILTER USTC_CG_ADD_LIB_PYTHON_WRAP_SRC EXCLUDE REGEX "${skip_dir}/.*")
+        foreach(skip_dir ${RUZINO_ADD_LIB_SKIP_DIRS})
+            list(FILTER RUZINO_ADD_LIB_PYTHON_WRAP_SRC EXCLUDE REGEX "${skip_dir}/.*")
         endforeach()
     endif()
 
-    if(USTC_CG_ADD_LIB_PYTHON_WRAP_DIR)
-        list(APPEND USTC_CG_ADD_LIB_SKIP_DIRS ${USTC_CG_ADD_LIB_PYTHON_WRAP_DIR})
+    if(RUZINO_ADD_LIB_PYTHON_WRAP_DIR)
+        list(APPEND RUZINO_ADD_LIB_SKIP_DIRS ${RUZINO_ADD_LIB_PYTHON_WRAP_DIR})
     endif()
 
-    foreach(skip_dir ${USTC_CG_ADD_LIB_SKIP_DIRS})
+    foreach(skip_dir ${RUZINO_ADD_LIB_SKIP_DIRS})
         list(FILTER ${name}_src_headers EXCLUDE REGEX "${skip_dir}/.*")
         list(FILTER ${name}_cpp_sources EXCLUDE REGEX "${skip_dir}/.*")
     endforeach()
@@ -138,19 +138,19 @@ function(USTC_CG_ADD_LIB LIB_NAME)
         ${${name}_cpp_sources}
         ${${name}_headers}
         ${${name}_src_headers}
-        ${USTC_CG_ADD_LIB_EXTRA_FILES}
+        ${RUZINO_ADD_LIB_EXTRA_FILES}
     )
 
-    if(USTC_CG_ADD_LIB_WITH_CUDA)
-        if(USTC_CG_WITH_CUDA)
+    if(RUZINO_ADD_LIB_WITH_CUDA)
+        if(RUZINO_WITH_CUDA)
             file(GLOB_RECURSE ${name}_cuda_sources ${folder}/*.cu ${folder}/*.cuh)
             list(FILTER ${name}_cuda_sources EXCLUDE REGEX "${folder}/tests/.*")
 
-            foreach(resource_dir ${USTC_CG_ADD_LIB_USD_RESOURCE_DIRS})
+            foreach(resource_dir ${RUZINO_ADD_LIB_USD_RESOURCE_DIRS})
                 list(FILTER ${name}_cuda_sources EXCLUDE REGEX "${resource_dir}/.*")
             endforeach()
 
-            foreach(skip_dir ${USTC_CG_ADD_LIB_SKIP_DIRS})
+            foreach(skip_dir ${RUZINO_ADD_LIB_SKIP_DIRS})
                 list(FILTER ${name}_cuda_sources EXCLUDE REGEX "${skip_dir}/.*")
             endforeach()
 
@@ -159,10 +159,10 @@ function(USTC_CG_ADD_LIB LIB_NAME)
         endif()
     endif()
 
-    if(${USTC_CG_ADD_LIB_SHARED})
-        add_library(${name} SHARED ${USTC_CG_ADD_LIB_LIB_FLAGS} ${${name}_sources})
+    if(${RUZINO_ADD_LIB_SHARED})
+        add_library(${name} SHARED ${RUZINO_ADD_LIB_LIB_FLAGS} ${${name}_sources})
     else()
-        add_library(${name} STATIC ${USTC_CG_ADD_LIB_LIB_FLAGS} ${${name}_sources})
+        add_library(${name} STATIC ${RUZINO_ADD_LIB_LIB_FLAGS} ${${name}_sources})
     endif()
 
     # Set folder for the main library
@@ -176,28 +176,28 @@ function(USTC_CG_ADD_LIB LIB_NAME)
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         PRIVATE
-        ${USTC_CG_ADD_LIB_INC_DIR}
+        ${RUZINO_ADD_LIB_INC_DIR}
     )
 
-    if(USTC_CG_ADD_LIB_WITH_CUDA)
-        if(USTC_CG_WITH_CUDA)
+    if(RUZINO_ADD_LIB_WITH_CUDA)
+        if(RUZINO_WITH_CUDA)
             Set_CUDA_Properties(${name})
         endif()
     endif()
 
-    target_compile_options(${name} PRIVATE ${USTC_CG_ADD_LIB_COMPILE_OPTIONS})
-    target_compile_definitions(${name} PRIVATE ${USTC_CG_ADD_LIB_COMPILE_DEFS})
+    target_compile_options(${name} PRIVATE ${RUZINO_ADD_LIB_COMPILE_OPTIONS})
+    target_compile_definitions(${name} PRIVATE ${RUZINO_ADD_LIB_COMPILE_DEFS})
     string(TOUPPER ${LIB_NAME} LIB_NAME_UPPER)
     target_compile_definitions(${name} PRIVATE BUILD_${LIB_NAME_UPPER}_MODULE=1)
 
     target_link_libraries(${name}
-        PUBLIC ${USTC_CG_ADD_LIB_PUBLIC_LIBS}
-        PRIVATE ${USTC_CG_ADD_LIB_PRIVATE_LIBS}
+        PUBLIC ${RUZINO_ADD_LIB_PUBLIC_LIBS}
+        PRIVATE ${RUZINO_ADD_LIB_PRIVATE_LIBS}
     )
     set_target_properties(${name} PROPERTIES ${OUTPUT_DIR})
 
-    if(USTC_CG_ADD_LIB_PYTHON_WRAP_SRC)
-        nanobind_add_module(${name}_py NB_SHARED ${USTC_CG_ADD_LIB_PYTHON_WRAP_SRC})
+    if(RUZINO_ADD_LIB_PYTHON_WRAP_SRC)
+        nanobind_add_module(${name}_py NB_SHARED ${RUZINO_ADD_LIB_PYTHON_WRAP_SRC})
         set_target_properties(nanobind PROPERTIES ${OUTPUT_DIR})
         target_link_libraries(${name}_py PRIVATE ${name})
 
@@ -205,7 +205,7 @@ function(USTC_CG_ADD_LIB LIB_NAME)
         set_target_properties(${name}_py PROPERTIES FOLDER "Libraries/${name}")
 
         # Apply the same compile definitions to Python bindings
-        target_compile_definitions(${name}_py PRIVATE ${USTC_CG_ADD_LIB_COMPILE_DEFS})
+        target_compile_definitions(${name}_py PRIVATE ${RUZINO_ADD_LIB_COMPILE_DEFS})
 
         # target_link_libraries(${name}_py PRIVATE Python3::Python)
         # target_link_libraries(nanobind-static PRIVATE Python3::Python)
@@ -235,8 +235,8 @@ function(USTC_CG_ADD_LIB LIB_NAME)
 
     file(GLOB test_cpp_sources ${folder}/tests/*.cpp)
 
-    if(USTC_CG_ADD_LIB_WITH_CUDA)
-        if(USTC_CG_WITH_CUDA)
+    if(RUZINO_ADD_LIB_WITH_CUDA)
+        if(RUZINO_WITH_CUDA)
             file(GLOB test_cuda_sources ${folder}/tests/*.cu)
             set(test_sources ${test_cpp_sources} ${test_cuda_sources})
         else()
@@ -248,7 +248,7 @@ function(USTC_CG_ADD_LIB LIB_NAME)
 
     set(test_sources ${test_cpp_sources} ${test_cuda_sources})
 
-    foreach(skip_dir ${USTC_CG_ADD_LIB_SKIP_DIRS})
+    foreach(skip_dir ${RUZINO_ADD_LIB_SKIP_DIRS})
         list(FILTER test_sources EXCLUDE REGEX "${skip_dir}/.*")
     endforeach()
 
@@ -257,7 +257,7 @@ function(USTC_CG_ADD_LIB LIB_NAME)
             SRC ${source}
             LIBS
             ${name}
-            ${USTC_CG_ADD_LIB_PUBLIC_LIBS}
+            ${RUZINO_ADD_LIB_PUBLIC_LIBS}
         )
         # Set folder for test targets
         string(REGEX REPLACE "(.*/)([a-zA-Z0-9_ ]+)(\.cpp|\.cu)" "\\2" test_name ${source})
@@ -265,17 +265,17 @@ function(USTC_CG_ADD_LIB LIB_NAME)
     endforeach()
 
     # Ensure the copy target directory exists only if RESOURCE_COPY_TARGET is specified
-    if(USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET)
-        file(MAKE_DIRECTORY ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET})
+    if(RUZINO_ADD_LIB_RESOURCE_COPY_TARGET)
+        file(MAKE_DIRECTORY ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET})
     else()
-        set(USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET ${OUT_BINARY_DIR}/usd)
-        file(MAKE_DIRECTORY ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET})
+        set(RUZINO_ADD_LIB_RESOURCE_COPY_TARGET ${OUT_BINARY_DIR}/usd)
+        file(MAKE_DIRECTORY ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET})
     endif()
 
     # Suppress C4251 and C4996 warnings for MSVC
     if(MSVC)
         target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4251> $<$<COMPILE_LANGUAGE:CXX>:/wd4996>)
-        if(USTC_CG_ADD_LIB_PYTHON_WRAP_SRC)
+        if(RUZINO_ADD_LIB_PYTHON_WRAP_SRC)
             target_compile_options(${name}_py PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4251> $<$<COMPILE_LANGUAGE:CXX>:/wd4996>)
         endif()
         foreach(source ${test_sources})
@@ -285,23 +285,23 @@ function(USTC_CG_ADD_LIB LIB_NAME)
     endif()
 
     # Copy USD resource directories and files
-    foreach(resource_dir ${USTC_CG_ADD_LIB_USD_RESOURCE_DIRS})
+    foreach(resource_dir ${RUZINO_ADD_LIB_USD_RESOURCE_DIRS})
         get_filename_component(absolute_resource_dir ${resource_dir} ABSOLUTE)
         add_custom_command(
             TARGET ${name} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${absolute_resource_dir} ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET}
-            COMMENT "Copying USD resource directory ${absolute_resource_dir} to ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET}"
+            ${absolute_resource_dir} ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET}
+            COMMENT "Copying USD resource directory ${absolute_resource_dir} to ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET}"
         )
     endforeach()
 
-    foreach(resource_file ${USTC_CG_ADD_LIB_USD_RESOURCE_FILES})
+    foreach(resource_file ${RUZINO_ADD_LIB_USD_RESOURCE_FILES})
         get_filename_component(absolute_resource_file ${resource_file} ABSOLUTE)
         add_custom_command(
             TARGET ${name} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${absolute_resource_file} ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET}
-            COMMENT "Copying USD resource file ${absolute_resource_file} to ${USTC_CG_ADD_LIB_RESOURCE_COPY_TARGET}"
+            ${absolute_resource_file} ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET}
+            COMMENT "Copying USD resource file ${absolute_resource_file} to ${RUZINO_ADD_LIB_RESOURCE_COPY_TARGET}"
         )
     endforeach()
 endfunction()

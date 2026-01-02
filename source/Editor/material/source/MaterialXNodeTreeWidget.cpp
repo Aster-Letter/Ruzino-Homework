@@ -15,7 +15,7 @@
 #include "MCore/MaterialXNodeTree.hpp"
 namespace mx = MaterialX;
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 // Based on the dimensions of the dot_color3 node, computed by calling
 // ed::getNodeSize
@@ -1397,4 +1397,4 @@ bool MaterialXNodeTreeWidget::draw_socket_controllers(NodeSocket* input)
     return changed;
 }
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

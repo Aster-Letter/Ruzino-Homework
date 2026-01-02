@@ -38,7 +38,7 @@
 
 #include <format>
 
-namespace USTC_CG
+namespace Ruzino
 {
 namespace settings::detail
 {
@@ -118,4 +118,4 @@ public:
 };
 
 } // namespace settings::detail
-} // namespace USTC_CG
+} // namespace Ruzino

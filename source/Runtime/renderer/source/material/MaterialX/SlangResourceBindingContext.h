@@ -20,7 +20,7 @@ using SlangResourceBindingContextPtr = shared_ptr<class SlangResourceBindingCont
 
 /// @class SlangResourceBindingContext
 /// Class representing a resource binding for Slang shader resources.
-class HD_USTC_CG_API SlangResourceBindingContext : public HwResourceBindingContext
+class HD_RUZINO_API SlangResourceBindingContext : public HwResourceBindingContext
 {
   public:
     SlangResourceBindingContext(size_t uniformBindingLocation, size_t samplerBindingLocation);

@@ -4,7 +4,7 @@
 #include "nvrhi/nvrhi.h"
 #include "program_vars.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
 class GPUCONTEXT_API GPUContext {
    public:
@@ -45,4 +45,4 @@ class GPUCONTEXT_API GPUContext {
     nvrhi::CommandListHandle commandList_;
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE

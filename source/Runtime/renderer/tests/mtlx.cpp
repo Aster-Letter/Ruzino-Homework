@@ -47,7 +47,7 @@ TEST(MATERIALX, shader_gen)
     mx::DocumentPtr libraries = mx::createDocument();
     mx::loadLibraries({ "libraries" }, searchPath, libraries);
     mx::loadLibraries(
-        { "usd/hd_USTC_CG/resources/libraries" }, searchPath, libraries);
+        { "usd/hd_RUZINO/resources/libraries" }, searchPath, libraries);
 
     auto str = prettyPrint(libraries);
 
@@ -58,7 +58,7 @@ TEST(MATERIALX, shader_gen)
     mx::GenContext context(mx::SlangShaderGenerator::create());
 
     context.registerSourceCodeSearchPath(searchPath);
-    searchPath.append(FileSearchPath("usd/hd_USTC_CG/resources"));
+    searchPath.append(FileSearchPath("usd/hd_RUZINO/resources"));
     context.registerSourceCodeSearchPath(searchPath);
     checkPixelDependencies(libraries, context);
 }
@@ -133,12 +133,12 @@ TEST(GenShader, SLANG_Implementation)
     mx::GenContext context(mx::SlangShaderGenerator::create());
 
     auto searchPath = mx::getDefaultDataSearchPath();
-    searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
+    searchPath.append(mx::FileSearchPath("usd/hd_RUZINO/resources"));
     context.registerSourceCodeSearchPath(searchPath);
 
     mx::StringSet generatorSkipNodeTypes;
     mx::StringSet generatorSkipNodeDefs;
-    USTC_CG::GenShaderUtil::checkImplementations(
+    Ruzino::GenShaderUtil::checkImplementations(
         context, generatorSkipNodeTypes, generatorSkipNodeDefs, 47);
 }
 
@@ -147,9 +147,9 @@ TEST(GenShader, SLANG_Unique_Names)
     mx::GenContext context(mx::SlangShaderGenerator::create());
     context.registerSourceCodeSearchPath(mx::getDefaultDataSearchPath());
     auto searchPath = mx::getDefaultDataSearchPath();
-    searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
+    searchPath.append(mx::FileSearchPath("usd/hd_RUZINO/resources"));
     context.registerSourceCodeSearchPath(searchPath);
-    USTC_CG::GenShaderUtil::testUniqueNames(context, mx::Stage::PIXEL);
+    Ruzino::GenShaderUtil::testUniqueNames(context, mx::Stage::PIXEL);
 }
 
 TEST(GenShader, Bind_Light_Shaders)
@@ -159,7 +159,7 @@ TEST(GenShader, Bind_Light_Shaders)
     mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
     loadLibraries({ "libraries" }, searchPath, doc);
     mx::loadLibraries(
-        { "usd/hd_USTC_CG/resources/libraries" }, searchPath, doc);
+        { "usd/hd_RUZINO/resources/libraries" }, searchPath, doc);
 
     mx::NodeDefPtr pointLightShader = doc->getNodeDef("ND_point_light");
     mx::NodeDefPtr spotLightShader = doc->getNodeDef("ND_spot_light");
@@ -170,7 +170,7 @@ TEST(GenShader, Bind_Light_Shaders)
     context.registerSourceCodeSearchPath(searchPath);
 
     searchPath = mx::getDefaultDataSearchPath();
-    searchPath.append(mx::FileSearchPath("usd/hd_USTC_CG/resources"));
+    searchPath.append(mx::FileSearchPath("usd/hd_RUZINO/resources"));
     context.registerSourceCodeSearchPath(searchPath);
 
     mx::HwShaderGenerator::bindLightShader(*pointLightShader, 42, context);
@@ -201,7 +201,7 @@ static void generateSlangCode()
     const mx::FilePath logPath(std::string("genslang_") + "generate_test.txt");
 
     bool writeShadersToDisk = true;
-    USTC_CG::GenShaderUtil::SlangShaderGeneratorTester tester(
+    Ruzino::GenShaderUtil::SlangShaderGeneratorTester tester(
         mx::SlangShaderGenerator::create(),
         testRootPaths,
         searchPath,
@@ -216,7 +216,7 @@ static void generateSlangCode()
 
     const mx::GenOptions genOptions;
     mx::FilePath optionsFilePath =
-        searchPath.find("usd/hd_USTC_CG/resources/test_options.mtlx");
+        searchPath.find("usd/hd_RUZINO/resources/test_options.mtlx");
     tester.validate_shader_compile(genOptions, optionsFilePath);
 }
 

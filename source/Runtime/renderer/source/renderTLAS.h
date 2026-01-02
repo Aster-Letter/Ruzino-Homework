@@ -12,12 +12,12 @@
 #include "../nodes/shaders/shaders/Scene/SceneTypes.slang"
 #include "internal/memory/DeviceMemoryPool.hpp"
 
-USTC_CG_NAMESPACE_OPEN_SCOPE
+RUZINO_NAMESPACE_OPEN_SCOPE
 
-class HD_USTC_CG_API Hd_USTC_CG_RenderInstanceCollection {
+class HD_RUZINO_API Hd_RUZINO_RenderInstanceCollection {
    public:
-    explicit Hd_USTC_CG_RenderInstanceCollection();
-    ~Hd_USTC_CG_RenderInstanceCollection();
+    explicit Hd_RUZINO_RenderInstanceCollection();
+    ~Hd_RUZINO_RenderInstanceCollection();
 
     nvrhi::rt::IAccelStruct* get_tlas();
     DescriptorTableManager* get_buffer_descriptor_table() const
@@ -100,4 +100,4 @@ class HD_USTC_CG_API Hd_USTC_CG_RenderInstanceCollection {
     void rebuild_tlas();
 };
 
-USTC_CG_NAMESPACE_CLOSE_SCOPE
+RUZINO_NAMESPACE_CLOSE_SCOPE
