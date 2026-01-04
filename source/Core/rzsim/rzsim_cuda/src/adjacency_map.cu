@@ -15,17 +15,22 @@
 #include "RHI/internal/cuda_extension.hpp"
 #include "rzsim_cuda/adjacency_map.cuh"
 
-
 RUZINO_NAMESPACE_OPEN_SCOPE
 
 namespace rzsim_cuda {
 
-// Kernel to count neighbors for each vertex
-__global__ void count_neighbors_kernel(
+// Directed edge representation used for sorting/unique
+struct Edge {
+    unsigned src;
+    unsigned dst;
+};
+
+// Build directed edges for each face (two per undirected edge)
+__global__ void build_edges_kernel(
     const int* face_vertex_counts,
     const int* face_vertex_indices,
-    unsigned* neighbor_counts,
-    unsigned num_vertices,
+    const unsigned* face_offsets,
+    Edge* edges,
     unsigned num_faces)
 {
     unsigned face_idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -33,64 +38,50 @@ __global__ void count_neighbors_kernel(
         return;
 
     int vertex_count = face_vertex_counts[face_idx];
+    unsigned face_start = face_offsets[face_idx];
+    unsigned edge_base = 2 * face_start;
 
-    // Calculate starting index for this face's vertices
-    unsigned face_start_idx = 0;
-    for (unsigned i = 0; i < face_idx; i++) {
-        face_start_idx += face_vertex_counts[i];
-    }
-
-    // For each edge in the face
     for (int i = 0; i < vertex_count; i++) {
-        int v0_idx = face_vertex_indices[face_start_idx + i];
-        int v1_idx =
-            face_vertex_indices[face_start_idx + (i + 1) % vertex_count];
+        unsigned v0 = face_vertex_indices[face_start + i];
+        unsigned v1 = face_vertex_indices[face_start + (i + 1) % vertex_count];
 
-        // Both directions: v0->v1 and v1->v0
-        atomicAdd(&neighbor_counts[v0_idx], 1);
-        atomicAdd(&neighbor_counts[v1_idx], 1);
+        edges[edge_base + 2 * i] = { v0, v1 };      // v0 -> v1
+        edges[edge_base + 2 * i + 1] = { v1, v0 };  // v1 -> v0
     }
 }
 
-// Kernel to fill the adjacency list
-__global__ void fill_adjacency_kernel(
-    const int* face_vertex_counts,
-    const int* face_vertex_indices,
-    unsigned*
-        neighbor_write_pos,    // Current write positions (will be incremented)
-    const unsigned* offsets,   // Offsets for each vertex
-    unsigned* adjacency_list,  // Output adjacency data
-    unsigned num_vertices,
-    unsigned num_faces)
+// Count degree (unique neighbors) per vertex
+__global__ void count_degrees_kernel(
+    const Edge* edges,
+    unsigned edge_count,
+    unsigned* neighbor_counts)
 {
-    unsigned face_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (face_idx >= num_faces)
+    unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= edge_count)
         return;
 
-    int vertex_count = face_vertex_counts[face_idx];
-    unsigned face_start_idx = 0;
+    unsigned src = edges[idx].src;
+    atomicAdd(&neighbor_counts[src], 1);
+}
 
-    // Calculate starting index for this face's vertices
-    for (unsigned i = 0; i < face_idx; i++) {
-        face_start_idx += face_vertex_counts[i];
-    }
+// Fill adjacency list from unique edges
+__global__ void fill_adjacency_from_edges_kernel(
+    const Edge* edges,
+    unsigned edge_count,
+    unsigned* neighbor_write_pos,
+    const unsigned* offsets,
+    unsigned* adjacency_list)
+{
+    unsigned idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= edge_count)
+        return;
 
-    // For each edge in the face
-    for (int i = 0; i < vertex_count; i++) {
-        int v0_idx = face_vertex_indices[face_start_idx + i];
-        int v1_idx =
-            face_vertex_indices[face_start_idx + (i + 1) % vertex_count];
+    unsigned src = edges[idx].src;
+    unsigned dst = edges[idx].dst;
 
-        // Add v1 as neighbor of v0
-        unsigned offset = offsets[v0_idx];
-        unsigned pos = atomicAdd(&neighbor_write_pos[v0_idx], 1);
-        adjacency_list[offset + 1 + pos] = v1_idx;
-
-        // Add v0 as neighbor of v1
-        offset = offsets[v1_idx];
-        pos = atomicAdd(&neighbor_write_pos[v1_idx], 1);
-        adjacency_list[offset + 1 + pos] = v0_idx;
-    }
+    unsigned offset = offsets[src];
+    unsigned pos = atomicAdd(&neighbor_write_pos[src], 1);
+    adjacency_list[offset + 1 + pos] = dst;
 }
 
 std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
@@ -105,39 +96,83 @@ compute_adjacency_map_gpu(
 
     auto vertex_count = vertices->getDesc().element_count;
     auto face_count = faceVertexCounts->getDesc().element_count;
+    thrust::device_ptr<const int> counts_ptr(
+        reinterpret_cast<const int*>(face_vertex_counts_addr));
+    thrust::device_ptr<const int> indices_ptr(
+        reinterpret_cast<const int*>(face_vertex_indices_addr));
 
-    // Step 1: Count neighbors for each vertex using atomic operations
-    thrust::device_vector<unsigned> neighbor_counts(vertex_count, 0);
+    // Prefix for face vertex indices to avoid per-face loops
+    thrust::device_vector<unsigned> face_offsets(face_count);
+    thrust::exclusive_scan(
+        thrust::device,
+        counts_ptr,
+        counts_ptr + face_count,
+        face_offsets.begin());
+
+    // Total directed edges = 2 * sum(faceVertexCounts)
+    unsigned total_face_vertices =
+        thrust::reduce(thrust::device, counts_ptr, counts_ptr + face_count, 0);
+    unsigned total_directed_edges = 2 * total_face_vertices;
+
+    thrust::device_vector<Edge> edges(total_directed_edges);
 
     int threads_per_block = 256;
-    int blocks = (face_count + threads_per_block - 1) / threads_per_block;
+    int face_blocks = (face_count + threads_per_block - 1) / threads_per_block;
 
-    count_neighbors_kernel<<<blocks, threads_per_block>>>(
+    build_edges_kernel<<<face_blocks, threads_per_block>>>(
         (const int*)face_vertex_counts_addr,
         (const int*)face_vertex_indices_addr,
-        thrust::raw_pointer_cast(neighbor_counts.data()),
-        vertex_count,
+        thrust::raw_pointer_cast(face_offsets.data()),
+        thrust::raw_pointer_cast(edges.data()),
         face_count);
     cudaDeviceSynchronize();
 
-    // Step 2: Compute sizes array (each vertex needs size+1 space for count +
-    // neighbors)
-    thrust::device_vector<unsigned> sizes(vertex_count);
+    // Radix-sort edges by 64-bit key (src<<32 | dst) then unique
+    thrust::device_vector<unsigned long long> keys(total_directed_edges);
+    thrust::transform(
+        thrust::device,
+        edges.begin(),
+        edges.end(),
+        keys.begin(),
+        [] __device__(const Edge& e) {
+            return (static_cast<unsigned long long>(e.src) << 32) |
+                   static_cast<unsigned long long>(e.dst);
+        });
 
+    thrust::sort_by_key(
+        thrust::device, keys.begin(), keys.end(), edges.begin());
+
+    auto unique_pair = thrust::unique_by_key(
+        thrust::device, keys.begin(), keys.end(), edges.begin());
+    keys.erase(unique_pair.first, keys.end());
+    edges.erase(unique_pair.second, edges.end());
+
+    unsigned unique_edge_count = static_cast<unsigned>(edges.size());
+
+    // Degree per vertex after dedup
+    thrust::device_vector<unsigned> neighbor_counts(vertex_count, 0);
+    int edge_blocks =
+        (unique_edge_count + threads_per_block - 1) / threads_per_block;
+
+    count_degrees_kernel<<<edge_blocks, threads_per_block>>>(
+        thrust::raw_pointer_cast(edges.data()),
+        unique_edge_count,
+        thrust::raw_pointer_cast(neighbor_counts.data()));
+    cudaDeviceSynchronize();
+
+    // sizes = degree + 1 (store count first)
+    thrust::device_vector<unsigned> sizes(vertex_count);
     thrust::transform(
         neighbor_counts.begin(),
         neighbor_counts.end(),
         sizes.begin(),
         [] __device__(unsigned count) { return count + 1; });
 
-    // Step 3: Use CUB for high-performance exclusive scan to get offsets
+    // Offsets via CUB exclusive scan
     thrust::device_vector<unsigned> offsets(vertex_count);
 
-    // Allocate temporary storage for CUB
     void* d_temp_storage = nullptr;
     size_t temp_storage_bytes = 0;
-
-    // Query temporary storage size
     cub::DeviceScan::ExclusiveSum(
         d_temp_storage,
         temp_storage_bytes,
@@ -145,10 +180,7 @@ compute_adjacency_map_gpu(
         thrust::raw_pointer_cast(offsets.data()),
         vertex_count);
 
-    // Allocate temporary storage
     thrust::device_vector<char> temp_storage(temp_storage_bytes);
-
-    // Run exclusive scan
     cub::DeviceScan::ExclusiveSum(
         thrust::raw_pointer_cast(temp_storage.data()),
         temp_storage_bytes,
@@ -157,7 +189,6 @@ compute_adjacency_map_gpu(
         vertex_count);
     cudaDeviceSynchronize();
 
-    // Step 4: Calculate total size and allocate output buffer
     unsigned total_size = thrust::reduce(sizes.begin(), sizes.end(), 0u);
 
     cuda::CUDALinearBufferDesc desc;
@@ -167,7 +198,7 @@ compute_adjacency_map_gpu(
     auto result_buffer = cuda::create_cuda_linear_buffer(desc);
     auto result_ptr = (unsigned*)result_buffer->get_device_ptr();
 
-    // Step 5: Fill count field for each vertex at its offset position
+    // Write counts at offsets
     thrust::for_each(
         thrust::device,
         thrust::make_zip_iterator(
@@ -180,17 +211,14 @@ compute_adjacency_map_gpu(
             result_ptr[offset] = count;
         });
 
-    // Step 6: Fill adjacency list - reset write positions and call fill kernel
-    thrust::fill(neighbor_counts.begin(), neighbor_counts.end(), 0);
-
-    fill_adjacency_kernel<<<blocks, threads_per_block>>>(
-        (const int*)face_vertex_counts_addr,
-        (const int*)face_vertex_indices_addr,
-        thrust::raw_pointer_cast(neighbor_counts.data()),
+    // Fill neighbors
+    thrust::device_vector<unsigned> neighbor_write_pos(vertex_count, 0);
+    fill_adjacency_from_edges_kernel<<<edge_blocks, threads_per_block>>>(
+        thrust::raw_pointer_cast(edges.data()),
+        unique_edge_count,
+        thrust::raw_pointer_cast(neighbor_write_pos.data()),
         thrust::raw_pointer_cast(offsets.data()),
-        result_ptr,
-        vertex_count,
-        face_count);
+        result_ptr);
     cudaDeviceSynchronize();
 
     // Create offset buffer for random access
@@ -201,11 +229,11 @@ compute_adjacency_map_gpu(
     auto offset_buffer = cuda::create_cuda_linear_buffer(offset_desc);
     auto offset_ptr = (unsigned*)offset_buffer->get_device_ptr();
 
-    // Copy offsets from device vector to buffer
-    cudaMemcpy(offset_ptr,
-               thrust::raw_pointer_cast(offsets.data()),
-               vertex_count * sizeof(unsigned),
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpy(
+        offset_ptr,
+        thrust::raw_pointer_cast(offsets.data()),
+        vertex_count * sizeof(unsigned),
+        cudaMemcpyDeviceToDevice);
     cudaDeviceSynchronize();
 
     return std::make_tuple(result_buffer, offset_buffer);
