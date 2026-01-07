@@ -34,15 +34,11 @@ class CUDALinearBuffer : public nvrhi::RefCounter<cuda::ICUDALinearBuffer> {
 CUDALinearBuffer::CUDALinearBuffer(const cuda::CUDALinearBufferDesc& in_desc)
     : desc(in_desc)
 {
-    spdlog::info(
-        "Allocating vMem of size(MB) : {}",
-        desc.element_size * desc.element_count / 1024 / 1024.f);
     d_vec.resize(desc.element_size * desc.element_count);
 }
 
 CUDALinearBuffer::~CUDALinearBuffer()
 {
-    spdlog::info("Freeing vMem of size(MB) : {}", d_vec.size() / 1024 / 1024.f);
     d_vec.clear();
 }
 
