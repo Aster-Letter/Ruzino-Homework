@@ -387,17 +387,202 @@ void compute_gradient_gpu(
     }
 }
 
+// Custom 3x3 symmetric eigenvalue decomposition using Jacobi rotation
+// This is needed because Eigen's SelfAdjointEigenSolver doesn't work on CUDA device
+__device__ void eigen_decomposition_3x3(
+    const Eigen::Matrix3f& A,
+    Eigen::Vector3f& eigenvalues,
+    Eigen::Matrix3f& eigenvectors)
+{
+    const int MAX_ITER = 50;
+    const float EPSILON = 1e-10f;
+    
+    // Initialize eigenvectors as identity
+    eigenvectors.setIdentity();
+    
+    // Copy A to working matrix
+    Eigen::Matrix3f a = A;
+    
+    // Jacobi rotation
+    for (int iter = 0; iter < MAX_ITER; iter++) {
+        // Find largest off-diagonal element
+        float max_offdiag = 0.0f;
+        int p = 0, q = 1;
+        
+        for (int i = 0; i < 3; i++) {
+            for (int j = i + 1; j < 3; j++) {
+                float abs_aij = fabsf(a(i, j));
+                if (abs_aij > max_offdiag) {
+                    max_offdiag = abs_aij;
+                    p = i;
+                    q = j;
+                }
+            }
+        }
+        
+        // Check convergence
+        if (max_offdiag < EPSILON) {
+            break;
+        }
+        
+        // Compute rotation angle
+        float diff = a(q, q) - a(p, p);
+        float theta = 0.5f * atan2f(2.0f * a(p, q), diff);
+        float c = cosf(theta);
+        float s = sinf(theta);
+        
+        // Apply rotation to a: a = J^T * a * J
+        Eigen::Matrix3f J;
+        J.setIdentity();
+        J(p, p) = c;
+        J(q, q) = c;
+        J(p, q) = s;
+        J(q, p) = -s;
+        
+        a = J.transpose() * a * J;
+        
+        // Accumulate eigenvectors
+        eigenvectors = eigenvectors * J;
+    }
+    
+    // Extract eigenvalues from diagonal
+    eigenvalues(0) = a(0, 0);
+    eigenvalues(1) = a(1, 1);
+    eigenvalues(2) = a(2, 2);
+}
+
+// Custom PSD projection for 3x3 symmetric matrix
+__device__ Eigen::Matrix3f project_psd_custom(const Eigen::Matrix3f& H, int debug_sid = -1)
+{
+    Eigen::Vector3f eigenvalues;
+    Eigen::Matrix3f eigenvectors;
+    
+    // Compute eigendecomposition
+    eigen_decomposition_3x3(H, eigenvalues, eigenvectors);
+    
+    if (debug_sid == 0) {
+        printf("[GPU PSD Custom] Input matrix H:\n");
+        printf("  [%.6e %.6e %.6e]\n", H(0,0), H(0,1), H(0,2));
+        printf("  [%.6e %.6e %.6e]\n", H(1,0), H(1,1), H(1,2));
+        printf("  [%.6e %.6e %.6e]\n", H(2,0), H(2,1), H(2,2));
+        printf("[GPU PSD Custom] Eigenvalues: [%.6e, %.6e, %.6e]\n", 
+               eigenvalues(0), eigenvalues(1), eigenvalues(2));
+    }
+    
+    // Clamp negative eigenvalues to zero
+    for (int i = 0; i < 3; i++) {
+        if (eigenvalues(i) < 0.0f) {
+            eigenvalues(i) = 0.0f;
+        }
+    }
+    
+    if (debug_sid == 0) {
+        printf("[GPU PSD Custom] After clamping: [%.6e, %.6e, %.6e]\n", 
+               eigenvalues(0), eigenvalues(1), eigenvalues(2));
+    }
+    
+    // Reconstruct: H_psd = V * Lambda * V^T
+    Eigen::Matrix3f result = eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
+    
+    if (debug_sid == 0) {
+        printf("[GPU PSD Custom] Output matrix:\n");
+        printf("  [%.6e %.6e %.6e]\n", result(0,0), result(0,1), result(0,2));
+        printf("  [%.6e %.6e %.6e]\n", result(1,0), result(1,1), result(1,2));
+        printf("  [%.6e %.6e %.6e]\n", result(2,0), result(2,1), result(2,2));
+    }
+    
+    return result;
+}
+
+// Test kernel to verify custom eigensolver works on device
+__global__ void test_eigen_solver_kernel()
+{
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        printf("\n========== TESTING CUSTOM 3x3 EIGENSOLVER ==========\n");
+        
+        // Test 1: Diagonal matrix with known eigenvalues
+        Eigen::Matrix3f test1;
+        test1 << 12000.0f, 0.0f, 0.0f,
+                 0.0f, 0.0f, 0.0f,
+                 0.0f, 0.0f, 0.0f;
+        
+        printf("[TEST 1] Input diagonal matrix: diag(12000, 0, 0)\n");
+        
+        Eigen::Vector3f evals1;
+        Eigen::Matrix3f evecs1;
+        eigen_decomposition_3x3(test1, evals1, evecs1);
+        printf("  Computed eigenvalues: [%.6e, %.6e, %.6e]\n", evals1(0), evals1(1), evals1(2));
+        printf("  Expected: [0, 0, 12000] (in some order)\n");
+        
+        // Reconstruct and verify
+        Eigen::Matrix3f reconstructed1 = evecs1 * evals1.asDiagonal() * evecs1.transpose();
+        printf("  Reconstruction error: %.6e\n", (reconstructed1 - test1).norm());
+        
+        // Test 2: Symmetric matrix
+        Eigen::Matrix3f test2;
+        test2 << 4.0f, 1.0f, 0.0f,
+                 1.0f, 3.0f, 0.0f,
+                 0.0f, 0.0f, 2.0f;
+        
+        printf("[TEST 2] Input symmetric matrix:\n");
+        printf("  [4 1 0; 1 3 0; 0 0 2]\n");
+        
+        Eigen::Vector3f evals2;
+        Eigen::Matrix3f evecs2;
+        eigen_decomposition_3x3(test2, evals2, evecs2);
+        printf("  Computed eigenvalues: [%.6e, %.6e, %.6e]\n", evals2(0), evals2(1), evals2(2));
+        
+        Eigen::Matrix3f reconstructed2 = evecs2 * evals2.asDiagonal() * evecs2.transpose();
+        printf("  Reconstruction error: %.6e\n", (reconstructed2 - test2).norm());
+        
+        // Test 3: PSD projection with negative eigenvalue
+        Eigen::Matrix3f test3;
+        test3 << 2.0f, 1.0f, 0.0f,
+                 1.0f, -1.0f, 0.0f,
+                 0.0f, 0.0f, 3.0f;
+        
+        printf("[TEST 3] Matrix with negative eigenvalue:\n");
+        Eigen::Matrix3f projected3 = project_psd_custom(test3);
+        printf("  Output should be PSD\n");
+        
+        // Verify it's PSD by checking eigenvalues
+        Eigen::Vector3f evals3_check;
+        Eigen::Matrix3f evecs3_check;
+        eigen_decomposition_3x3(projected3, evals3_check, evecs3_check);
+        printf("  Final eigenvalues: [%.6e, %.6e, %.6e]\n", 
+               evals3_check(0), evals3_check(1), evals3_check(2));
+        printf("  All should be >= 0\n");
+        
+        printf("========== CUSTOM EIGENSOLVER TEST COMPLETE ==========\n\n");
+    }
+}
+
 // Kernel to compute 3x3 eigenvalues and eigenvectors using analytical solution
-__device__ Eigen::Matrix3f project_psd(const Eigen::Matrix3f& H)
+__device__ Eigen::Matrix3f project_psd(const Eigen::Matrix3f& H, int debug_sid = -1)
 {
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigensolver(H);
     Eigen::Vector3f eigenvalues = eigensolver.eigenvalues();
     Eigen::Matrix3f eigenvectors = eigensolver.eigenvectors();
 
+    if (debug_sid == 0) {
+        printf("[GPU PSD] Input matrix H:\n");
+        printf("  [%.6e %.6e %.6e]\n", H(0,0), H(0,1), H(0,2));
+        printf("  [%.6e %.6e %.6e]\n", H(1,0), H(1,1), H(1,2));
+        printf("  [%.6e %.6e %.6e]\n", H(2,0), H(2,1), H(2,2));
+        printf("[GPU PSD] Eigenvalues: [%.6e, %.6e, %.6e]\n", 
+               eigenvalues(0), eigenvalues(1), eigenvalues(2));
+        printf("[GPU PSD] Solver info: %d\n", (int)eigensolver.info());
+    }
+
     // Clamp negative eigenvalues to zero
     for (int i = 0; i < 3; i++) {
         if (eigenvalues(i) < 0.0f)
             eigenvalues(i) = 0.0f;
+    }
+
+    if (debug_sid == 0) {
+        printf("[GPU PSD] After clamping: [%.6e, %.6e, %.6e]\n", 
+               eigenvalues(0), eigenvalues(1), eigenvalues(2));
     }
 
     // Reconstruct: H_psd = V * Lambda * V^T
@@ -445,12 +630,36 @@ __global__ void compute_spring_hessian_kernel(
         2.0f * k / l0_sq *
         (2.0f * outer + (diff_sq - l0_sq) * Eigen::Matrix3f::Identity());
 
-    // PSD projection using Eigen on device
-    H_diff = project_psd(H_diff);
+    // Debug for first spring (sid == 0) which should contribute to (0,0)
+    if (sid == 0) {
+        printf("[GPU Spring 0] vi=%d, vj=%d, k=%.2f, l0=%.6f\n", vi, vj, k, l0);
+        printf("[GPU Spring 0] diff_sq=%.6f, l0_sq=%.6f\n", diff_sq, l0_sq);
+        printf("[GPU Spring 0] H_diff before PSD:\n");
+        for (int r = 0; r < 3; r++) {
+            printf("  [%d,%d %d,%d %d,%d] = [%.6e %.6e %.6e]\n", 
+                   r, 0, r, 1, r, 2, H_diff(r, 0), H_diff(r, 1), H_diff(r, 2));
+        }
+    }
+
+    // Use custom PSD projection (Eigen's solver doesn't work on CUDA device)
+    H_diff = project_psd_custom(H_diff, sid);
+
+    if (sid == 0) {
+        printf("[GPU Spring 0] H_diff after PSD:\n");
+        for (int r = 0; r < 3; r++) {
+            printf("  [%d,%d %d,%d %d,%d] = [%.6e %.6e %.6e]\n", 
+                   r, 0, r, 1, r, 2, H_diff(r, 0), H_diff(r, 1), H_diff(r, 2));
+        }
+    }
 
     // Scale by dt^2
     float scale = dt * dt;
     H_diff *= scale;
+
+    if (sid == 0) {
+        printf("[GPU Spring 0] H_diff after dt^2 scaling (dt=%.6f, scale=%.6e):\n", dt, scale);
+        printf("  H_diff(0,0) = %.6e\n", H_diff(0, 0));
+    }
 
     // Write triplets for 6x6 block (4 3x3 blocks)
     int base_idx = sid * 36;  // Each spring contributes 36 triplets (4 blocks * 9 entries)
@@ -502,10 +711,11 @@ __global__ void add_mass_diagonal_kernel(
     if (tid >= num_particles * 3)
         return;
 
+    int particle_id = tid / 3;  // M_diag is per-particle, not per-DOF
     float regularization = 1e-6f;
     triplet_rows[offset + tid] = tid;
     triplet_cols[offset + tid] = tid;
-    triplet_vals[offset + tid] = M_diag[tid] + regularization;
+    triplet_vals[offset + tid] = M_diag[particle_id] + regularization;
 }
 
 // Kernel to convert COO to CSR format
@@ -592,6 +802,16 @@ CSRMatrix assemble_hessian_gpu(
     printf("[GPU] Assembling Hessian: %d particles, %d springs\n", num_particles, num_springs);
     printf("[GPU] dt = %.6f, stiffness = %.6f\n", dt, stiffness);
 
+    // Run Eigen solver test ONCE
+    static bool eigen_test_done = false;
+    if (!eigen_test_done) {
+        printf("\n========== TESTING EIGEN SOLVER ON DEVICE ==========\n");
+        test_eigen_solver_kernel<<<1, 1>>>();
+        cudaDeviceSynchronize();
+        printf("========== EIGEN TEST COMPLETE ==========\n\n");
+        eigen_test_done = true;
+    }
+
     // Calculate total number of triplets
     // Mass matrix: num_particles * 3 diagonal entries  
     // Spring contributions: num_springs * 36 entries (4 blocks * 9)
@@ -642,6 +862,50 @@ CSRMatrix assemble_hessian_gpu(
     size_t total_triplets = num_mass_triplets + max_spring_triplets;
 
     printf("[GPU] Total allocated triplets: %zu\n", total_triplets);
+
+    // Debug: Check mass matrix contribution at offset
+    int mass_offset = max_spring_triplets;
+    std::vector<int> mass_rows(10);
+    std::vector<int> mass_cols(10);
+    std::vector<float> mass_vals(10);
+    thrust::copy(thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + mass_offset,
+                 thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + mass_offset + 10,
+                 mass_rows.begin());
+    thrust::copy(thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + mass_offset,
+                 thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + mass_offset + 10,
+                 mass_cols.begin());
+    thrust::copy(thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + mass_offset,
+                 thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + mass_offset + 10,
+                 mass_vals.begin());
+    printf("[GPU] Mass matrix triplets (at offset %d):\n", mass_offset);
+    for (int i = 0; i < 10; i++) {
+        printf("  [%d] (%d, %d) = %.6e\n", mass_offset + i, mass_rows[i], mass_cols[i], mass_vals[i]);
+    }
+
+    // Debug: Search for all (0,0) entries in spring triplets
+    std::vector<int> spring_rows(std::min(100, (int)max_spring_triplets));
+    std::vector<int> spring_cols(std::min(100, (int)max_spring_triplets));
+    std::vector<float> spring_vals(std::min(100, (int)max_spring_triplets));
+    thrust::copy(thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()),
+                 thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + std::min(100, (int)max_spring_triplets),
+                 spring_rows.begin());
+    thrust::copy(thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()),
+                 thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + std::min(100, (int)max_spring_triplets),
+                 spring_cols.begin());
+    thrust::copy(thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()),
+                 thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + std::min(100, (int)max_spring_triplets),
+                 spring_vals.begin());
+    printf("[GPU] Searching first 100 spring triplets for (0,0) contributions:\n");
+    int count_00 = 0;
+    float sum_00 = 0.0f;
+    for (int i = 0; i < std::min(100, (int)max_spring_triplets); i++) {
+        if (spring_rows[i] == 0 && spring_cols[i] == 0) {
+            printf("  [%d] (0, 0) = %.6e\n", i, spring_vals[i]);
+            count_00++;
+            sum_00 += spring_vals[i];
+        }
+    }
+    printf("[GPU] Found %d (0,0) entries in first 100, sum = %.6e\n", count_00, sum_00);
 
     // Check for CUDA errors before sorting
     cudaError_t err = cudaGetLastError();
