@@ -379,16 +379,11 @@ void compute_gradient_gpu(
         grad->get_device_ptr<float>());
 
     cudaDeviceSynchronize();
-
-    // Debug: print first few gradient values
-    std::vector<float> grad_host = grad->get_host_vector<float>();
-    for (int i = 0; i < std::min(10, (int)grad_host.size()); i++) {
-        printf("  grad[%d] = %.6e\n", i, grad_host[i]);
-    }
 }
 
 // Custom 3x3 symmetric eigenvalue decomposition using Jacobi rotation
-// This is needed because Eigen's SelfAdjointEigenSolver doesn't work on CUDA device
+// This is needed because Eigen's SelfAdjointEigenSolver doesn't work on CUDA
+// device
 __device__ void eigen_decomposition_3x3(
     const Eigen::Matrix3f& A,
     Eigen::Vector3f& eigenvalues,
@@ -396,19 +391,19 @@ __device__ void eigen_decomposition_3x3(
 {
     const int MAX_ITER = 50;
     const float EPSILON = 1e-10f;
-    
+
     // Initialize eigenvectors as identity
     eigenvectors.setIdentity();
-    
+
     // Copy A to working matrix
     Eigen::Matrix3f a = A;
-    
+
     // Jacobi rotation
     for (int iter = 0; iter < MAX_ITER; iter++) {
         // Find largest off-diagonal element
         float max_offdiag = 0.0f;
         int p = 0, q = 1;
-        
+
         for (int i = 0; i < 3; i++) {
             for (int j = i + 1; j < 3; j++) {
                 float abs_aij = fabsf(a(i, j));
@@ -419,18 +414,18 @@ __device__ void eigen_decomposition_3x3(
                 }
             }
         }
-        
+
         // Check convergence
         if (max_offdiag < EPSILON) {
             break;
         }
-        
+
         // Compute rotation angle
         float diff = a(q, q) - a(p, p);
         float theta = 0.5f * atan2f(2.0f * a(p, q), diff);
         float c = cosf(theta);
         float s = sinf(theta);
-        
+
         // Apply rotation to a: a = J^T * a * J
         Eigen::Matrix3f J;
         J.setIdentity();
@@ -438,13 +433,13 @@ __device__ void eigen_decomposition_3x3(
         J(q, q) = c;
         J(p, q) = s;
         J(q, p) = -s;
-        
+
         a = J.transpose() * a * J;
-        
+
         // Accumulate eigenvectors
         eigenvectors = eigenvectors * J;
     }
-    
+
     // Extract eigenvalues from diagonal
     eigenvalues(0) = a(0, 0);
     eigenvalues(1) = a(1, 1);
@@ -452,137 +447,39 @@ __device__ void eigen_decomposition_3x3(
 }
 
 // Custom PSD projection for 3x3 symmetric matrix
-__device__ Eigen::Matrix3f project_psd_custom(const Eigen::Matrix3f& H, int debug_sid = -1)
+__device__ Eigen::Matrix3f project_psd_custom(const Eigen::Matrix3f& H)
 {
     Eigen::Vector3f eigenvalues;
     Eigen::Matrix3f eigenvectors;
-    
+
     // Compute eigendecomposition
     eigen_decomposition_3x3(H, eigenvalues, eigenvectors);
-    
-    if (debug_sid == 0) {
-        printf("[GPU PSD Custom] Input matrix H:\n");
-        printf("  [%.6e %.6e %.6e]\n", H(0,0), H(0,1), H(0,2));
-        printf("  [%.6e %.6e %.6e]\n", H(1,0), H(1,1), H(1,2));
-        printf("  [%.6e %.6e %.6e]\n", H(2,0), H(2,1), H(2,2));
-        printf("[GPU PSD Custom] Eigenvalues: [%.6e, %.6e, %.6e]\n", 
-               eigenvalues(0), eigenvalues(1), eigenvalues(2));
-    }
-    
+
     // Clamp negative eigenvalues to zero
     for (int i = 0; i < 3; i++) {
         if (eigenvalues(i) < 0.0f) {
             eigenvalues(i) = 0.0f;
         }
     }
-    
-    if (debug_sid == 0) {
-        printf("[GPU PSD Custom] After clamping: [%.6e, %.6e, %.6e]\n", 
-               eigenvalues(0), eigenvalues(1), eigenvalues(2));
-    }
-    
+
     // Reconstruct: H_psd = V * Lambda * V^T
-    Eigen::Matrix3f result = eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
-    
-    if (debug_sid == 0) {
-        printf("[GPU PSD Custom] Output matrix:\n");
-        printf("  [%.6e %.6e %.6e]\n", result(0,0), result(0,1), result(0,2));
-        printf("  [%.6e %.6e %.6e]\n", result(1,0), result(1,1), result(1,2));
-        printf("  [%.6e %.6e %.6e]\n", result(2,0), result(2,1), result(2,2));
-    }
-    
+    Eigen::Matrix3f result =
+        eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
+
     return result;
 }
 
-// Test kernel to verify custom eigensolver works on device
-__global__ void test_eigen_solver_kernel()
-{
-    if (threadIdx.x == 0 && blockIdx.x == 0) {
-        printf("\n========== TESTING CUSTOM 3x3 EIGENSOLVER ==========\n");
-        
-        // Test 1: Diagonal matrix with known eigenvalues
-        Eigen::Matrix3f test1;
-        test1 << 12000.0f, 0.0f, 0.0f,
-                 0.0f, 0.0f, 0.0f,
-                 0.0f, 0.0f, 0.0f;
-        
-        printf("[TEST 1] Input diagonal matrix: diag(12000, 0, 0)\n");
-        
-        Eigen::Vector3f evals1;
-        Eigen::Matrix3f evecs1;
-        eigen_decomposition_3x3(test1, evals1, evecs1);
-        printf("  Computed eigenvalues: [%.6e, %.6e, %.6e]\n", evals1(0), evals1(1), evals1(2));
-        printf("  Expected: [0, 0, 12000] (in some order)\n");
-        
-        // Reconstruct and verify
-        Eigen::Matrix3f reconstructed1 = evecs1 * evals1.asDiagonal() * evecs1.transpose();
-        printf("  Reconstruction error: %.6e\n", (reconstructed1 - test1).norm());
-        
-        // Test 2: Symmetric matrix
-        Eigen::Matrix3f test2;
-        test2 << 4.0f, 1.0f, 0.0f,
-                 1.0f, 3.0f, 0.0f,
-                 0.0f, 0.0f, 2.0f;
-        
-        printf("[TEST 2] Input symmetric matrix:\n");
-        printf("  [4 1 0; 1 3 0; 0 0 2]\n");
-        
-        Eigen::Vector3f evals2;
-        Eigen::Matrix3f evecs2;
-        eigen_decomposition_3x3(test2, evals2, evecs2);
-        printf("  Computed eigenvalues: [%.6e, %.6e, %.6e]\n", evals2(0), evals2(1), evals2(2));
-        
-        Eigen::Matrix3f reconstructed2 = evecs2 * evals2.asDiagonal() * evecs2.transpose();
-        printf("  Reconstruction error: %.6e\n", (reconstructed2 - test2).norm());
-        
-        // Test 3: PSD projection with negative eigenvalue
-        Eigen::Matrix3f test3;
-        test3 << 2.0f, 1.0f, 0.0f,
-                 1.0f, -1.0f, 0.0f,
-                 0.0f, 0.0f, 3.0f;
-        
-        printf("[TEST 3] Matrix with negative eigenvalue:\n");
-        Eigen::Matrix3f projected3 = project_psd_custom(test3);
-        printf("  Output should be PSD\n");
-        
-        // Verify it's PSD by checking eigenvalues
-        Eigen::Vector3f evals3_check;
-        Eigen::Matrix3f evecs3_check;
-        eigen_decomposition_3x3(projected3, evals3_check, evecs3_check);
-        printf("  Final eigenvalues: [%.6e, %.6e, %.6e]\n", 
-               evals3_check(0), evals3_check(1), evals3_check(2));
-        printf("  All should be >= 0\n");
-        
-        printf("========== CUSTOM EIGENSOLVER TEST COMPLETE ==========\n\n");
-    }
-}
-
 // Kernel to compute 3x3 eigenvalues and eigenvectors using analytical solution
-__device__ Eigen::Matrix3f project_psd(const Eigen::Matrix3f& H, int debug_sid = -1)
+__device__ Eigen::Matrix3f project_psd(const Eigen::Matrix3f& H)
 {
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigensolver(H);
     Eigen::Vector3f eigenvalues = eigensolver.eigenvalues();
     Eigen::Matrix3f eigenvectors = eigensolver.eigenvectors();
 
-    if (debug_sid == 0) {
-        printf("[GPU PSD] Input matrix H:\n");
-        printf("  [%.6e %.6e %.6e]\n", H(0,0), H(0,1), H(0,2));
-        printf("  [%.6e %.6e %.6e]\n", H(1,0), H(1,1), H(1,2));
-        printf("  [%.6e %.6e %.6e]\n", H(2,0), H(2,1), H(2,2));
-        printf("[GPU PSD] Eigenvalues: [%.6e, %.6e, %.6e]\n", 
-               eigenvalues(0), eigenvalues(1), eigenvalues(2));
-        printf("[GPU PSD] Solver info: %d\n", (int)eigensolver.info());
-    }
-
     // Clamp negative eigenvalues to zero
     for (int i = 0; i < 3; i++) {
         if (eigenvalues(i) < 0.0f)
             eigenvalues(i) = 0.0f;
-    }
-
-    if (debug_sid == 0) {
-        printf("[GPU PSD] After clamping: [%.6e, %.6e, %.6e]\n", 
-               eigenvalues(0), eigenvalues(1), eigenvalues(2));
     }
 
     // Reconstruct: H_psd = V * Lambda * V^T
@@ -631,20 +528,21 @@ __global__ void compute_spring_hessian_kernel(
         (2.0f * outer + (diff_sq - l0_sq) * Eigen::Matrix3f::Identity());
 
     // Use custom PSD projection (Eigen's solver doesn't work on CUDA device)
-    H_diff = project_psd_custom(H_diff, sid);
+    H_diff = project_psd_custom(H_diff);
 
     // Scale by dt^2
     float scale = dt * dt;
     H_diff *= scale;
 
     // Write triplets for 6x6 block (4 3x3 blocks)
-    int base_idx = sid * 36;  // Each spring contributes 36 triplets (4 blocks * 9 entries)
+    int base_idx =
+        sid * 36;  // Each spring contributes 36 triplets (4 blocks * 9 entries)
     int count = 0;
 
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 3; ++c) {
             float val = H_diff(r, c);
-            
+
             // Block (vi, vi)
             triplet_rows[base_idx + count] = vi * 3 + r;
             triplet_cols[base_idx + count] = vi * 3 + c;
@@ -754,10 +652,13 @@ struct KeyEqual {
 // Functor to atomically increment row counts
 struct IncrementRowCount {
     int* row_offsets;
-    
-    IncrementRowCount(int* offsets) : row_offsets(offsets) {}
-    
-    __device__ void operator()(int row) {
+
+    IncrementRowCount(int* offsets) : row_offsets(offsets)
+    {
+    }
+
+    __device__ void operator()(int row)
+    {
         atomicAdd(&row_offsets[row + 1], 1);
     }
 };
@@ -775,34 +676,28 @@ CSRMatrix assemble_hessian_gpu(
     int num_springs = springs->getDesc().element_count / 2;
     int n = num_particles * 3;
 
-    printf("[GPU] Assembling Hessian: %d particles, %d springs\n", num_particles, num_springs);
-    printf("[GPU] dt = %.6f, stiffness = %.6f\n", dt, stiffness);
-
-    // Run Eigen solver test ONCE
-    static bool eigen_test_done = false;
-    if (!eigen_test_done) {
-        printf("\n========== TESTING EIGEN SOLVER ON DEVICE ==========\n");
-        test_eigen_solver_kernel<<<1, 1>>>();
-        cudaDeviceSynchronize();
-        printf("========== EIGEN TEST COMPLETE ==========\n\n");
-        eigen_test_done = true;
-    }
-
     // Calculate total number of triplets
-    // Mass matrix: num_particles * 3 diagonal entries  
+    // Mass matrix: num_particles * 3 diagonal entries
     // Spring contributions: num_springs * 36 entries (4 blocks * 9)
     int num_mass_triplets = num_particles * 3;
     size_t max_spring_triplets = (size_t)num_springs * 36;
     size_t max_total_triplets = num_mass_triplets + max_spring_triplets;
 
-    printf("[GPU] Allocating %zu triplets (%d mass + %zu spring)\n", 
-           max_total_triplets, num_mass_triplets, max_spring_triplets);
+    printf(
+        "[GPU] Allocating %zu triplets (%d mass + %zu spring)\n",
+        max_total_triplets,
+        num_mass_triplets,
+        max_spring_triplets);
 
     // Allocate temporary buffers for triplets
-    auto d_triplet_rows = cuda::create_cuda_linear_buffer<int>(max_total_triplets);
-    auto d_triplet_cols = cuda::create_cuda_linear_buffer<int>(max_total_triplets);
-    auto d_triplet_vals = cuda::create_cuda_linear_buffer<float>(max_total_triplets);
-    auto d_num_triplets_per_spring = cuda::create_cuda_linear_buffer<int>(num_springs);
+    auto d_triplet_rows =
+        cuda::create_cuda_linear_buffer<int>(max_total_triplets);
+    auto d_triplet_cols =
+        cuda::create_cuda_linear_buffer<int>(max_total_triplets);
+    auto d_triplet_vals =
+        cuda::create_cuda_linear_buffer<float>(max_total_triplets);
+    auto d_num_triplets_per_spring =
+        cuda::create_cuda_linear_buffer<int>(num_springs);
 
     // Compute spring Hessian blocks
     int block_size = 256;
@@ -844,52 +739,44 @@ CSRMatrix assemble_hessian_gpu(
     std::vector<int> mass_rows(10);
     std::vector<int> mass_cols(10);
     std::vector<float> mass_vals(10);
-    thrust::copy(thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + mass_offset,
-                 thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + mass_offset + 10,
-                 mass_rows.begin());
-    thrust::copy(thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + mass_offset,
-                 thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + mass_offset + 10,
-                 mass_cols.begin());
-    thrust::copy(thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + mass_offset,
-                 thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + mass_offset + 10,
-                 mass_vals.begin());
-    printf("[GPU] Mass matrix triplets (at offset %d):\n", mass_offset);
-    for (int i = 0; i < 10; i++) {
-        printf("  [%d] (%d, %d) = %.6e\n", mass_offset + i, mass_rows[i], mass_cols[i], mass_vals[i]);
-    }
+    thrust::copy(
+        thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) +
+            mass_offset,
+        thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) +
+            mass_offset + 10,
+        mass_rows.begin());
+    thrust::copy(
+        thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) +
+            mass_offset,
+        thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) +
+            mass_offset + 10,
+        mass_cols.begin());
+    thrust::copy(
+        thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) +
+            mass_offset,
+        thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) +
+            mass_offset + 10,
+        mass_vals.begin());
 
     // Debug: Search for all (0,0) entries in spring triplets
     std::vector<int> spring_rows(std::min(100, (int)max_spring_triplets));
     std::vector<int> spring_cols(std::min(100, (int)max_spring_triplets));
     std::vector<float> spring_vals(std::min(100, (int)max_spring_triplets));
-    thrust::copy(thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()),
-                 thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) + std::min(100, (int)max_spring_triplets),
-                 spring_rows.begin());
-    thrust::copy(thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()),
-                 thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) + std::min(100, (int)max_spring_triplets),
-                 spring_cols.begin());
-    thrust::copy(thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()),
-                 thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) + std::min(100, (int)max_spring_triplets),
-                 spring_vals.begin());
-    printf("[GPU] Searching first 100 spring triplets for (0,0) contributions:\n");
-    int count_00 = 0;
-    float sum_00 = 0.0f;
-    for (int i = 0; i < std::min(100, (int)max_spring_triplets); i++) {
-        if (spring_rows[i] == 0 && spring_cols[i] == 0) {
-            printf("  [%d] (0, 0) = %.6e\n", i, spring_vals[i]);
-            count_00++;
-            sum_00 += spring_vals[i];
-        }
-    }
-    printf("[GPU] Found %d (0,0) entries in first 100, sum = %.6e\n", count_00, sum_00);
-
-    // Check for CUDA errors before sorting
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("[GPU ERROR] Before sort: %s\n", cudaGetErrorString(err));
-        result.nnz = 0;
-        return result;
-    }
+    thrust::copy(
+        thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()),
+        thrust::device_ptr<int>(d_triplet_rows->get_device_ptr<int>()) +
+            std::min(100, (int)max_spring_triplets),
+        spring_rows.begin());
+    thrust::copy(
+        thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()),
+        thrust::device_ptr<int>(d_triplet_cols->get_device_ptr<int>()) +
+            std::min(100, (int)max_spring_triplets),
+        spring_cols.begin());
+    thrust::copy(
+        thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()),
+        thrust::device_ptr<float>(d_triplet_vals->get_device_ptr<float>()) +
+            std::min(100, (int)max_spring_triplets),
+        spring_vals.begin());
 
     // Sort triplets by (row, col) using Thrust
     thrust::device_ptr<int> rows_ptr(d_triplet_rows->get_device_ptr<int>());
@@ -910,8 +797,8 @@ CSRMatrix assemble_hessian_gpu(
     thrust::device_vector<int> unique_cols(total_triplets);
     thrust::device_vector<float> unique_vals(total_triplets);
 
-    auto key_begin = thrust::make_zip_iterator(
-        thrust::make_tuple(rows_ptr, cols_ptr));
+    auto key_begin =
+        thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
     auto key_end = key_begin + total_triplets;
 
     auto new_end = thrust::reduce_by_key(
@@ -933,19 +820,18 @@ CSRMatrix assemble_hessian_gpu(
     std::vector<int> debug_rows(std::min(20, nnz));
     std::vector<int> debug_cols(std::min(20, nnz));
     std::vector<float> debug_vals(std::min(20, nnz));
-    thrust::copy(unique_rows.begin(), unique_rows.begin() + std::min(20, nnz),
-                 debug_rows.begin());
-    thrust::copy(unique_cols.begin(), unique_cols.begin() + std::min(20, nnz),
-                 debug_cols.begin());
-    thrust::copy(unique_vals.begin(), unique_vals.begin() + std::min(20, nnz),
-                 debug_vals.begin());
-    printf("[GPU] First 20 triplets after reduction (sorted by row,col):\n");
-    int row0_count = 0;
-    for (int i = 0; i < std::min(20, nnz); i++) {
-        printf("  (%d, %d) = %.6e\n", debug_rows[i], debug_cols[i], debug_vals[i]);
-        if (debug_rows[i] == 0) row0_count++;
-    }
-    printf("[GPU] Row 0 has %d entries in first 20 triplets\n", row0_count);
+    thrust::copy(
+        unique_rows.begin(),
+        unique_rows.begin() + std::min(20, nnz),
+        debug_rows.begin());
+    thrust::copy(
+        unique_cols.begin(),
+        unique_cols.begin() + std::min(20, nnz),
+        debug_cols.begin());
+    thrust::copy(
+        unique_vals.begin(),
+        unique_vals.begin() + std::min(20, nnz),
+        debug_vals.begin());
 
     // Convert to CSR format
     result.num_rows = n;
@@ -957,40 +843,52 @@ CSRMatrix assemble_hessian_gpu(
     result.row_offsets = cuda::create_cuda_linear_buffer<int>(n + 1);
 
     // Copy unique cols and vals
-    thrust::copy(unique_cols.begin(), unique_cols.begin() + nnz,
-                 thrust::device_ptr<int>(result.col_indices->get_device_ptr<int>()));
-    thrust::copy(unique_vals.begin(), unique_vals.begin() + nnz,
-                 thrust::device_ptr<float>(result.values->get_device_ptr<float>()));
+    thrust::copy(
+        unique_cols.begin(),
+        unique_cols.begin() + nnz,
+        thrust::device_ptr<int>(result.col_indices->get_device_ptr<int>()));
+    thrust::copy(
+        unique_vals.begin(),
+        unique_vals.begin() + nnz,
+        thrust::device_ptr<float>(result.values->get_device_ptr<float>()));
 
     // Build row_offsets: histogram approach
-    thrust::device_ptr<int> row_offsets_ptr(result.row_offsets->get_device_ptr<int>());
+    thrust::device_ptr<int> row_offsets_ptr(
+        result.row_offsets->get_device_ptr<int>());
     int* row_offsets_raw = thrust::raw_pointer_cast(row_offsets_ptr);
-    
+
     // Initialize all row_offsets to 0
     thrust::fill(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, 0);
-    
+
     // Count entries per row using histogram
     thrust::device_ptr<int> unique_rows_ptr(unique_rows.data());
     int* unique_rows_raw = thrust::raw_pointer_cast(unique_rows_ptr);
-    
+
     thrust::for_each(
         thrust::device,
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(nnz),
-        [row_offsets_raw, unique_rows_raw] __device__ (int idx) {
+        [row_offsets_raw, unique_rows_raw] __device__(int idx) {
             int row = unique_rows_raw[idx];
             atomicAdd(&row_offsets_raw[row], 1);
         });
-    
+
     cudaDeviceSynchronize();
 
     // Compute prefix sum to get row offsets
     thrust::exclusive_scan(
-        thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, row_offsets_ptr);
+        thrust::device,
+        row_offsets_ptr,
+        row_offsets_ptr + n + 1,
+        row_offsets_ptr);
 
     cudaDeviceSynchronize();
 
-    printf("[GPU] CSR assembly complete: %dx%d matrix with %d non-zeros\n", n, n, nnz);
+    printf(
+        "[GPU] CSR assembly complete: %dx%d matrix with %d non-zeros\n",
+        n,
+        n,
+        nnz);
 
     return result;
 }
@@ -1007,25 +905,26 @@ __global__ void compute_spring_energy_kernel(
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
     if (sid >= num_springs)
         return;
-    
+
     int vi = springs[sid * 2];
     int vj = springs[sid * 2 + 1];
     float l0 = rest_lengths[sid];
-    
+
     // Get positions
-    float xi[3] = {x_curr[vi * 3], x_curr[vi * 3 + 1], x_curr[vi * 3 + 2]};
-    float xj[3] = {x_curr[vj * 3], x_curr[vj * 3 + 1], x_curr[vj * 3 + 2]};
-    
+    float xi[3] = { x_curr[vi * 3], x_curr[vi * 3 + 1], x_curr[vi * 3 + 2] };
+    float xj[3] = { x_curr[vj * 3], x_curr[vj * 3 + 1], x_curr[vj * 3 + 2] };
+
     // Compute current length
-    float diff[3] = {xi[0] - xj[0], xi[1] - xj[1], xi[2] - xj[2]};
+    float diff[3] = { xi[0] - xj[0], xi[1] - xj[1], xi[2] - xj[2] };
     float l = sqrtf(diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]);
-    
+
     // Spring energy: 0.5 * k * (l - l0)^2
     float stretch = l - l0;
     spring_energies[sid] = 0.5f * stiffness * stretch * stretch;
 }
 
-// Compute total energy: E = 0.5 * M * ||x - x_tilde||^2 + spring_energy - f_ext^T * x
+// Compute total energy: E = 0.5 * M * ||x - x_tilde||^2 + spring_energy -
+// f_ext^T * x
 float compute_energy_gpu(
     cuda::CUDALinearBufferHandle x_curr,
     cuda::CUDALinearBufferHandle x_tilde,
@@ -1039,30 +938,35 @@ float compute_energy_gpu(
 {
     int n = num_particles * 3;
     int num_springs = springs->getDesc().element_count / 2;
-    
+
     float* x_ptr = reinterpret_cast<float*>(x_curr->get_device_ptr());
     float* x_tilde_ptr = reinterpret_cast<float*>(x_tilde->get_device_ptr());
     float* M_ptr = reinterpret_cast<float*>(M_diag->get_device_ptr());
     float* f_ptr = reinterpret_cast<float*>(f_ext->get_device_ptr());
-    
+
     // Compute inertial energy: 0.5 * M * ||x - x_tilde||^2
     auto d_inertial_terms = cuda::create_cuda_linear_buffer<float>(n);
-    float* inertial_ptr = reinterpret_cast<float*>(d_inertial_terms->get_device_ptr());
-    
-    cuda::GPUParallelFor("compute_inertial_energy", n, GPU_LAMBDA_Ex(int i) {
-        int particle_id = i / 3;
-        float diff = x_ptr[i] - x_tilde_ptr[i];
-        inertial_ptr[i] = 0.5f * M_ptr[particle_id] * diff * diff;
-    });
-    
+    float* inertial_ptr =
+        reinterpret_cast<float*>(d_inertial_terms->get_device_ptr());
+
+    cuda::GPUParallelFor(
+        "compute_inertial_energy", n, GPU_LAMBDA_Ex(int i) {
+            int particle_id = i / 3;
+            float diff = x_ptr[i] - x_tilde_ptr[i];
+            inertial_ptr[i] = 0.5f * M_ptr[particle_id] * diff * diff;
+        });
+
     // Sum inertial energy
     thrust::device_ptr<float> d_inertial_thrust(inertial_ptr);
-    float E_inertial = thrust::reduce(d_inertial_thrust, d_inertial_thrust + n, 0.0f);
-    
+    float E_inertial =
+        thrust::reduce(d_inertial_thrust, d_inertial_thrust + n, 0.0f);
+
     // Compute spring energy
-    auto d_spring_energies = cuda::create_cuda_linear_buffer<float>(num_springs);
-    float* spring_energy_ptr = reinterpret_cast<float*>(d_spring_energies->get_device_ptr());
-    
+    auto d_spring_energies =
+        cuda::create_cuda_linear_buffer<float>(num_springs);
+    float* spring_energy_ptr =
+        reinterpret_cast<float*>(d_spring_energies->get_device_ptr());
+
     int block_size = 256;
     int num_blocks = (num_springs + block_size - 1) / block_size;
     compute_spring_energy_kernel<<<num_blocks, block_size>>>(
@@ -1072,26 +976,30 @@ float compute_energy_gpu(
         stiffness,
         num_springs,
         spring_energy_ptr);
-    
+
     cudaDeviceSynchronize();
-    
+
     // Sum spring energy
     thrust::device_ptr<float> d_spring_thrust(spring_energy_ptr);
-    float E_spring = thrust::reduce(d_spring_thrust, d_spring_thrust + num_springs, 0.0f);
-    
+    float E_spring =
+        thrust::reduce(d_spring_thrust, d_spring_thrust + num_springs, 0.0f);
+
     // Compute potential energy: -f_ext^T * x
     auto d_potential_terms = cuda::create_cuda_linear_buffer<float>(n);
-    float* potential_ptr = reinterpret_cast<float*>(d_potential_terms->get_device_ptr());
-    
-    cuda::GPUParallelFor("compute_potential_energy", n, GPU_LAMBDA_Ex(int i) {
-        potential_ptr[i] = -f_ptr[i] * x_ptr[i] * dt * dt;
-    });
-    
+    float* potential_ptr =
+        reinterpret_cast<float*>(d_potential_terms->get_device_ptr());
+
+    cuda::GPUParallelFor(
+        "compute_potential_energy", n, GPU_LAMBDA_Ex(int i) {
+            potential_ptr[i] = -f_ptr[i] * x_ptr[i] * dt * dt;
+        });
+
     thrust::device_ptr<float> d_potential_thrust(potential_ptr);
-    float E_potential = thrust::reduce(d_potential_thrust, d_potential_thrust + n, 0.0f);
-    
+    float E_potential =
+        thrust::reduce(d_potential_thrust, d_potential_thrust + n, 0.0f);
+
     float total_energy = E_inertial + E_spring + E_potential;
-    
+
     return total_energy;
 }
 

@@ -1,20 +1,11 @@
 file(GLOB test_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-# Exclude test_hessian_gpu.cpp from automatic processing
-list(REMOVE_ITEM test_sources ${CMAKE_CURRENT_SOURCE_DIR}/test_hessian_gpu.cpp)
-
 foreach(source ${test_sources})
     UCG_ADD_APP(
         SRC ${source}
         LIBS usdview_widget nodes_system GUI usd nodes_ui_imgui geometry MCore usdImaging usdImagingGL stb_image
     )
 endforeach()
-
-# Add special target for test_hessian_gpu with rzsim_cuda dependency
-UCG_ADD_APP(
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/test_hessian_gpu.cpp
-    LIBS rzsim_cuda RHI
-)
 
 add_dependencies(headless_render hd_RUZINO)
 add_dependencies(headless_render render_nodes)
@@ -26,29 +17,29 @@ add_dependencies(Ruzino optimization)
 add_dependencies(Ruzino hd_RUZINO)
 add_dependencies(Ruzino render_nodes)
 # add_dependencies(Ruzino gl_based_render_nodes)
- add_dependencies(Ruzino RZFemBemNodes)
- target_link_libraries(Ruzino PUBLIC rzpython)
+add_dependencies(Ruzino RZFemBemNodes)
+target_link_libraries(Ruzino PUBLIC rzpython)
 
 
-if (RUZINO_WITH_POLYSCOPE)
-target_link_libraries(RUZINO_polyscope PUBLIC polyscope_widget)
+if(RUZINO_WITH_POLYSCOPE)
+    target_link_libraries(RUZINO_polyscope PUBLIC polyscope_widget)
 
-add_dependencies(RUZINO_polyscope geometry_nodes)
-add_dependencies(RUZINO_polyscope basic_nodes)
-add_dependencies(RUZINO_polyscope polyscope_nodes)
-add_dependencies(RUZINO_polyscope optimization)
+    add_dependencies(RUZINO_polyscope geometry_nodes)
+    add_dependencies(RUZINO_polyscope basic_nodes)
+    add_dependencies(RUZINO_polyscope polyscope_nodes)
+    add_dependencies(RUZINO_polyscope optimization)
 
-if (ENABLE_SUBMISSION)
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../submissions_inner)
-        message(STATUS "[Inner submissions found]")
-    
-    add_dependencies(RUZINO_polyscope submissions_inner_nodes)
-    add_dependencies(Ruzino submissions_inner_nodes)
-    endif ()
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../submissions)
-        message(STATUS "[Outer submissions found]")
-    add_dependencies(RUZINO_polyscope submissions_nodes)
-    add_dependencies(Ruzino submissions_nodes)
-    endif ()
-endif ()
-endif (RUZINO_WITH_POLYSCOPE)
+    if(ENABLE_SUBMISSION)
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../submissions_inner)
+            message(STATUS "[Inner submissions found]")
+
+            add_dependencies(RUZINO_polyscope submissions_inner_nodes)
+            add_dependencies(Ruzino submissions_inner_nodes)
+        endif()
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../submissions)
+            message(STATUS "[Outer submissions found]")
+            add_dependencies(RUZINO_polyscope submissions_nodes)
+            add_dependencies(Ruzino submissions_nodes)
+        endif()
+    endif()
+endif(RUZINO_WITH_POLYSCOPE)
