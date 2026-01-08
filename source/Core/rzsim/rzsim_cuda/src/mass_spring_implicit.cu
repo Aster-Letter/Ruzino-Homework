@@ -171,6 +171,82 @@ cuda::CUDALinearBufferHandle build_edge_set_gpu(
     return output_buffer;
 }
 
+// Build per-vertex spring adjacency: for each vertex, store list of spring indices it belongs to
+std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+build_vertex_spring_adjacency_gpu(
+    cuda::CUDALinearBufferHandle springs,
+    int num_particles)
+{
+    int num_springs = springs->getDesc().element_count / 2;
+    const int* springs_ptr = springs->get_device_ptr<int>();
+
+    // Count springs per vertex
+    auto d_spring_count = cuda::create_cuda_linear_buffer<int>(num_particles);
+    int* count_ptr = d_spring_count->get_device_ptr<int>();
+
+    // Initialize counts to zero
+    cudaMemset(count_ptr, 0, num_particles * sizeof(int));
+
+    // Count: each spring contributes to 2 vertices
+    cuda::GPUParallelFor(
+        "count_springs_per_vertex", num_springs, GPU_LAMBDA_Ex(int s) {
+            int i = springs_ptr[s * 2];
+            int j = springs_ptr[s * 2 + 1];
+            atomicAdd(&count_ptr[i], 1);
+            atomicAdd(&count_ptr[j], 1);
+        });
+
+    // Build offset buffer (prefix sum)
+    auto d_offsets = cuda::create_cuda_linear_buffer<int>(num_particles + 1);
+    int* offsets_ptr = d_offsets->get_device_ptr<int>();
+
+    thrust::device_ptr<int> count_thrust(count_ptr);
+    thrust::device_ptr<int> offsets_thrust(offsets_ptr);
+    thrust::exclusive_scan(
+        thrust::device, count_thrust, count_thrust + num_particles, offsets_thrust);
+
+    // Get total count for last offset
+    int total_entries;
+    cudaMemcpy(
+        &total_entries,
+        count_ptr + num_particles - 1,
+        sizeof(int),
+        cudaMemcpyDeviceToHost);
+    int last_offset;
+    cudaMemcpy(
+        &last_offset, offsets_ptr + num_particles - 1, sizeof(int), cudaMemcpyDeviceToHost);
+    total_entries += last_offset;
+    cudaMemcpy(
+        offsets_ptr + num_particles, &total_entries, sizeof(int), cudaMemcpyHostToDevice);
+
+    // Allocate spring indices array
+    auto d_spring_indices =
+        cuda::create_cuda_linear_buffer<int>(total_entries);
+    int* indices_ptr = d_spring_indices->get_device_ptr<int>();
+
+    // Reset counts for filling
+    cudaMemset(count_ptr, 0, num_particles * sizeof(int));
+
+    // Fill spring indices: each spring adds itself to both vertices
+    cuda::GPUParallelFor(
+        "fill_spring_indices", num_springs, GPU_LAMBDA_Ex(int s) {
+            int i = springs_ptr[s * 2];
+            int j = springs_ptr[s * 2 + 1];
+
+            // Add spring index to vertex i's list
+            int pos_i = offsets_ptr[i] + atomicAdd(&count_ptr[i], 1);
+            indices_ptr[pos_i] = s;
+
+            // Add spring index to vertex j's list
+            int pos_j = offsets_ptr[j] + atomicAdd(&count_ptr[j], 1);
+            indices_ptr[pos_j] = s;
+        });
+
+    cudaDeviceSynchronize();
+
+    return { d_spring_indices, d_offsets };
+}
+
 // Kernel to compute explicit step: x_tilde = x + dt * v
 __global__ void explicit_step_kernel(
     const float* x,
@@ -283,7 +359,71 @@ cuda::CUDALinearBufferHandle compute_rest_lengths_gpu(
     return rest_lengths_buffer;
 }
 
-// Kernel to compute gradient
+// Optimized gradient kernel using per-vertex spring adjacency
+__global__ void compute_gradient_kernel_optimized(
+    const float* x_curr,
+    const float* x_tilde,
+    const float* M_diag,
+    const float* f_ext,
+    const int* springs,
+    const float* rest_lengths,
+    const int* spring_indices_per_vertex,
+    const int* vertex_spring_offsets,
+    float stiffness,
+    float dt,
+    int num_particles,
+    float* grad)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= num_particles)
+        return;
+
+    // Initialize with inertial term: M * (x - x_tilde)
+    grad[tid * 3 + 0] =
+        M_diag[tid * 3 + 0] * (x_curr[tid * 3 + 0] - x_tilde[tid * 3 + 0]);
+    grad[tid * 3 + 1] =
+        M_diag[tid * 3 + 1] * (x_curr[tid * 3 + 1] - x_tilde[tid * 3 + 1]);
+    grad[tid * 3 + 2] =
+        M_diag[tid * 3 + 2] * (x_curr[tid * 3 + 2] - x_tilde[tid * 3 + 2]);
+
+    // Add spring forces - only iterate over springs connected to this vertex
+    int start = vertex_spring_offsets[tid];
+    int end = vertex_spring_offsets[tid + 1];
+
+    for (int idx = start; idx < end; ++idx) {
+        int s = spring_indices_per_vertex[idx];
+
+        int i = springs[s * 2];
+        int j = springs[s * 2 + 1];
+        float l0 = rest_lengths[s];
+        float l0_sq = l0 * l0;
+
+        float dx = x_curr[i * 3 + 0] - x_curr[j * 3 + 0];
+        float dy = x_curr[i * 3 + 1] - x_curr[j * 3 + 1];
+        float dz = x_curr[i * 3 + 2] - x_curr[j * 3 + 2];
+        float diff_sq = dx * dx + dy * dy + dz * dz;
+
+        float factor = 2.0f * stiffness * (diff_sq / l0_sq - 1.0f) * dt * dt;
+
+        if (i == tid) {
+            grad[tid * 3 + 0] += factor * dx;
+            grad[tid * 3 + 1] += factor * dy;
+            grad[tid * 3 + 2] += factor * dz;
+        }
+        else {  // j == tid
+            grad[tid * 3 + 0] -= factor * dx;
+            grad[tid * 3 + 1] -= factor * dy;
+            grad[tid * 3 + 2] -= factor * dz;
+        }
+    }
+
+    // Subtract external forces
+    grad[tid * 3 + 0] -= dt * dt * f_ext[tid * 3 + 0];
+    grad[tid * 3 + 1] -= dt * dt * f_ext[tid * 3 + 1];
+    grad[tid * 3 + 2] -= dt * dt * f_ext[tid * 3 + 2];
+}
+
+// Legacy gradient kernel (kept for compatibility, less efficient)
 __global__ void compute_gradient_kernel(
     const float* x_curr,
     const float* x_tilde,
@@ -353,27 +493,28 @@ void compute_gradient_gpu(
     cuda::CUDALinearBufferHandle f_ext,
     cuda::CUDALinearBufferHandle springs,
     cuda::CUDALinearBufferHandle rest_lengths,
+    cuda::CUDALinearBufferHandle spring_indices_per_vertex,
+    cuda::CUDALinearBufferHandle vertex_spring_offsets,
     float stiffness,
     float dt,
     int num_particles,
     cuda::CUDALinearBufferHandle grad)
 {
-    int num_springs = springs->getDesc().element_count / 2;
-
     int block_size = 256;
     int num_blocks = (num_particles + block_size - 1) / block_size;
 
-    compute_gradient_kernel<<<num_blocks, block_size>>>(
+    compute_gradient_kernel_optimized<<<num_blocks, block_size>>>(
         x_curr->get_device_ptr<float>(),
         x_tilde->get_device_ptr<float>(),
         M_diag->get_device_ptr<float>(),
         f_ext->get_device_ptr<float>(),
         springs->get_device_ptr<int>(),
         rest_lengths->get_device_ptr<float>(),
+        spring_indices_per_vertex->get_device_ptr<int>(),
+        vertex_spring_offsets->get_device_ptr<int>(),
         stiffness,
         dt,
         num_particles,
-        num_springs,
         grad->get_device_ptr<float>());
 
     cudaDeviceSynchronize();

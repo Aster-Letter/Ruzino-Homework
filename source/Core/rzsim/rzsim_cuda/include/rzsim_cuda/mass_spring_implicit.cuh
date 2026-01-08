@@ -23,6 +23,15 @@ cuda::CUDALinearBufferHandle build_edge_set_gpu(
     cuda::CUDALinearBufferHandle positions,
     cuda::CUDALinearBufferHandle edges);
 
+// Build per-vertex spring adjacency for efficient gradient/hessian computation
+// Returns: (spring_indices_per_vertex, vertex_spring_offsets)
+// Format: spring_indices_per_vertex[vertex_spring_offsets[v]..vertex_spring_offsets[v+1]] = spring indices for vertex v
+RZSIM_CUDA_API
+std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+build_vertex_spring_adjacency_gpu(
+    cuda::CUDALinearBufferHandle springs,
+    int num_particles);
+
 RZSIM_CUDA_API
 void explicit_step_gpu(
     cuda::CUDALinearBufferHandle x,
@@ -51,6 +60,8 @@ void compute_gradient_gpu(
     cuda::CUDALinearBufferHandle f_ext,
     cuda::CUDALinearBufferHandle springs,
     cuda::CUDALinearBufferHandle rest_lengths,
+    cuda::CUDALinearBufferHandle spring_indices_per_vertex,
+    cuda::CUDALinearBufferHandle vertex_spring_offsets,
     float stiffness,
     float dt,
     int num_particles,

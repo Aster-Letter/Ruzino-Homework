@@ -26,6 +26,10 @@ struct MassSpringImplicitGPUStorage {
     cuda::CUDALinearBufferHandle gradients_buffer;
     cuda::CUDALinearBufferHandle f_ext_buffer;
 
+    // Per-vertex spring adjacency for efficient gradient/hessian computation
+    cuda::CUDALinearBufferHandle spring_indices_per_vertex;
+    cuda::CUDALinearBufferHandle vertex_spring_offsets;
+
     bool initialized = false;
     int num_particles = 0;
 
@@ -136,6 +140,13 @@ NODE_EXECUTION_FUNCTION(mass_spring_implicit_gpu)
         storage.rest_lengths_buffer = rzsim_cuda::compute_rest_lengths_gpu(
             storage.positions_buffer, storage.springs_buffer);
 
+        // Build per-vertex spring adjacency for efficient gradient computation
+        auto [spring_indices, vertex_offsets] =
+            rzsim_cuda::build_vertex_spring_adjacency_gpu(
+                storage.springs_buffer, num_particles);
+        storage.spring_indices_per_vertex = spring_indices;
+        storage.vertex_spring_offsets = vertex_offsets;
+
         storage.initialized = true;
         storage.num_particles = num_particles;
     }
@@ -182,6 +193,8 @@ NODE_EXECUTION_FUNCTION(mass_spring_implicit_gpu)
                 d_f_ext,
                 d_springs,
                 d_rest_lengths,
+                storage.spring_indices_per_vertex,
+                storage.vertex_spring_offsets,
                 stiffness,
                 dt_sub,
                 num_particles,
