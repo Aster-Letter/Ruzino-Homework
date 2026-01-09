@@ -54,6 +54,87 @@ struct MassSpringImplicitGPUStorage {
     int num_particles = 0;
 
     constexpr static bool has_storage = false;
+
+    // Initialize all GPU buffers and structures
+    void initialize(
+        const std::vector<glm::vec3>& positions,
+        const std::vector<int>& face_vertex_indices,
+        const std::vector<int>& face_counts,
+        float mass)
+    {
+        num_particles = positions.size();
+
+        // Write positions to GPU buffer
+        positions_buffer = cuda::create_cuda_linear_buffer(positions);
+
+        // Initialize velocities to zero
+        std::vector<glm::vec3> initial_velocities(
+            num_particles, glm::vec3(0.0f));
+        velocities_buffer = cuda::create_cuda_linear_buffer(initial_velocities);
+
+        next_positions_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        gradients_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        f_ext_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+
+        // Create mass matrix (diagonal with mass value per DOF, matching CPU)
+        std::vector<float> mass_diag(num_particles * 3, mass);
+        mass_matrix_buffer = cuda::create_cuda_linear_buffer(mass_diag);
+
+        // Cache face topology buffers
+        face_vertex_indices_buffer =
+            cuda::create_cuda_linear_buffer(face_vertex_indices);
+        face_counts_buffer = cuda::create_cuda_linear_buffer(face_counts);
+        normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
+            face_vertex_indices.size());
+
+        auto triangles = cuda::create_cuda_linear_buffer(face_vertex_indices);
+
+        // Build adjacency list directly from triangles
+        auto [adjacent_vertices, vertex_offsets, rest_lengths] =
+            rzsim_cuda::build_adjacency_list_gpu(
+                triangles, positions_buffer, num_particles);
+
+        adjacent_vertices_buffer = adjacent_vertices;
+        vertex_offsets_buffer = vertex_offsets;
+        rest_lengths_buffer = rest_lengths;
+
+        // Build CSR structure once (this is the key optimization!)
+        // Sparsity pattern is fixed, so we only need to update values later
+        hessian_structure = rzsim_cuda::build_hessian_structure_gpu(
+            adjacent_vertices_buffer, vertex_offsets_buffer, num_particles);
+
+        // Allocate values buffer (will be filled each iteration)
+        hessian_values =
+            cuda::create_cuda_linear_buffer<float>(hessian_structure.nnz);
+
+        // Allocate temporary buffers for Newton iterations (reused)
+        x_new_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        newton_direction_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        neg_gradient_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        x_candidate_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+
+        // Allocate temporary buffers for energy computation
+        inertial_terms_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        // Spring energies are computed per-vertex (not per-adjacency)
+        spring_energies_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles);
+        potential_terms_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+
+        // Create solver instance once
+        solver = Ruzino::Solver::SolverFactory::create(
+            Ruzino::Solver::SolverType::CUDA_CG);
+
+        initialized = true;
+    }
 };
 
 NODE_DECLARATION_FUNCTION(mass_spring_implicit_gpu)
@@ -130,81 +211,7 @@ NODE_EXECUTION_FUNCTION(mass_spring_implicit_gpu)
 
     // Initialize buffers only once or when particle count changes
     if (!storage.initialized || storage.num_particles != num_particles) {
-        // Write positions to GPU buffer
-        storage.positions_buffer = cuda::create_cuda_linear_buffer(positions);
-
-        // Initialize velocities to zero
-        std::vector<glm::vec3> initial_velocities(
-            num_particles, glm::vec3(0.0f));
-        storage.velocities_buffer =
-            cuda::create_cuda_linear_buffer(initial_velocities);
-
-        storage.next_positions_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        storage.gradients_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        storage.f_ext_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-
-        // Create mass matrix (diagonal with mass value per DOF, matching CPU)
-        std::vector<float> mass_diag(num_particles * 3, mass);
-        storage.mass_matrix_buffer = cuda::create_cuda_linear_buffer(mass_diag);
-
-        // Cache face topology buffers
-        storage.face_vertex_indices_buffer =
-            cuda::create_cuda_linear_buffer(face_vertex_indices);
-        storage.face_counts_buffer =
-            cuda::create_cuda_linear_buffer(face_counts);
-        storage.normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
-            face_vertex_indices.size());
-
-        auto triangles = cuda::create_cuda_linear_buffer(face_vertex_indices);
-
-        // Build adjacency list directly from triangles
-        auto [adjacent_vertices, vertex_offsets, rest_lengths] =
-            rzsim_cuda::build_adjacency_list_gpu(
-                triangles, storage.positions_buffer, num_particles);
-
-        storage.adjacent_vertices_buffer = adjacent_vertices;
-        storage.vertex_offsets_buffer = vertex_offsets;
-        storage.rest_lengths_buffer = rest_lengths;
-
-        // NEW: Build CSR structure once (this is the key optimization!)
-        // Sparsity pattern is fixed, so we only need to update values later
-        storage.hessian_structure = rzsim_cuda::build_hessian_structure_gpu(
-            storage.adjacent_vertices_buffer,
-            storage.vertex_offsets_buffer,
-            num_particles);
-
-        // Allocate values buffer (will be filled each iteration)
-        storage.hessian_values = cuda::create_cuda_linear_buffer<float>(
-            storage.hessian_structure.nnz);
-
-        // Allocate temporary buffers for Newton iterations (reused)
-        storage.x_new_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        storage.newton_direction_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        storage.neg_gradient_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        storage.x_candidate_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-
-        // Allocate temporary buffers for energy computation
-        storage.inertial_terms_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        // Spring energies are computed per-vertex (not per-adjacency)
-        storage.spring_energies_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles);
-        storage.potential_terms_buffer =
-            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-
-        // Create solver instance once
-        storage.solver = Ruzino::Solver::SolverFactory::create(
-            Ruzino::Solver::SolverType::CUDA_CG);
-
-        storage.initialized = true;
-        storage.num_particles = num_particles;
+        storage.initialize(positions, face_vertex_indices, face_counts, mass);
     }
 
     auto d_positions = storage.positions_buffer;
