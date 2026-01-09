@@ -554,347 +554,6 @@ __device__ Eigen::Matrix3f project_psd_custom(const Eigen::Matrix3f& H)
     return result;
 }
 
-// Kernel to compute triplets for spring Hessian blocks
-__global__ void compute_spring_hessian_kernel(
-    const float* x_curr,
-    const int* springs,
-    const float* rest_lengths,
-    float stiffness,
-    float dt,
-    int num_springs,
-    int* triplet_rows,
-    int* triplet_cols,
-    float* triplet_vals,
-    int* num_triplets_per_spring)
-{
-    int sid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (sid >= num_springs)
-        return;
-
-    int vi = springs[sid * 2];
-    int vj = springs[sid * 2 + 1];
-    float l0 = rest_lengths[sid];
-
-    if (l0 < 1e-10f) {
-        num_triplets_per_spring[sid] = 0;
-        return;
-    }
-
-    float k = stiffness;
-    float l0_sq = l0 * l0;
-
-    // Get positions
-    Eigen::Vector3f xi(x_curr[vi * 3], x_curr[vi * 3 + 1], x_curr[vi * 3 + 2]);
-    Eigen::Vector3f xj(x_curr[vj * 3], x_curr[vj * 3 + 1], x_curr[vj * 3 + 2]);
-    Eigen::Vector3f diff = xi - xj;
-    float diff_sq = diff.squaredNorm();
-
-    // H_diff = 2*k/l0^2 * (2*outer(diff,diff) + (diff_sq - l0^2)*I)
-    Eigen::Matrix3f outer = diff * diff.transpose();
-    Eigen::Matrix3f H_diff =
-        2.0f * k / l0_sq *
-        (2.0f * outer + (diff_sq - l0_sq) * Eigen::Matrix3f::Identity());
-
-    // TEMPORARY: Disable PSD projection to debug
-    // Use custom PSD projection (Eigen's solver doesn't work on CUDA device)
-    H_diff = project_psd_custom(H_diff);
-
-    // Scale by dt^2
-    float scale = dt * dt;
-    H_diff *= scale;
-
-    // Write triplets for 6x6 block (4 3x3 blocks)
-    int base_idx =
-        sid * 36;  // Each spring contributes 36 triplets (4 blocks * 9 entries)
-    int count = 0;
-
-    for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 3; ++c) {
-            float val = H_diff(r, c);
-
-            // Block (vi, vi)
-            triplet_rows[base_idx + count] = vi * 3 + r;
-            triplet_cols[base_idx + count] = vi * 3 + c;
-            triplet_vals[base_idx + count] = val;
-            count++;
-
-            // Block (vi, vj)
-            triplet_rows[base_idx + count] = vi * 3 + r;
-            triplet_cols[base_idx + count] = vj * 3 + c;
-            triplet_vals[base_idx + count] = -val;
-            count++;
-
-            // Block (vj, vi)
-            triplet_rows[base_idx + count] = vj * 3 + r;
-            triplet_cols[base_idx + count] = vi * 3 + c;
-            triplet_vals[base_idx + count] = -val;
-            count++;
-
-            // Block (vj, vj)
-            triplet_rows[base_idx + count] = vj * 3 + r;
-            triplet_cols[base_idx + count] = vj * 3 + c;
-            triplet_vals[base_idx + count] = val;
-            count++;
-        }
-    }
-
-    num_triplets_per_spring[sid] = count;
-}
-
-// Kernel to add mass matrix diagonal
-__global__ void add_mass_diagonal_kernel(
-    const float* M_diag,
-    int num_particles,
-    int* triplet_rows,
-    int* triplet_cols,
-    float* triplet_vals,
-    int offset)
-{
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= num_particles * 3)
-        return;
-
-    // M_diag is per-DOF (matching CPU implementation)
-    float regularization = 1e-6f;  // Matching CPU regularization
-    triplet_rows[offset + tid] = tid;
-    triplet_cols[offset + tid] = tid;
-    triplet_vals[offset + tid] = M_diag[tid] + regularization;
-}
-
-// Kernel to convert COO to CSR format
-__global__ void coo_to_csr_kernel(
-    const int* row_indices,
-    int nnz,
-    int num_rows,
-    int* row_offsets)
-{
-    // Initialize row_offsets
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid <= num_rows) {
-        row_offsets[tid] = 0;
-    }
-    __syncthreads();
-
-    if (tid < nnz) {
-        int row = row_indices[tid];
-        atomicAdd(&row_offsets[row + 1], 1);
-    }
-}
-
-// Kernel to compute prefix sum for row offsets
-__global__ void prefix_sum_kernel(int* row_offsets, int num_rows)
-{
-    // Simple sequential prefix sum (for small matrices)
-    // For large matrices, use thrust::exclusive_scan
-    if (threadIdx.x == 0 && blockIdx.x == 0) {
-        for (int i = 1; i <= num_rows; ++i) {
-            row_offsets[i] += row_offsets[i - 1];
-        }
-    }
-}
-
-// Functor for sorting triplets by (row, col)
-struct TripletComparator {
-    __host__ __device__ bool operator()(
-        const thrust::tuple<int, int, float>& a,
-        const thrust::tuple<int, int, float>& b) const
-    {
-        int row_a = thrust::get<0>(a);
-        int row_b = thrust::get<0>(b);
-        if (row_a != row_b)
-            return row_a < row_b;
-        return thrust::get<1>(a) < thrust::get<1>(b);
-    }
-};
-
-// Functor for comparing keys in reduce_by_key
-struct KeyEqual {
-    __host__ __device__ bool operator()(
-        const thrust::tuple<int, int>& a,
-        const thrust::tuple<int, int>& b) const
-    {
-        return thrust::get<0>(a) == thrust::get<0>(b) &&
-               thrust::get<1>(a) == thrust::get<1>(b);
-    }
-};
-
-// Functor to atomically increment row counts
-struct IncrementRowCount {
-    int* row_offsets;
-
-    IncrementRowCount(int* offsets) : row_offsets(offsets)
-    {
-    }
-
-    __device__ void operator()(int row)
-    {
-        atomicAdd(&row_offsets[row + 1], 1);
-    }
-};
-
-CSRMatrix assemble_hessian_gpu(
-    cuda::CUDALinearBufferHandle x_curr,
-    cuda::CUDALinearBufferHandle M_diag,
-    cuda::CUDALinearBufferHandle springs,
-    cuda::CUDALinearBufferHandle rest_lengths,
-    float stiffness,
-    float dt,
-    int num_particles,
-    cuda::CUDALinearBufferHandle d_triplet_rows,
-    cuda::CUDALinearBufferHandle d_triplet_cols,
-    cuda::CUDALinearBufferHandle d_triplet_vals,
-    cuda::CUDALinearBufferHandle d_unique_rows,
-    cuda::CUDALinearBufferHandle d_unique_cols,
-    cuda::CUDALinearBufferHandle d_unique_vals)
-{
-    CSRMatrix result;
-    int num_springs = springs->getDesc().element_count / 2;
-    int n = num_particles * 3;
-
-    // Calculate total number of triplets
-    // Mass matrix: num_particles * 3 diagonal entries
-    // Spring contributions: num_springs * 36 entries (4 blocks * 9)
-    int num_mass_triplets = num_particles * 3;
-    size_t max_spring_triplets = (size_t)num_springs * 36;
-
-    // Use pre-allocated buffers instead of creating new ones
-    auto d_num_triplets_per_spring =
-        cuda::create_cuda_linear_buffer<int>(num_springs);
-
-    // Compute spring Hessian blocks
-    int block_size = 256;
-    int num_blocks = (num_springs + block_size - 1) / block_size;
-
-    compute_spring_hessian_kernel<<<num_blocks, block_size>>>(
-        x_curr->get_device_ptr<float>(),
-        springs->get_device_ptr<int>(),
-        rest_lengths->get_device_ptr<float>(),
-        stiffness,
-        dt,
-        num_springs,
-        d_triplet_rows->get_device_ptr<int>(),
-        d_triplet_cols->get_device_ptr<int>(),
-        d_triplet_vals->get_device_ptr<float>(),
-        d_num_triplets_per_spring->get_device_ptr<int>());
-
-    cudaDeviceSynchronize();
-
-    // Add mass matrix diagonal
-    int mass_blocks = (num_mass_triplets + block_size - 1) / block_size;
-    add_mass_diagonal_kernel<<<mass_blocks, block_size>>>(
-        M_diag->get_device_ptr<float>(),
-        num_particles,
-        d_triplet_rows->get_device_ptr<int>(),
-        d_triplet_cols->get_device_ptr<int>(),
-        d_triplet_vals->get_device_ptr<float>(),
-        max_spring_triplets);
-
-    cudaDeviceSynchronize();
-
-    // Total number of triplets (all valid ones)
-    size_t total_triplets = num_mass_triplets + max_spring_triplets;
-
-    // Get device pointers
-    thrust::device_ptr<int> rows_ptr(d_triplet_rows->get_device_ptr<int>());
-    thrust::device_ptr<int> cols_ptr(d_triplet_cols->get_device_ptr<int>());
-    thrust::device_ptr<float> vals_ptr(d_triplet_vals->get_device_ptr<float>());
-
-    // Optimization: Use stable_sort_by_key which is faster and preserves order
-    // Sort by (row, col) - first sort by col, then by row for correct ordering
-    thrust::stable_sort_by_key(
-        thrust::device,
-        cols_ptr,
-        cols_ptr + total_triplets,
-        thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, vals_ptr)));
-    
-    thrust::stable_sort_by_key(
-        thrust::device,
-        rows_ptr,
-        rows_ptr + total_triplets,
-        thrust::make_zip_iterator(thrust::make_tuple(cols_ptr, vals_ptr)));
-
-    cudaDeviceSynchronize();
-
-    // Use pre-allocated unique buffers
-    thrust::device_ptr<int> unique_rows_ptr(
-        d_unique_rows->get_device_ptr<int>());
-    thrust::device_ptr<int> unique_cols_ptr(
-        d_unique_cols->get_device_ptr<int>());
-    thrust::device_ptr<float> unique_vals_ptr(
-        d_unique_vals->get_device_ptr<float>());
-
-    auto key_begin =
-        thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
-    auto key_end = key_begin + total_triplets;
-
-    auto new_end = thrust::reduce_by_key(
-        thrust::device,
-        key_begin,
-        key_end,
-        vals_ptr,
-        thrust::make_zip_iterator(
-            thrust::make_tuple(unique_rows_ptr, unique_cols_ptr)),
-        unique_vals_ptr,
-        KeyEqual());
-
-    int nnz = new_end.second - unique_vals_ptr;
-
-    // Convert to CSR format
-    result.num_rows = n;
-    result.num_cols = n;
-    result.nnz = nnz;
-
-    result.col_indices = cuda::create_cuda_linear_buffer<int>(nnz);
-    result.values = cuda::create_cuda_linear_buffer<float>(nnz);
-    result.row_offsets = cuda::create_cuda_linear_buffer<int>(n + 1);
-
-    // Direct copy from unique buffers to final CSR buffers
-    cudaMemcpy(
-        result.col_indices->get_device_ptr<int>(),
-        d_unique_cols->get_device_ptr<int>(),
-        nnz * sizeof(int),
-        cudaMemcpyDeviceToDevice);
-    
-    cudaMemcpy(
-        result.values->get_device_ptr<float>(),
-        d_unique_vals->get_device_ptr<float>(),
-        nnz * sizeof(float),
-        cudaMemcpyDeviceToDevice);
-
-    // Build row_offsets: histogram approach
-    thrust::device_ptr<int> row_offsets_ptr(
-        result.row_offsets->get_device_ptr<int>());
-    int* row_offsets_raw = thrust::raw_pointer_cast(row_offsets_ptr);
-
-    // Initialize all row_offsets to 0
-    thrust::fill(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, 0);
-
-    // Count entries per row using histogram
-    int* unique_rows_raw = thrust::raw_pointer_cast(unique_rows_ptr);
-
-    thrust::for_each(
-        thrust::device,
-        thrust::make_counting_iterator(0),
-        thrust::make_counting_iterator(nnz),
-        [row_offsets_raw, unique_rows_raw] __device__(int idx) {
-            int row = unique_rows_raw[idx];
-            atomicAdd(&row_offsets_raw[row], 1);
-        });
-
-    cudaDeviceSynchronize();
-
-    // Compute prefix sum to get row offsets
-    thrust::exclusive_scan(
-        thrust::device,
-        row_offsets_ptr,
-        row_offsets_ptr + n + 1,
-        row_offsets_ptr);
-
-    cudaDeviceSynchronize();
-
-    return result;
-}
-
 // ============================================================================
 // NEW: Zero-sort direct-fill implementation
 // ============================================================================
@@ -908,40 +567,41 @@ __global__ void generate_matrix_entries_kernel(
     int* cols)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     int n = num_particles * 3;
     int num_mass_entries = n;
     int num_spring_entries = num_springs * 36;
     int total_entries = num_mass_entries + num_spring_entries;
-    
+
     if (tid >= total_entries)
         return;
-    
+
     if (tid < num_mass_entries) {
         // Mass diagonal entry
         rows[tid] = tid;
         cols[tid] = tid;
-    } else {
+    }
+    else {
         // Spring entry
         int spring_idx = tid - num_mass_entries;
         int sid = spring_idx / 36;
         int entry_in_spring = spring_idx % 36;
-        
+
         int vi = springs[sid * 2];
         int vj = springs[sid * 2 + 1];
-        
+
         // Decode entry_in_spring into block and position
         int block_idx = entry_in_spring / 9;  // 0-3 for the 4 blocks
         int pos_in_block = entry_in_spring % 9;
-        
+
         int block_r = block_idx / 2;
         int block_c = block_idx % 2;
         int r = pos_in_block / 3;
         int c = pos_in_block % 3;
-        
+
         int v_row = (block_r == 0) ? vi : vj;
         int v_col = (block_c == 0) ? vi : vj;
-        
+
         rows[tid] = v_row * 3 + r;
         cols[tid] = v_col * 3 + c;
     }
@@ -957,24 +617,26 @@ __device__ int find_entry_position(
 {
     int left = 0;
     int right = nnz - 1;
-    
+
     while (left <= right) {
         int mid = (left + right) / 2;
         int mid_row = unique_rows[mid];
         int mid_col = unique_cols[mid];
-        
+
         if (mid_row == target_row && mid_col == target_col) {
             return mid;
         }
-        
+
         // Compare as (row, col) pairs
-        if (mid_row < target_row || (mid_row == target_row && mid_col < target_col)) {
+        if (mid_row < target_row ||
+            (mid_row == target_row && mid_col < target_col)) {
             left = mid + 1;
-        } else {
+        }
+        else {
             right = mid - 1;
         }
     }
-    
+
     return -1;  // Not found (should never happen for valid structure)
 }
 
@@ -989,9 +651,10 @@ __global__ void build_mass_positions_kernel(
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_dofs)
         return;
-    
+
     // Mass diagonal: find position of (tid, tid)
-    mass_positions[tid] = find_entry_position(unique_rows, unique_cols, nnz, tid, tid);
+    mass_positions[tid] =
+        find_entry_position(unique_rows, unique_cols, nnz, tid, tid);
 }
 
 // Kernel to build spring positions using binary search
@@ -1006,25 +669,25 @@ __global__ void build_spring_positions_kernel(
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_springs)
         return;
-    
+
     int vi = springs[tid * 2];
     int vj = springs[tid * 2 + 1];
     int base_idx = tid * 36;
     int count = 0;
-    
+
     // Same order as kernel: (vi,vi), (vi,vj), (vj,vi), (vj,vj)
     for (int block_r = 0; block_r < 2; ++block_r) {
         for (int block_c = 0; block_c < 2; ++block_c) {
             int v_row = (block_r == 0) ? vi : vj;
             int v_col = (block_c == 0) ? vi : vj;
-            
+
             for (int r = 0; r < 3; ++r) {
                 for (int c = 0; c < 3; ++c) {
                     int global_row = v_row * 3 + r;
                     int global_col = v_col * 3 + c;
-                    
-                    spring_positions[base_idx + count] = 
-                        find_entry_position(unique_rows, unique_cols, nnz, global_row, global_col);
+
+                    spring_positions[base_idx + count] = find_entry_position(
+                        unique_rows, unique_cols, nnz, global_row, global_col);
                     count++;
                 }
             }
@@ -1040,79 +703,87 @@ CSRStructure build_hessian_structure_gpu(
     CSRStructure structure;
     int num_springs = springs->getDesc().element_count / 2;
     int n = num_particles * 3;
-    
+
     int num_mass_entries = n;
     int num_spring_entries = num_springs * 36;
     int total_entries = num_mass_entries + num_spring_entries;
-    
+
     // Allocate temporary buffers for all entries
     auto d_all_rows = cuda::create_cuda_linear_buffer<int>(total_entries);
     auto d_all_cols = cuda::create_cuda_linear_buffer<int>(total_entries);
-    
+
     // Generate all (row, col) pairs on GPU
     int block_size = 256;
     int num_blocks = (total_entries + block_size - 1) / block_size;
-    
+
     generate_matrix_entries_kernel<<<num_blocks, block_size>>>(
         springs->get_device_ptr<int>(),
         num_springs,
         num_particles,
         d_all_rows->get_device_ptr<int>(),
         d_all_cols->get_device_ptr<int>());
-    
+
     cudaDeviceSynchronize();
-    
+
     // Sort by (row, col) using thrust
     thrust::device_ptr<int> rows_ptr(d_all_rows->get_device_ptr<int>());
     thrust::device_ptr<int> cols_ptr(d_all_cols->get_device_ptr<int>());
-    
-    auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
-    
+
+    auto zip_begin =
+        thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
+
     thrust::sort(
         thrust::device,
         zip_begin,
         zip_begin + total_entries,
-        [] __device__(const thrust::tuple<int, int>& a, const thrust::tuple<int, int>& b) {
+        [] __device__(
+            const thrust::tuple<int, int>& a,
+            const thrust::tuple<int, int>& b) {
             if (thrust::get<0>(a) != thrust::get<0>(b))
                 return thrust::get<0>(a) < thrust::get<0>(b);
             return thrust::get<1>(a) < thrust::get<1>(b);
         });
-    
+
     cudaDeviceSynchronize();
-    
+
     // Remove duplicates
     auto new_end = thrust::unique(
         thrust::device,
         zip_begin,
         zip_begin + total_entries,
-        [] __device__(const thrust::tuple<int, int>& a, const thrust::tuple<int, int>& b) {
-            return thrust::get<0>(a) == thrust::get<0>(b) && thrust::get<1>(a) == thrust::get<1>(b);
+        [] __device__(
+            const thrust::tuple<int, int>& a,
+            const thrust::tuple<int, int>& b) {
+            return thrust::get<0>(a) == thrust::get<0>(b) &&
+                   thrust::get<1>(a) == thrust::get<1>(b);
         });
-    
+
     int nnz = new_end - zip_begin;
-    
+
     cudaDeviceSynchronize();
-    
+
     // Allocate CSR arrays
     structure.col_indices = cuda::create_cuda_linear_buffer<int>(nnz);
     structure.row_offsets = cuda::create_cuda_linear_buffer<int>(n + 1);
     structure.mass_value_positions = cuda::create_cuda_linear_buffer<int>(n);
-    structure.spring_value_positions = cuda::create_cuda_linear_buffer<int>(num_springs * 36);
-    
+    structure.spring_value_positions =
+        cuda::create_cuda_linear_buffer<int>(num_springs * 36);
+
     // Copy unique columns
     cudaMemcpy(
         structure.col_indices->get_device_ptr<int>(),
         d_all_cols->get_device_ptr<int>(),
         nnz * sizeof(int),
         cudaMemcpyDeviceToDevice);
-    
+
     // Build row_offsets using histogram
-    thrust::device_ptr<int> row_offsets_ptr(structure.row_offsets->get_device_ptr<int>());
+    thrust::device_ptr<int> row_offsets_ptr(
+        structure.row_offsets->get_device_ptr<int>());
     thrust::fill(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, 0);
-    
+
     int* row_offsets_raw = structure.row_offsets->get_device_ptr<int>();
     int* unique_rows_raw = d_all_rows->get_device_ptr<int>();
-    
+
     thrust::for_each(
         thrust::device,
         thrust::make_counting_iterator(0),
@@ -1121,18 +792,18 @@ CSRStructure build_hessian_structure_gpu(
             int row = unique_rows_raw[idx];
             atomicAdd(&row_offsets_raw[row], 1);
         });
-    
+
     cudaDeviceSynchronize();
-    
+
     // Compute prefix sum for row offsets
     thrust::exclusive_scan(
         thrust::device,
         row_offsets_ptr,
         row_offsets_ptr + n + 1,
         row_offsets_ptr);
-    
+
     cudaDeviceSynchronize();
-    
+
     // Build position mappings on GPU using binary search
     int mass_blocks = (n + block_size - 1) / block_size;
     build_mass_positions_kernel<<<mass_blocks, block_size>>>(
@@ -1141,7 +812,7 @@ CSRStructure build_hessian_structure_gpu(
         nnz,
         n,
         structure.mass_value_positions->get_device_ptr<int>());
-    
+
     int spring_blocks = (num_springs + block_size - 1) / block_size;
     build_spring_positions_kernel<<<spring_blocks, block_size>>>(
         d_all_rows->get_device_ptr<int>(),
@@ -1150,13 +821,13 @@ CSRStructure build_hessian_structure_gpu(
         nnz,
         num_springs,
         structure.spring_value_positions->get_device_ptr<int>());
-    
+
     cudaDeviceSynchronize();
-    
+
     structure.num_rows = n;
     structure.num_cols = n;
     structure.nnz = nnz;
-    
+
     return structure;
 }
 
@@ -1174,47 +845,47 @@ __global__ void fill_spring_hessian_values_kernel(
     int sid = blockIdx.x * blockDim.x + threadIdx.x;
     if (sid >= num_springs)
         return;
-    
+
     int vi = springs[sid * 2];
     int vj = springs[sid * 2 + 1];
     float l0 = rest_lengths[sid];
-    
+
     if (l0 < 1e-10f) {
         return;  // Skip degenerate springs
     }
-    
+
     float k = stiffness;
     float l0_sq = l0 * l0;
-    
+
     // Get positions
     Eigen::Vector3f xi(x_curr[vi * 3], x_curr[vi * 3 + 1], x_curr[vi * 3 + 2]);
     Eigen::Vector3f xj(x_curr[vj * 3], x_curr[vj * 3 + 1], x_curr[vj * 3 + 2]);
     Eigen::Vector3f diff = xi - xj;
     float diff_sq = diff.squaredNorm();
-    
+
     // H_diff = 2*k/l0^2 * (2*outer(diff,diff) + (diff_sq - l0^2)*I)
     Eigen::Matrix3f outer = diff * diff.transpose();
     Eigen::Matrix3f H_diff =
         2.0f * k / l0_sq *
         (2.0f * outer + (diff_sq - l0_sq) * Eigen::Matrix3f::Identity());
-    
+
     // PSD projection
     H_diff = project_psd_custom(H_diff);
-    
+
     // Scale by dt^2
     float scale = dt * dt;
     H_diff *= scale;
-    
+
     // Directly write to pre-computed positions (using atomic add for safety)
     int base_idx = sid * 36;
     int count = 0;
-    
+
     // 4 blocks: (vi,vi), (vi,vj), (vj,vi), (vj,vj)
     for (int block_r = 0; block_r < 2; ++block_r) {
         for (int block_c = 0; block_c < 2; ++block_c) {
             float sign_row = (block_r == 0) ? 1.0f : -1.0f;
             float sign_col = (block_c == 0) ? 1.0f : -1.0f;
-            
+
             for (int r = 0; r < 3; ++r) {
                 for (int c = 0; c < 3; ++c) {
                     float val = H_diff(r, c) * sign_row * sign_col;
@@ -1236,7 +907,7 @@ __global__ void fill_mass_diagonal_kernel(
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_dofs)
         return;
-    
+
     float regularization = 1e-6f;
     int pos = mass_positions[tid];
     values[pos] = M_diag[tid] + regularization;
@@ -1257,11 +928,11 @@ void update_hessian_values_gpu(
     int num_springs = springs->getDesc().element_count / 2;
     int num_dofs = num_particles * 3;
     int block_size = 256;
-    
+
     // Zero out values array
-    cudaMemset(values->get_device_ptr<float>(), 0, 
-               csr_structure.nnz * sizeof(float));
-    
+    cudaMemset(
+        values->get_device_ptr<float>(), 0, csr_structure.nnz * sizeof(float));
+
     // Fill mass diagonal
     int mass_blocks = (num_dofs + block_size - 1) / block_size;
     fill_mass_diagonal_kernel<<<mass_blocks, block_size>>>(
@@ -1269,7 +940,7 @@ void update_hessian_values_gpu(
         csr_structure.mass_value_positions->get_device_ptr<int>(),
         num_dofs,
         values->get_device_ptr<float>());
-    
+
     // Fill spring contributions
     int spring_blocks = (num_springs + block_size - 1) / block_size;
     fill_spring_hessian_values_kernel<<<spring_blocks, block_size>>>(
@@ -1281,7 +952,7 @@ void update_hessian_values_gpu(
         dt,
         num_springs,
         values->get_device_ptr<float>());
-    
+
     cudaDeviceSynchronize();
 }
 

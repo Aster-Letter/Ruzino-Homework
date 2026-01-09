@@ -99,23 +99,6 @@ void update_hessian_values_gpu(
     int num_particles,
     cuda::CUDALinearBufferHandle values);  // Output values array
 
-// Legacy function (kept for compatibility, but slow due to sorting)
-RZSIM_CUDA_API
-CSRMatrix assemble_hessian_gpu(
-    cuda::CUDALinearBufferHandle x_curr,
-    cuda::CUDALinearBufferHandle M_diag,
-    cuda::CUDALinearBufferHandle springs,
-    cuda::CUDALinearBufferHandle rest_lengths,
-    float stiffness,
-    float dt,
-    int num_particles,
-    cuda::CUDALinearBufferHandle triplet_rows,
-    cuda::CUDALinearBufferHandle triplet_cols,
-    cuda::CUDALinearBufferHandle triplet_vals,
-    cuda::CUDALinearBufferHandle unique_rows,
-    cuda::CUDALinearBufferHandle unique_cols,
-    cuda::CUDALinearBufferHandle unique_vals);
-
 RZSIM_CUDA_API
 float compute_energy_gpu(
     cuda::CUDALinearBufferHandle x_curr,
