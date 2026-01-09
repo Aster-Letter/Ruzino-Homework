@@ -899,7 +899,140 @@ CSRMatrix assemble_hessian_gpu(
 // NEW: Zero-sort direct-fill implementation
 // ============================================================================
 
-// Build CSR sparsity pattern once during initialization
+// Kernel to generate all matrix entry (row, col) pairs in parallel
+__global__ void generate_matrix_entries_kernel(
+    const int* springs,
+    int num_springs,
+    int num_particles,
+    int* rows,
+    int* cols)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    int n = num_particles * 3;
+    int num_mass_entries = n;
+    int num_spring_entries = num_springs * 36;
+    int total_entries = num_mass_entries + num_spring_entries;
+    
+    if (tid >= total_entries)
+        return;
+    
+    if (tid < num_mass_entries) {
+        // Mass diagonal entry
+        rows[tid] = tid;
+        cols[tid] = tid;
+    } else {
+        // Spring entry
+        int spring_idx = tid - num_mass_entries;
+        int sid = spring_idx / 36;
+        int entry_in_spring = spring_idx % 36;
+        
+        int vi = springs[sid * 2];
+        int vj = springs[sid * 2 + 1];
+        
+        // Decode entry_in_spring into block and position
+        int block_idx = entry_in_spring / 9;  // 0-3 for the 4 blocks
+        int pos_in_block = entry_in_spring % 9;
+        
+        int block_r = block_idx / 2;
+        int block_c = block_idx % 2;
+        int r = pos_in_block / 3;
+        int c = pos_in_block % 3;
+        
+        int v_row = (block_r == 0) ? vi : vj;
+        int v_col = (block_c == 0) ? vi : vj;
+        
+        rows[tid] = v_row * 3 + r;
+        cols[tid] = v_col * 3 + c;
+    }
+}
+
+// Binary search helper for finding (row, col) in sorted unique arrays
+__device__ int find_entry_position(
+    const int* unique_rows,
+    const int* unique_cols,
+    int nnz,
+    int target_row,
+    int target_col)
+{
+    int left = 0;
+    int right = nnz - 1;
+    
+    while (left <= right) {
+        int mid = (left + right) / 2;
+        int mid_row = unique_rows[mid];
+        int mid_col = unique_cols[mid];
+        
+        if (mid_row == target_row && mid_col == target_col) {
+            return mid;
+        }
+        
+        // Compare as (row, col) pairs
+        if (mid_row < target_row || (mid_row == target_row && mid_col < target_col)) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    
+    return -1;  // Not found (should never happen for valid structure)
+}
+
+// Kernel to build mass diagonal positions using binary search
+__global__ void build_mass_positions_kernel(
+    const int* unique_rows,
+    const int* unique_cols,
+    int nnz,
+    int num_dofs,
+    int* mass_positions)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= num_dofs)
+        return;
+    
+    // Mass diagonal: find position of (tid, tid)
+    mass_positions[tid] = find_entry_position(unique_rows, unique_cols, nnz, tid, tid);
+}
+
+// Kernel to build spring positions using binary search
+__global__ void build_spring_positions_kernel(
+    const int* unique_rows,
+    const int* unique_cols,
+    const int* springs,
+    int nnz,
+    int num_springs,
+    int* spring_positions)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= num_springs)
+        return;
+    
+    int vi = springs[tid * 2];
+    int vj = springs[tid * 2 + 1];
+    int base_idx = tid * 36;
+    int count = 0;
+    
+    // Same order as kernel: (vi,vi), (vi,vj), (vj,vi), (vj,vj)
+    for (int block_r = 0; block_r < 2; ++block_r) {
+        for (int block_c = 0; block_c < 2; ++block_c) {
+            int v_row = (block_r == 0) ? vi : vj;
+            int v_col = (block_c == 0) ? vi : vj;
+            
+            for (int r = 0; r < 3; ++r) {
+                for (int c = 0; c < 3; ++c) {
+                    int global_row = v_row * 3 + r;
+                    int global_col = v_col * 3 + c;
+                    
+                    spring_positions[base_idx + count] = 
+                        find_entry_position(unique_rows, unique_cols, nnz, global_row, global_col);
+                    count++;
+                }
+            }
+        }
+    }
+}
+
+// Build CSR sparsity pattern once during initialization (GPU version)
 CSRStructure build_hessian_structure_gpu(
     cuda::CUDALinearBufferHandle springs,
     int num_particles)
@@ -908,109 +1041,118 @@ CSRStructure build_hessian_structure_gpu(
     int num_springs = springs->getDesc().element_count / 2;
     int n = num_particles * 3;
     
-    // Get springs on host to build structure
-    std::vector<int> h_springs = springs->get_host_vector<int>();
+    int num_mass_entries = n;
+    int num_spring_entries = num_springs * 36;
+    int total_entries = num_mass_entries + num_spring_entries;
     
-    // Build sparsity pattern on CPU (one-time cost)
-    std::map<std::pair<int, int>, int> position_map;  // (row,col) -> position in values array
-    int nnz = 0;
+    // Allocate temporary buffers for all entries
+    auto d_all_rows = cuda::create_cuda_linear_buffer<int>(total_entries);
+    auto d_all_cols = cuda::create_cuda_linear_buffer<int>(total_entries);
     
-    // Add all entries: mass diagonal + spring blocks
-    // 1. Mass diagonal (guaranteed to exist)
-    for (int i = 0; i < n; ++i) {
-        position_map[{i, i}] = nnz++;
-    }
+    // Generate all (row, col) pairs on GPU
+    int block_size = 256;
+    int num_blocks = (total_entries + block_size - 1) / block_size;
     
-    // 2. Spring contributions (4 3x3 blocks per spring)
-    for (int sid = 0; sid < num_springs; ++sid) {
-        int vi = h_springs[sid * 2];
-        int vj = h_springs[sid * 2 + 1];
-        
-        // 4 blocks: (vi,vi), (vi,vj), (vj,vi), (vj,vj)
-        for (int block_r = 0; block_r < 2; ++block_r) {
-            for (int block_c = 0; block_c < 2; ++block_c) {
-                int v_row = (block_r == 0) ? vi : vj;
-                int v_col = (block_c == 0) ? vi : vj;
-                
-                // Each block is 3x3
-                for (int r = 0; r < 3; ++r) {
-                    for (int c = 0; c < 3; ++c) {
-                        int global_row = v_row * 3 + r;
-                        int global_col = v_col * 3 + c;
-                        
-                        auto key = std::make_pair(global_row, global_col);
-                        if (position_map.find(key) == position_map.end()) {
-                            position_map[key] = nnz++;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    generate_matrix_entries_kernel<<<num_blocks, block_size>>>(
+        springs->get_device_ptr<int>(),
+        num_springs,
+        num_particles,
+        d_all_rows->get_device_ptr<int>(),
+        d_all_cols->get_device_ptr<int>());
     
-    // Build CSR arrays
-    std::vector<int> h_row_offsets(n + 1, 0);
-    std::vector<int> h_col_indices(nnz);
-    std::vector<int> h_spring_positions(num_springs * 36);
-    std::vector<int> h_mass_positions(n);
+    cudaDeviceSynchronize();
     
-    // Sort entries by (row, col) and build CSR
-    std::vector<std::pair<std::pair<int,int>, int>> sorted_entries;
-    for (const auto& entry : position_map) {
-        sorted_entries.push_back(entry);
-    }
-    std::sort(sorted_entries.begin(), sorted_entries.end());
+    // Sort by (row, col) using thrust
+    thrust::device_ptr<int> rows_ptr(d_all_rows->get_device_ptr<int>());
+    thrust::device_ptr<int> cols_ptr(d_all_cols->get_device_ptr<int>());
     
-    // Build col_indices and update position_map with sorted positions
-    std::map<std::pair<int, int>, int> sorted_position_map;
-    for (int i = 0; i < nnz; ++i) {
-        auto [row_col, old_pos] = sorted_entries[i];
-        h_col_indices[i] = row_col.second;
-        sorted_position_map[row_col] = i;
-        h_row_offsets[row_col.first + 1]++;
-    }
+    auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
     
-    // Convert counts to offsets
-    for (int i = 1; i <= n; ++i) {
-        h_row_offsets[i] += h_row_offsets[i - 1];
-    }
+    thrust::sort(
+        thrust::device,
+        zip_begin,
+        zip_begin + total_entries,
+        [] __device__(const thrust::tuple<int, int>& a, const thrust::tuple<int, int>& b) {
+            if (thrust::get<0>(a) != thrust::get<0>(b))
+                return thrust::get<0>(a) < thrust::get<0>(b);
+            return thrust::get<1>(a) < thrust::get<1>(b);
+        });
     
-    // Build position mappings for fast updates
-    // Mass diagonal positions
-    for (int i = 0; i < n; ++i) {
-        h_mass_positions[i] = sorted_position_map[{i, i}];
-    }
+    cudaDeviceSynchronize();
     
-    // Spring block positions (36 entries per spring)
-    for (int sid = 0; sid < num_springs; ++sid) {
-        int vi = h_springs[sid * 2];
-        int vj = h_springs[sid * 2 + 1];
-        int base_idx = sid * 36;
-        int count = 0;
-        
-        // Same order as kernel: (vi,vi), (vi,vj), (vj,vi), (vj,vj)
-        for (int block_r = 0; block_r < 2; ++block_r) {
-            for (int block_c = 0; block_c < 2; ++block_c) {
-                int v_row = (block_r == 0) ? vi : vj;
-                int v_col = (block_c == 0) ? vi : vj;
-                
-                for (int r = 0; r < 3; ++r) {
-                    for (int c = 0; c < 3; ++c) {
-                        int global_row = v_row * 3 + r;
-                        int global_col = v_col * 3 + c;
-                        h_spring_positions[base_idx + count++] = 
-                            sorted_position_map[{global_row, global_col}];
-                    }
-                }
-            }
-        }
-    }
+    // Remove duplicates
+    auto new_end = thrust::unique(
+        thrust::device,
+        zip_begin,
+        zip_begin + total_entries,
+        [] __device__(const thrust::tuple<int, int>& a, const thrust::tuple<int, int>& b) {
+            return thrust::get<0>(a) == thrust::get<0>(b) && thrust::get<1>(a) == thrust::get<1>(b);
+        });
     
-    // Upload to GPU
-    structure.row_offsets = cuda::create_cuda_linear_buffer(h_row_offsets);
-    structure.col_indices = cuda::create_cuda_linear_buffer(h_col_indices);
-    structure.spring_value_positions = cuda::create_cuda_linear_buffer(h_spring_positions);
-    structure.mass_value_positions = cuda::create_cuda_linear_buffer(h_mass_positions);
+    int nnz = new_end - zip_begin;
+    
+    cudaDeviceSynchronize();
+    
+    // Allocate CSR arrays
+    structure.col_indices = cuda::create_cuda_linear_buffer<int>(nnz);
+    structure.row_offsets = cuda::create_cuda_linear_buffer<int>(n + 1);
+    structure.mass_value_positions = cuda::create_cuda_linear_buffer<int>(n);
+    structure.spring_value_positions = cuda::create_cuda_linear_buffer<int>(num_springs * 36);
+    
+    // Copy unique columns
+    cudaMemcpy(
+        structure.col_indices->get_device_ptr<int>(),
+        d_all_cols->get_device_ptr<int>(),
+        nnz * sizeof(int),
+        cudaMemcpyDeviceToDevice);
+    
+    // Build row_offsets using histogram
+    thrust::device_ptr<int> row_offsets_ptr(structure.row_offsets->get_device_ptr<int>());
+    thrust::fill(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, 0);
+    
+    int* row_offsets_raw = structure.row_offsets->get_device_ptr<int>();
+    int* unique_rows_raw = d_all_rows->get_device_ptr<int>();
+    
+    thrust::for_each(
+        thrust::device,
+        thrust::make_counting_iterator(0),
+        thrust::make_counting_iterator(nnz),
+        [row_offsets_raw, unique_rows_raw] __device__(int idx) {
+            int row = unique_rows_raw[idx];
+            atomicAdd(&row_offsets_raw[row], 1);
+        });
+    
+    cudaDeviceSynchronize();
+    
+    // Compute prefix sum for row offsets
+    thrust::exclusive_scan(
+        thrust::device,
+        row_offsets_ptr,
+        row_offsets_ptr + n + 1,
+        row_offsets_ptr);
+    
+    cudaDeviceSynchronize();
+    
+    // Build position mappings on GPU using binary search
+    int mass_blocks = (n + block_size - 1) / block_size;
+    build_mass_positions_kernel<<<mass_blocks, block_size>>>(
+        d_all_rows->get_device_ptr<int>(),
+        d_all_cols->get_device_ptr<int>(),
+        nnz,
+        n,
+        structure.mass_value_positions->get_device_ptr<int>());
+    
+    int spring_blocks = (num_springs + block_size - 1) / block_size;
+    build_spring_positions_kernel<<<spring_blocks, block_size>>>(
+        d_all_rows->get_device_ptr<int>(),
+        d_all_cols->get_device_ptr<int>(),
+        springs->get_device_ptr<int>(),
+        nnz,
+        num_springs,
+        structure.spring_value_positions->get_device_ptr<int>());
+    
+    cudaDeviceSynchronize();
+    
     structure.num_rows = n;
     structure.num_cols = n;
     structure.nnz = nnz;
