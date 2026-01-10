@@ -46,8 +46,10 @@ void compute_gradient_nh_gpu(
     cuda::CUDALinearBufferHandle x_tilde,
     cuda::CUDALinearBufferHandle M_diag,
     cuda::CUDALinearBufferHandle f_ext,
-    cuda::CUDALinearBufferHandle tetrahedra,  // [4 * num_elements] vertex
-                                              // indices
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,      // [9 * num_elements] inverse
                                               // reference shape matrices
     cuda::CUDALinearBufferHandle volumes,     // [num_elements] rest volumes
@@ -61,7 +63,10 @@ void compute_gradient_nh_gpu(
 // Build CSR sparsity pattern once during initialization
 RZSIM_CUDA_API
 NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     int num_particles,
     int num_elements);
 
@@ -71,7 +76,10 @@ void update_hessian_values_nh_gpu(
     const NeoHookeanCSRStructure& csr_structure,
     cuda::CUDALinearBufferHandle x_curr,
     cuda::CUDALinearBufferHandle M_diag,
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,
     cuda::CUDALinearBufferHandle volumes,
     float mu,
@@ -88,7 +96,10 @@ float compute_energy_nh_gpu(
     cuda::CUDALinearBufferHandle x_tilde,
     cuda::CUDALinearBufferHandle M_diag,
     cuda::CUDALinearBufferHandle f_ext,
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,
     cuda::CUDALinearBufferHandle volumes,
     float mu,
@@ -101,8 +112,9 @@ float compute_energy_nh_gpu(
     cuda::CUDALinearBufferHandle potential_terms);
 
 // Compute reference shape matrices Dm and their inverses for all tetrahedra
+// Returns: (Dm_inv, volumes, element_to_vertex, element_to_local_face)
 RZSIM_CUDA_API
-std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
 compute_reference_data_gpu(
     cuda::CUDALinearBufferHandle positions,
     cuda::CUDALinearBufferHandle adjacency,

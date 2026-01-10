@@ -22,6 +22,8 @@ struct NeoHookeanGPUStorage {
     cuda::CUDALinearBufferHandle velocities_buffer;
     cuda::CUDALinearBufferHandle Dm_inv_buffer;
     cuda::CUDALinearBufferHandle volumes_buffer;
+    cuda::CUDALinearBufferHandle element_to_vertex_buffer;
+    cuda::CUDALinearBufferHandle element_to_local_face_buffer;
     cuda::CUDALinearBufferHandle next_positions_buffer;
     cuda::CUDALinearBufferHandle mass_matrix_buffer;
     cuda::CUDALinearBufferHandle gradients_buffer;
@@ -77,20 +79,12 @@ struct NeoHookeanGPUStorage {
         spdlog::info(
             "[NeoHookean] Computing volume adjacency from {} triangles...",
             face_vertex_indices.size() / 3);
-        std::tie(adjacency_buffer, offsets_buffer) =
+        unsigned num_elements_gpu;
+        std::tie(adjacency_buffer, offsets_buffer, num_elements_gpu) =
             rzsim_cuda::compute_volume_adjacency_gpu(
                 positions_buffer, face_vertex_indices_buffer);
 
-        auto adjacency_cpu = adjacency_buffer->get_host_vector<unsigned>();
-        auto offsets_cpu = offsets_buffer->get_host_vector<unsigned>();
-
-        // Calculate total number of tetrahedra from adjacency data
-        num_elements = 0;
-        for (size_t v = 0; v < offsets_cpu.size(); v++) {
-            unsigned offset = offsets_cpu[v];
-            unsigned count = adjacency_cpu[offset];
-            num_elements += count;
-        }
+        num_elements = num_elements_gpu;
 
         spdlog::info(
             "[NeoHookean] Extracted {} tetrahedra from adjacency map",
@@ -129,103 +123,53 @@ struct NeoHookeanGPUStorage {
                 cudaGetErrorString(err));
         }
 
-        auto [Dm_inv, volumes] = rzsim_cuda::compute_reference_data_gpu(
-            positions_buffer, adjacency_buffer, offsets_buffer, num_elements);
+        auto [Dm_inv, volumes, element_to_vertex, element_to_local_face] =
+            rzsim_cuda::compute_reference_data_gpu(
+                positions_buffer,
+                adjacency_buffer,
+                offsets_buffer,
+                num_elements);
 
-        auto Dm_inv_host = Dm_inv->get_host_vector<float>();
-        auto volumes_host = volumes->get_host_vector<float>();
+        Dm_inv_buffer = Dm_inv;
+        volumes_buffer = volumes;
+        element_to_vertex_buffer = element_to_vertex;
+        element_to_local_face_buffer = element_to_local_face;
 
-        printf("[NeoHookean] Sample Dm_inv values:\n");
+        spdlog::info("[NeoHookean] Reference data computed successfully");
 
-        // err = cudaGetLastError();
-        // if (err != cudaSuccess) {
-        //     spdlog::error(
-        //         "[NeoHookean] CUDA error after Dm_inv compute: {}",
-        //         cudaGetErrorString(err));
-        //     return;
-        // }
-        // cudaDeviceSynchronize();
-        // err = cudaGetLastError();
-        // if (err != cudaSuccess) {
-        //     spdlog::error(
-        //         "[NeoHookean] CUDA error after Dm_inv sync: {}",
-        //         cudaGetErrorString(err));
-        //     return;
-        // }
+        normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
+            face_vertex_indices.size());
 
-        //// Validate Dm_inv and volumes
-        // auto Dm_inv_host = Dm_inv->get_host_vector<float>();
-        // auto volumes_host = volumes->get_host_vector<float>();
+        // Build CSR structure once
+        hessian_structure = rzsim_cuda::build_hessian_structure_nh_gpu(
+            adjacency_buffer,
+            offsets_buffer,
+            element_to_vertex_buffer,
+            element_to_local_face_buffer,
+            num_particles,
+            num_elements);
 
-        // int invalid_count = 0;
-        // for (int i = 0; i < num_elements; i++) {
-        //     float vol = volumes_host[i];
-        //     if (!std::isfinite(vol) || vol <= 0.0f) {
-        //         if (invalid_count < 5) {
-        //             spdlog::error(
-        //                 "[NeoHookean] Invalid volume for tet {}: {}", i,
-        //                 vol);
-        //         }
-        //         invalid_count++;
-        //     }
-        //     for (int j = 0; j < 9; j++) {
-        //         float val = Dm_inv_host[i * 9 + j];
-        //         if (!std::isfinite(val)) {
-        //             if (invalid_count < 5) {
-        //                 spdlog::error(
-        //                     "[NeoHookean] Invalid Dm_inv for tet {} at {}:
-        //                     {}", i, j, val);
-        //             }
-        //             invalid_count++;
-        //             break;
-        //         }
-        //     }
-        // }
+        // Allocate values buffer
+        hessian_values =
+            cuda::create_cuda_linear_buffer<float>(hessian_structure.nnz);
 
-        // if (invalid_count > 0) {
-        //     spdlog::error(
-        //         "[NeoHookean] Found {} invalid tetrahedra (NaN/Inf/negative "
-        //         "volume)",
-        //         invalid_count);
-        //     spdlog::error(
-        //         "[NeoHookean] This indicates degenerate tetrahedra in the "
-        //         "mesh");
-        //     return;
-        // }
+        // Allocate temporary buffers for Newton iterations
+        x_new_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        newton_direction_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        neg_gradient_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        x_candidate_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
 
-        // Dm_inv_buffer = Dm_inv;
-        // volumes_buffer = volumes;
-
-        // spdlog::info("[NeoHookean] Reference data computed successfully");
-
-        // normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
-        //     face_vertex_indices.size());
-
-        //// Build CSR structure once
-        // hessian_structure = rzsim_cuda::build_hessian_structure_nh_gpu(
-        //     tetrahedra_buffer, num_particles, num_elements);
-
-        //// Allocate values buffer
-        // hessian_values =
-        //     cuda::create_cuda_linear_buffer<float>(hessian_structure.nnz);
-
-        //// Allocate temporary buffers for Newton iterations
-        // x_new_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        // newton_direction_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        // neg_gradient_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        // x_candidate_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-
-        //// Allocate temporary buffers for energy computation
-        // inertial_terms_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
-        // element_energies_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_elements);
-        // potential_terms_buffer =
-        //     cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        // Allocate temporary buffers for energy computation
+        inertial_terms_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
+        element_energies_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_elements);
+        potential_terms_buffer =
+            cuda::create_cuda_linear_buffer<float>(num_particles * 3);
 
         // Create solver instance
         solver = Ruzino::Solver::SolverFactory::create(
@@ -343,271 +287,280 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
     auto d_gradients = storage.gradients_buffer;
     auto d_f_ext = storage.f_ext_buffer;
 
-    //// Substep loop
-    // float dt_sub = dt / substeps;
-    // for (int substep = 0; substep < substeps; ++substep) {
-    //     spdlog::info("[NeoHookean] Substep {}/{}", substep + 1, substeps);
-    //     // Setup external forces on GPU
-    //     spdlog::info("[NeoHookean] Setting up external forces...");
-    //     rzsim_cuda::setup_external_forces_nh_gpu(
-    //         mass, gravity, num_particles, d_f_ext);
+    // Substep loop
+    float dt_sub = dt / substeps;
+    for (int substep = 0; substep < substeps; ++substep) {
+        spdlog::info("[NeoHookean] Substep {}/{}", substep + 1, substeps);
+        // Setup external forces on GPU
+        spdlog::info("[NeoHookean] Setting up external forces...");
+        rzsim_cuda::setup_external_forces_nh_gpu(
+            mass, gravity, num_particles, d_f_ext);
 
-    //    // Compute x_tilde = x + dt_sub * v on GPU
-    //    spdlog::info("[NeoHookean] Computing explicit step...");
-    //    rzsim_cuda::explicit_step_nh_gpu(
-    //        d_positions, d_velocities, dt_sub, num_particles,
-    //        d_next_positions);
+        // Compute x_tilde = x + dt_sub * v on GPU
+        spdlog::info("[NeoHookean] Computing explicit step...");
+        rzsim_cuda::explicit_step_nh_gpu(
+            d_positions, d_velocities, dt_sub, num_particles, d_next_positions);
 
-    //    // Newton's method iterations
-    //    spdlog::info("[NeoHookean] Starting Newton iterations...");
-    //    storage.x_new_buffer->copy_from_device(d_next_positions.Get());
+        // Newton's method iterations
+        spdlog::info("[NeoHookean] Starting Newton iterations...");
+        storage.x_new_buffer->copy_from_device(d_next_positions.Get());
 
-    //    bool converged = false;
-    //    for (int iter = 0; iter < max_iterations; iter++) {
-    //        spdlog::info(
-    //            "[NeoHookean] Newton iteration {}/{}",
-    //            iter + 1,
-    //            max_iterations);
-    //        // Compute gradient at current x_new
-    //        spdlog::info("[NeoHookean] Computing gradient...");
-    //        cudaError_t err_before = cudaGetLastError();
-    //        if (err_before != cudaSuccess) {
-    //            spdlog::error(
-    //                "[NeoHookean] CUDA error BEFORE gradient: {}",
-    //                cudaGetErrorString(err_before));
-    //        }
+        bool converged = false;
+        for (int iter = 0; iter < max_iterations; iter++) {
+            spdlog::info(
+                "[NeoHookean] Newton iteration {}/{}",
+                iter + 1,
+                max_iterations);
 
-    //        rzsim_cuda::compute_gradient_nh_gpu(
-    //            storage.x_new_buffer,
-    //            d_next_positions,
-    //            d_M_diag,
-    //            d_f_ext,
-    //            storage.tetrahedra_buffer,
-    //            storage.Dm_inv_buffer,
-    //            storage.volumes_buffer,
-    //            mu,
-    //            lambda,
-    //            dt_sub,
-    //            num_particles,
-    //            storage.num_elements,
-    //            d_gradients);
+            // Compute gradient at current x_new
+            rzsim_cuda::compute_gradient_nh_gpu(
+                storage.x_new_buffer,
+                d_next_positions,
+                d_M_diag,
+                d_f_ext,
+                storage.adjacency_buffer,
+                storage.offsets_buffer,
+                storage.element_to_vertex_buffer,
+                storage.element_to_local_face_buffer,
+                storage.Dm_inv_buffer,
+                storage.volumes_buffer,
+                mu,
+                lambda,
+                dt_sub,
+                num_particles,
+                storage.num_elements,
+                d_gradients);
 
-    //        cudaError_t err_after = cudaGetLastError();
-    //        if (err_after != cudaSuccess) {
-    //            spdlog::error(
-    //                "[NeoHookean] CUDA error AFTER gradient kernel: {}",
-    //                cudaGetErrorString(err_after));
-    //            break;
-    //        }
-    //        cudaDeviceSynchronize();
-    //        err_after = cudaGetLastError();
-    //        if (err_after != cudaSuccess) {
-    //            spdlog::error(
-    //                "[NeoHookean] CUDA error AFTER gradient sync: {}",
-    //                cudaGetErrorString(err_after));
-    //            break;
-    //        }
-    //        spdlog::info("[NeoHookean] Gradient computed successfully");
+            cudaError_t err_after = cudaGetLastError();
+            if (err_after != cudaSuccess) {
+                spdlog::error(
+                    "[NeoHookean] CUDA error AFTER gradient kernel: {}",
+                    cudaGetErrorString(err_after));
+                break;
+            }
+            cudaDeviceSynchronize();
+            err_after = cudaGetLastError();
+            if (err_after != cudaSuccess) {
+                spdlog::error(
+                    "[NeoHookean] CUDA error AFTER gradient sync: {}",
+                    cudaGetErrorString(err_after));
+                break;
+            }
+            //        if (err_after != cudaSuccess) {
+            //            spdlog::error(
+            //                "[NeoHookean] CUDA error AFTER gradient sync: {}",
+            //                cudaGetErrorString(err_after));
+            //            break;
+            //        }
+            //        spdlog::info("[NeoHookean] Gradient computed
+            //        successfully");
 
-    //        // Check gradient norm for convergence
-    //        spdlog::info("[NeoHookean] Computing gradient norm...");
-    //        cudaError_t err = cudaGetLastError();
-    //        if (err != cudaSuccess) {
-    //            spdlog::error(
-    //                "[NeoHookean] CUDA error before norm: {}",
-    //                cudaGetErrorString(err));
-    //        }
-    //        float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
-    //            d_gradients, num_particles * 3);
-    //        err = cudaGetLastError();
-    //        if (err != cudaSuccess) {
-    //            spdlog::error(
-    //                "[NeoHookean] CUDA error after norm: {}",
-    //                cudaGetErrorString(err));
-    //        }
-    //        spdlog::info("[NeoHookean] Gradient norm: {}", grad_norm);
+            //        // Check gradient norm for convergence
+            //        spdlog::info("[NeoHookean] Computing gradient norm...");
+            //        cudaError_t err = cudaGetLastError();
+            //        if (err != cudaSuccess) {
+            //            spdlog::error(
+            //                "[NeoHookean] CUDA error before norm: {}",
+            //                cudaGetErrorString(err));
+            //        }
+            //        float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
+            //            d_gradients, num_particles * 3);
+            //        err = cudaGetLastError();
+            //        if (err != cudaSuccess) {
+            //            spdlog::error(
+            //                "[NeoHookean] CUDA error after norm: {}",
+            //                cudaGetErrorString(err));
+            //        }
+            //        spdlog::info("[NeoHookean] Gradient norm: {}", grad_norm);
 
-    //        if (!std::isfinite(grad_norm)) {
-    //            spdlog::error(
-    //                "[NeoHookean] Gradient norm is not finite! Simulation "
-    //                "unstable.");
-    //            break;
-    //        }
+            //        if (!std::isfinite(grad_norm)) {
+            //            spdlog::error(
+            //                "[NeoHookean] Gradient norm is not finite!
+            //                Simulation " "unstable.");
+            //            break;
+            //        }
 
-    //        auto dof = num_particles * 3;
-    //        grad_norm = grad_norm / dof;
-    //        spdlog::info(
-    //            "[NeoHookean] Normalized gradient norm: {}", grad_norm);
+            //        auto dof = num_particles * 3;
+            //        grad_norm = grad_norm / dof;
+            //        spdlog::info(
+            //            "[NeoHookean] Normalized gradient norm: {}",
+            //            grad_norm);
 
-    //        if (iter > 0 && grad_norm < tolerance) {
-    //            spdlog::info("[NeoHookean] Converged!");
-    //            converged = true;
-    //            break;
-    //        }
+            //        if (iter > 0 && grad_norm < tolerance) {
+            //            spdlog::info("[NeoHookean] Converged!");
+            //            converged = true;
+            //            break;
+            //        }
 
-    //        // Update Hessian values
-    //        spdlog::info("[NeoHookean] Updating Hessian values...");
-    //        rzsim_cuda::update_hessian_values_nh_gpu(
-    //            storage.hessian_structure,
-    //            storage.x_new_buffer,
-    //            d_M_diag,
-    //            storage.tetrahedra_buffer,
-    //            storage.Dm_inv_buffer,
-    //            storage.volumes_buffer,
-    //            mu,
-    //            lambda,
-    //            dt_sub,
-    //            num_particles,
-    //            storage.num_elements,
-    //            storage.hessian_values);
-    //        spdlog::info("[NeoHookean] Hessian updated");
+            //        // Update Hessian values
+            //        spdlog::info("[NeoHookean] Updating Hessian values...");
+            //        rzsim_cuda::update_hessian_values_nh_gpu(
+            //            storage.hessian_structure,
+            //            storage.x_new_buffer,
+            //            d_M_diag,
+            //            storage.tetrahedra_buffer,
+            //            storage.Dm_inv_buffer,
+            //            storage.volumes_buffer,
+            //            mu,
+            //            lambda,
+            //            dt_sub,
+            //            num_particles,
+            //            storage.num_elements,
+            //            storage.hessian_values);
+            //        spdlog::info("[NeoHookean] Hessian updated");
 
-    //        // Solve H * p = -grad using CUDA CG
-    //        float cg_tol = std::max(1e-9f, grad_norm * 1e-3f);
+            //        // Solve H * p = -grad using CUDA CG
+            //        float cg_tol = std::max(1e-9f, grad_norm * 1e-3f);
 
-    //        Ruzino::Solver::SolverConfig solver_config;
-    //        solver_config.tolerance = cg_tol;
-    //        solver_config.max_iterations = 1000;
-    //        solver_config.use_preconditioner = true;
-    //        solver_config.verbose = false;
+            //        Ruzino::Solver::SolverConfig solver_config;
+            //        solver_config.tolerance = cg_tol;
+            //        solver_config.max_iterations = 1000;
+            //        solver_config.use_preconditioner = true;
+            //        solver_config.verbose = false;
 
-    //        // Negate gradient for RHS
-    //        spdlog::info("[NeoHookean] Negating gradient...");
-    //        rzsim_cuda::negate_nh_gpu(
-    //            d_gradients, storage.neg_gradient_buffer, num_particles * 3);
+            //        // Negate gradient for RHS
+            //        spdlog::info("[NeoHookean] Negating gradient...");
+            //        rzsim_cuda::negate_nh_gpu(
+            //            d_gradients, storage.neg_gradient_buffer,
+            //            num_particles * 3);
 
-    //        // Solve on GPU
-    //        spdlog::info("[NeoHookean] Solving linear system with CG...");
-    //        auto result = storage.solver->solveGPU(
-    //            storage.hessian_structure.num_rows,
-    //            storage.hessian_structure.nnz,
-    //            reinterpret_cast<const int*>(
-    //                storage.hessian_structure.row_offsets->get_device_ptr()),
-    //            reinterpret_cast<const int*>(
-    //                storage.hessian_structure.col_indices->get_device_ptr()),
-    //            reinterpret_cast<const float*>(
-    //                storage.hessian_values->get_device_ptr()),
-    //            reinterpret_cast<const float*>(
-    //                storage.neg_gradient_buffer->get_device_ptr()),
-    //            reinterpret_cast<float*>(
-    //                storage.newton_direction_buffer->get_device_ptr()),
-    //            solver_config);
+            //        // Solve on GPU
+            //        spdlog::info("[NeoHookean] Solving linear system with
+            //        CG..."); auto result = storage.solver->solveGPU(
+            //            storage.hessian_structure.num_rows,
+            //            storage.hessian_structure.nnz,
+            //            reinterpret_cast<const int*>(
+            //                storage.hessian_structure.row_offsets->get_device_ptr()),
+            //            reinterpret_cast<const int*>(
+            //                storage.hessian_structure.col_indices->get_device_ptr()),
+            //            reinterpret_cast<const float*>(
+            //                storage.hessian_values->get_device_ptr()),
+            //            reinterpret_cast<const float*>(
+            //                storage.neg_gradient_buffer->get_device_ptr()),
+            //            reinterpret_cast<float*>(
+            //                storage.newton_direction_buffer->get_device_ptr()),
+            //            solver_config);
 
-    //        if (!result.converged) {
-    //            spdlog::warn(
-    //                "[NeoHookean] CG solver did not converge in iteration {}",
-    //                iter);
-    //        }
-    //        else {
-    //            spdlog::info(
-    //                "[NeoHookean] CG solver converged in {} iterations",
-    //                result.iterations);
-    //        }
+            //        if (!result.converged) {
+            //            spdlog::warn(
+            //                "[NeoHookean] CG solver did not converge in
+            //                iteration
+            //                {}", iter);
+            //        }
+            //        else {
+            //            spdlog::info(
+            //                "[NeoHookean] CG solver converged in {}
+            //                iterations", result.iterations);
+            //        }
 
-    //        // Line search with energy descent
-    //        spdlog::info("[NeoHookean] Starting line search...");
-    //        float E_current = rzsim_cuda::compute_energy_nh_gpu(
-    //            storage.x_new_buffer,
-    //            d_next_positions,
-    //            d_M_diag,
-    //            d_f_ext,
-    //            storage.tetrahedra_buffer,
-    //            storage.Dm_inv_buffer,
-    //            storage.volumes_buffer,
-    //            mu,
-    //            lambda,
-    //            dt_sub,
-    //            num_particles,
-    //            storage.num_elements,
-    //            storage.inertial_terms_buffer,
-    //            storage.element_energies_buffer,
-    //            storage.potential_terms_buffer);
+            //        // Line search with energy descent
+            //        spdlog::info("[NeoHookean] Starting line search...");
+            //        float E_current = rzsim_cuda::compute_energy_nh_gpu(
+            //            storage.x_new_buffer,
+            //            d_next_positions,
+            //            d_M_diag,
+            //            d_f_ext,
+            //            storage.tetrahedra_buffer,
+            //            storage.Dm_inv_buffer,
+            //            storage.volumes_buffer,
+            //            mu,
+            //            lambda,
+            //            dt_sub,
+            //            num_particles,
+            //            storage.num_elements,
+            //            storage.inertial_terms_buffer,
+            //            storage.element_energies_buffer,
+            //            storage.potential_terms_buffer);
 
-    //        float alpha = 1.0f;
-    //        int ls_iter = 0;
-    //        float E_candidate = std::numeric_limits<float>::infinity();
+            //        float alpha = 1.0f;
+            //        int ls_iter = 0;
+            //        float E_candidate =
+            //        std::numeric_limits<float>::infinity();
 
-    //        while (E_candidate > E_current && ls_iter < 50) {
-    //            // x_candidate = x_new + alpha * p
-    //            rzsim_cuda::axpy_nh_gpu(
-    //                alpha,
-    //                storage.newton_direction_buffer,
-    //                storage.x_new_buffer,
-    //                storage.x_candidate_buffer,
-    //                num_particles * 3);
+            //        while (E_candidate > E_current && ls_iter < 50) {
+            //            // x_candidate = x_new + alpha * p
+            //            rzsim_cuda::axpy_nh_gpu(
+            //                alpha,
+            //                storage.newton_direction_buffer,
+            //                storage.x_new_buffer,
+            //                storage.x_candidate_buffer,
+            //                num_particles * 3);
 
-    //            E_candidate = rzsim_cuda::compute_energy_nh_gpu(
-    //                storage.x_candidate_buffer,
-    //                d_next_positions,
-    //                d_M_diag,
-    //                d_f_ext,
-    //                storage.tetrahedra_buffer,
-    //                storage.Dm_inv_buffer,
-    //                storage.volumes_buffer,
-    //                mu,
-    //                lambda,
-    //                dt_sub,
-    //                num_particles,
-    //                storage.num_elements,
-    //                storage.inertial_terms_buffer,
-    //                storage.element_energies_buffer,
-    //                storage.potential_terms_buffer);
+            //            E_candidate = rzsim_cuda::compute_energy_nh_gpu(
+            //                storage.x_candidate_buffer,
+            //                d_next_positions,
+            //                d_M_diag,
+            //                d_f_ext,
+            //                storage.tetrahedra_buffer,
+            //                storage.Dm_inv_buffer,
+            //                storage.volumes_buffer,
+            //                mu,
+            //                lambda,
+            //                dt_sub,
+            //                num_particles,
+            //                storage.num_elements,
+            //                storage.inertial_terms_buffer,
+            //                storage.element_energies_buffer,
+            //                storage.potential_terms_buffer);
 
-    //            if (E_candidate <= E_current) {
-    //                storage.x_new_buffer->copy_from_device(
-    //                    storage.x_candidate_buffer.Get());
-    //                break;
-    //            }
+            //            if (E_candidate <= E_current) {
+            //                storage.x_new_buffer->copy_from_device(
+            //                    storage.x_candidate_buffer.Get());
+            //                break;
+            //            }
 
-    //            alpha *= 0.5f;
-    //            ls_iter++;
-    //        }
+            //            alpha *= 0.5f;
+            //            ls_iter++;
+            //        }
 
-    //        if (alpha < 1e-4f) {
-    //            spdlog::warn("Line search failed, alpha too small");
-    //            break;
-    //        }
-    //    }
+            //        if (alpha < 1e-4f) {
+            //            spdlog::warn("Line search failed, alpha too small");
+            //            break;
+            //        }
+        }
 
-    //    // Update velocities: v = (x_new - x_n) / dt_sub and apply damping
-    //    spdlog::info("[NeoHookean] Updating velocities...");
-    //    auto x_new_final = storage.x_new_buffer->get_host_vector<float>();
-    //    auto x_n_host = d_positions->get_host_vector<glm::vec3>();
-    //    std::vector<glm::vec3> v_new(num_particles);
-    //    for (int i = 0; i < num_particles; i++) {
-    //        v_new[i].x =
-    //            (x_new_final[i * 3 + 0] - x_n_host[i].x) / dt_sub * damping;
-    //        v_new[i].y =
-    //            (x_new_final[i * 3 + 1] - x_n_host[i].y) / dt_sub * damping;
-    //        v_new[i].z =
-    //            (x_new_final[i * 3 + 2] - x_n_host[i].z) / dt_sub * damping;
-    //    }
+        //    // Update velocities: v = (x_new - x_n) / dt_sub and apply damping
+        //    spdlog::info("[NeoHookean] Updating velocities...");
+        //    auto x_new_final = storage.x_new_buffer->get_host_vector<float>();
+        //    auto x_n_host = d_positions->get_host_vector<glm::vec3>();
+        //    std::vector<glm::vec3> v_new(num_particles);
+        //    for (int i = 0; i < num_particles; i++) {
+        //        v_new[i].x =
+        //            (x_new_final[i * 3 + 0] - x_n_host[i].x) / dt_sub *
+        //            damping;
+        //        v_new[i].y =
+        //            (x_new_final[i * 3 + 1] - x_n_host[i].y) / dt_sub *
+        //            damping;
+        //        v_new[i].z =
+        //            (x_new_final[i * 3 + 2] - x_n_host[i].z) / dt_sub *
+        //            damping;
+        //    }
 
-    //    // Handle ground collision (z = 0)
-    //    for (int i = 0; i < num_particles; i++) {
-    //        float z_new = x_new_final[i * 3 + 2];
-    //        if (z_new < 0.0f) {
-    //            x_new_final[i * 3 + 2] = 0.0f;
+        //    // Handle ground collision (z = 0)
+        //    for (int i = 0; i < num_particles; i++) {
+        //        float z_new = x_new_final[i * 3 + 2];
+        //        if (z_new < 0.0f) {
+        //            x_new_final[i * 3 + 2] = 0.0f;
 
-    //            // Reflect velocity with restitution
-    //            if (v_new[i].z < 0.0f) {
-    //                v_new[i].z = -v_new[i].z * restitution;
-    //            }
-    //        }
-    //    }
+        //            // Reflect velocity with restitution
+        //            if (v_new[i].z < 0.0f) {
+        //                v_new[i].z = -v_new[i].z * restitution;
+        //            }
+        //        }
+        //    }
 
-    //    // Convert to output format
-    //    std::vector<glm::vec3> new_positions(num_particles);
-    //    for (int i = 0; i < num_particles; i++) {
-    //        new_positions[i].x = x_new_final[i * 3 + 0];
-    //        new_positions[i].y = x_new_final[i * 3 + 1];
-    //        new_positions[i].z = x_new_final[i * 3 + 2];
-    //    }
+        //    // Convert to output format
+        //    std::vector<glm::vec3> new_positions(num_particles);
+        //    for (int i = 0; i < num_particles; i++) {
+        //        new_positions[i].x = x_new_final[i * 3 + 0];
+        //        new_positions[i].y = x_new_final[i * 3 + 1];
+        //        new_positions[i].z = x_new_final[i * 3 + 2];
+        //    }
 
-    //    d_velocities->assign_host_vector(v_new);
-    //    d_positions->assign_host_vector(new_positions);
-    //    spdlog::info("[NeoHookean] Substep {} completed", substep + 1);
-    //}
+        //    d_velocities->assign_host_vector(v_new);
+        //    d_positions->assign_host_vector(new_positions);
+        //    spdlog::info("[NeoHookean] Substep {} completed", substep + 1);
+    }
 
     // Update geometry with new positions
     if (mesh_component) {

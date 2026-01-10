@@ -33,9 +33,9 @@ void explicit_step_nh_gpu(
     float* x_tilde_ptr = x_tilde->get_device_ptr<float>();
 
     cuda::GPUParallelFor(
-        "explicit_step_nh",
-        num_particles * 3,
-        [=] __device__(int i) { x_tilde_ptr[i] = x_ptr[i] + dt * v_ptr[i]; });
+        "explicit_step_nh", num_particles * 3, [=] __device__(int i) {
+            x_tilde_ptr[i] = x_ptr[i] + dt * v_ptr[i];
+        });
 }
 
 void setup_external_forces_nh_gpu(
@@ -46,9 +46,10 @@ void setup_external_forces_nh_gpu(
 {
     float* f_ext_ptr = f_ext->get_device_ptr<float>();
 
-    cuda::GPUParallelFor("setup_external_forces_nh", num_particles * 3, [=] __device__(int i) {
-        f_ext_ptr[i] = (i % 3 == 2) ? mass * gravity : 0.0f;
-    });
+    cuda::GPUParallelFor(
+        "setup_external_forces_nh", num_particles * 3, [=] __device__(int i) {
+            f_ext_ptr[i] = (i % 3 == 2) ? mass * gravity : 0.0f;
+        });
 }
 
 // ============================================================================
@@ -88,11 +89,10 @@ __device__ void compute_deformation_gradient(
     F = Ds * Dm_inv_mat;
 }
 
-// Neo-Hookean energy density: Ψ = μ/2 * (tr(F^T F) - 3) - μ log(J) + λ/2 * log(J)^2
-__device__ float neo_hookean_energy_density(
-    const Eigen::Matrix3f& F,
-    float mu,
-    float lambda)
+// Neo-Hookean energy density: Ψ = μ/2 * (tr(F^T F) - 3) - μ log(J) + λ/2 *
+// log(J)^2
+__device__ float
+neo_hookean_energy_density(const Eigen::Matrix3f& F, float mu, float lambda)
 {
     float J = F.determinant();
     if (J <= 0.0f) {
@@ -104,7 +104,8 @@ __device__ float neo_hookean_energy_density(
     float I1 = FtF.trace();  // tr(F^T F)
     float log_J = logf(J);
 
-    float psi = 0.5f * mu * (I1 - 3.0f) - mu * log_J + 0.5f * lambda * log_J * log_J;
+    float psi =
+        0.5f * mu * (I1 - 3.0f) - mu * log_J + 0.5f * lambda * log_J * log_J;
     return psi;
 }
 
@@ -116,19 +117,54 @@ __device__ void compute_pk1_stress(
     Eigen::Matrix3f& P)
 {
     float J = F.determinant();
-    if (J <= 1e-10f) {
-        // Degenerate case
+    if (fabsf(J) <= 1e-6f || !isfinite(J)) {
+        // Degenerate/inverted case
         P.setZero();
         return;
     }
 
     Eigen::Matrix3f F_inv_T = F.inverse().transpose();
-    float log_J = logf(J);
+
+    // Check inverse validity
+    bool valid = true;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite(F_inv_T(i, j))) {
+                valid = false;
+                break;
+            }
+        }
+        if (!valid)
+            break;
+    }
+
+    if (!valid) {
+        P.setZero();
+        return;
+    }
+
+    float log_J = logf(fabsf(J));
+
+    if (!isfinite(log_J)) {
+        P.setZero();
+        return;
+    }
 
     P = mu * (F - F_inv_T) + lambda * log_J * F_inv_T;
+
+    // Check result
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite(P(i, j))) {
+                P.setZero();
+                return;
+            }
+        }
+    }
 }
 
 // Compute gradient contribution from one tetrahedron
+// REWRITTEN using raw float arrays to avoid Eigen::Matrix stack issues
 __device__ void add_element_gradient(
     const float* x_curr,
     const int* tet,
@@ -138,33 +174,100 @@ __device__ void add_element_gradient(
     float lambda,
     float* grad_local)
 {
-    Eigen::Matrix3f F;
-    compute_deformation_gradient(x_curr, tet, Dm_inv, F);
+    // Compute F = Ds * Dm_inv manually
+    // Ds = [x1-x0, x2-x0, x3-x0]
 
-    Eigen::Matrix3f P;
-    compute_pk1_stress(F, mu, lambda, P);
+    // Get vertex positions
+    float x0[3] = { x_curr[tet[0] * 3 + 0],
+                    x_curr[tet[0] * 3 + 1],
+                    x_curr[tet[0] * 3 + 2] };
+    float x1[3] = { x_curr[tet[1] * 3 + 0],
+                    x_curr[tet[1] * 3 + 1],
+                    x_curr[tet[1] * 3 + 2] };
+    float x2[3] = { x_curr[tet[2] * 3 + 0],
+                    x_curr[tet[2] * 3 + 1],
+                    x_curr[tet[2] * 3 + 2] };
+    float x3[3] = { x_curr[tet[3] * 3 + 0],
+                    x_curr[tet[3] * 3 + 1],
+                    x_curr[tet[3] * 3 + 2] };
 
-    // Load Dm_inv
-    Eigen::Matrix3f Dm_inv_mat;
+    // Ds columns
+    float ds0[3] = { x1[0] - x0[0], x1[1] - x0[1], x1[2] - x0[2] };
+    float ds1[3] = { x2[0] - x0[0], x2[1] - x0[1], x2[2] - x0[2] };
+    float ds2[3] = { x3[0] - x0[0], x3[1] - x0[1], x3[2] - x0[2] };
+
+    // F = Ds * Dm_inv (row-major 3x3 matrix)
+    float F[9];
+    for (int i = 0; i < 3; i++) {
+        // F[i, 0] = ds0[i] * Dm_inv[0,0] + ds1[i] * Dm_inv[1,0] + ds2[i] *
+        // Dm_inv[2,0]
+        F[i * 3 + 0] =
+            ds0[i] * Dm_inv[0] + ds1[i] * Dm_inv[3] + ds2[i] * Dm_inv[6];
+        // F[i, 1] = ds0[i] * Dm_inv[0,1] + ds1[i] * Dm_inv[1,1] + ds2[i] *
+        // Dm_inv[2,1]
+        F[i * 3 + 1] =
+            ds0[i] * Dm_inv[1] + ds1[i] * Dm_inv[4] + ds2[i] * Dm_inv[7];
+        // F[i, 2] = ds0[i] * Dm_inv[0,2] + ds1[i] * Dm_inv[1,2] + ds2[i] *
+        // Dm_inv[2,2]
+        F[i * 3 + 2] =
+            ds0[i] * Dm_inv[2] + ds1[i] * Dm_inv[5] + ds2[i] * Dm_inv[8];
+    }
+
+    // Compute J = det(F)
+    float J = F[0] * (F[4] * F[8] - F[5] * F[7]) -
+              F[1] * (F[3] * F[8] - F[5] * F[6]) +
+              F[2] * (F[3] * F[7] - F[4] * F[6]);
+
+    if (fabsf(J) <= 1e-6f) {
+        // Zero gradient
+        for (int i = 0; i < 12; i++)
+            grad_local[i] = 0.0f;
+        return;
+    }
+
+    // Compute F_inv_T (F^{-T}) manually
+    float invJ = 1.0f / J;
+    float F_inv_T[9];
+    F_inv_T[0] = (F[4] * F[8] - F[5] * F[7]) * invJ;
+    F_inv_T[1] = (F[5] * F[6] - F[3] * F[8]) * invJ;
+    F_inv_T[2] = (F[3] * F[7] - F[4] * F[6]) * invJ;
+    F_inv_T[3] = (F[2] * F[7] - F[1] * F[8]) * invJ;
+    F_inv_T[4] = (F[0] * F[8] - F[2] * F[6]) * invJ;
+    F_inv_T[5] = (F[1] * F[6] - F[0] * F[7]) * invJ;
+    F_inv_T[6] = (F[1] * F[5] - F[2] * F[4]) * invJ;
+    F_inv_T[7] = (F[2] * F[3] - F[0] * F[5]) * invJ;
+    F_inv_T[8] = (F[0] * F[4] - F[1] * F[3]) * invJ;
+
+    float log_J = logf(J);
+
+    // P = mu * (F - F_inv_T) + lambda * log_J * F_inv_T
+    float P[9];
+    for (int i = 0; i < 9; i++) {
+        P[i] = mu * (F[i] - F_inv_T[i]) + lambda * log_J * F_inv_T[i];
+    }
+
+    // H = -V * P * Dm_inv^T
+    float H[9];
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            Dm_inv_mat(i, j) = Dm_inv[j * 3 + i];
+            H[i * 3 + j] = 0.0f;
+            for (int k = 0; k < 3; k++) {
+                // Dm_inv^T[k,j] = Dm_inv[j*3 + k]
+                H[i * 3 + j] += -volume * P[i * 3 + k] * Dm_inv[j * 3 + k];
+            }
         }
     }
 
-    // H = -V * P * Dm_inv^T (force on vertices)
-    Eigen::Matrix3f H = -volume * P * Dm_inv_mat.transpose();
-
     // Forces on vertices 1, 2, 3
     for (int i = 0; i < 3; i++) {
-        grad_local[1 * 3 + i] = H(i, 0);
-        grad_local[2 * 3 + i] = H(i, 1);
-        grad_local[3 * 3 + i] = H(i, 2);
+        grad_local[1 * 3 + i] = H[i * 3 + 0];
+        grad_local[2 * 3 + i] = H[i * 3 + 1];
+        grad_local[3 * 3 + i] = H[i * 3 + 2];
     }
 
     // Force on vertex 0 (equilibrium)
     for (int i = 0; i < 3; i++) {
-        grad_local[0 * 3 + i] = -(H(i, 0) + H(i, 1) + H(i, 2));
+        grad_local[0 * 3 + i] = -(H[i * 3 + 0] + H[i * 3 + 1] + H[i * 3 + 2]);
     }
 }
 
@@ -189,9 +292,12 @@ __global__ void compute_gradient_nh_kernel(
         return;
 
     // Initialize with inertial term: M * (x - x_tilde)
-    grad[i * 3 + 0] = M_diag[i * 3 + 0] * (x_curr[i * 3 + 0] - x_tilde[i * 3 + 0]);
-    grad[i * 3 + 1] = M_diag[i * 3 + 1] * (x_curr[i * 3 + 1] - x_tilde[i * 3 + 1]);
-    grad[i * 3 + 2] = M_diag[i * 3 + 2] * (x_curr[i * 3 + 2] - x_tilde[i * 3 + 2]);
+    grad[i * 3 + 0] =
+        M_diag[i * 3 + 0] * (x_curr[i * 3 + 0] - x_tilde[i * 3 + 0]);
+    grad[i * 3 + 1] =
+        M_diag[i * 3 + 1] * (x_curr[i * 3 + 1] - x_tilde[i * 3 + 1]);
+    grad[i * 3 + 2] =
+        M_diag[i * 3 + 2] * (x_curr[i * 3 + 2] - x_tilde[i * 3 + 2]);
 
     // Subtract external forces
     grad[i * 3 + 0] -= dt * dt * f_ext[i * 3 + 0];
@@ -202,30 +308,81 @@ __global__ void compute_gradient_nh_kernel(
 // Accumulate elastic forces from elements
 __global__ void accumulate_elastic_forces_kernel(
     const float* x_curr,
-    const int* tetrahedra,
+    const unsigned* adjacency,
+    const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
     const float* Dm_inv,
     const float* volumes,
     float mu,
     float lambda,
     float dt,
     int num_elements,
+    int num_particles,
     float* grad)
 {
     int elem_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (elem_idx >= num_elements)
         return;
 
-    const int* tet = &tetrahedra[elem_idx * 4];
+    // Step 1: Test mapping lookup
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
+    if (v_apex < 0 || v_apex >= num_particles) {
+        return;
+    }
+
+    unsigned offset = offsets[v_apex];
+    unsigned count = adjacency[offset];
+
+    if (local_face_idx < 0 || local_face_idx >= (int)count) {
+        return;
+    }
+
+    unsigned face_a = adjacency[offset + 1 + local_face_idx * 3 + 0];
+    unsigned face_b = adjacency[offset + 1 + local_face_idx * 3 + 1];
+    unsigned face_c = adjacency[offset + 1 + local_face_idx * 3 + 2];
+
+    if (face_a >= (unsigned)num_particles ||
+        face_b >= (unsigned)num_particles ||
+        face_c >= (unsigned)num_particles) {
+        return;
+    }
+
+    int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
     const float* Dm_inv_local = &Dm_inv[elem_idx * 9];
     float volume = volumes[elem_idx];
 
-    float grad_local[12] = {0};
-    add_element_gradient(x_curr, tet, Dm_inv_local, volume, mu, lambda, grad_local);
+    if (volume <= 0.0f || !isfinite(volume)) {
+        return;
+    }
+
+    // Compute gradient with raw float arrays
+    float grad_local[12] = { 0 };
+    add_element_gradient(
+        x_curr, tet, Dm_inv_local, volume, mu, lambda, grad_local);
+
+    // Check for NaN/Inf in grad_local
+    bool valid = true;
+    for (int i = 0; i < 12; i++) {
+        if (!isfinite(grad_local[i])) {
+            valid = false;
+            break;
+        }
+    }
+
+    if (!valid) {
+        return;
+    }
 
     // Add scaled elastic forces to gradient (dt^2 scaling)
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
-            atomicAdd(&grad[tet[i] * 3 + j], dt * dt * grad_local[i * 3 + j]);
+            int idx = tet[i] * 3 + j;
+            if (idx >= 0 && idx < num_particles * 3) {
+                atomicAdd(&grad[idx], dt * dt * grad_local[i * 3 + j]);
+            }
         }
     }
 }
@@ -235,7 +392,10 @@ void compute_gradient_nh_gpu(
     cuda::CUDALinearBufferHandle x_tilde,
     cuda::CUDALinearBufferHandle M_diag,
     cuda::CUDALinearBufferHandle f_ext,
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,
     cuda::CUDALinearBufferHandle volumes,
     float mu,
@@ -255,7 +415,7 @@ void compute_gradient_nh_gpu(
         x_tilde->get_device_ptr<float>(),
         M_diag->get_device_ptr<float>(),
         f_ext->get_device_ptr<float>(),
-        tetrahedra->get_device_ptr<int>(),
+        nullptr,  // Not used in this kernel
         Dm_inv->get_device_ptr<float>(),
         volumes->get_device_ptr<float>(),
         mu,
@@ -268,13 +428,17 @@ void compute_gradient_nh_gpu(
     // Second pass: elastic forces
     accumulate_elastic_forces_kernel<<<num_blocks_elements, block_size>>>(
         x_curr->get_device_ptr<float>(),
-        tetrahedra->get_device_ptr<int>(),
+        adjacency->get_device_ptr<unsigned>(),
+        offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
         Dm_inv->get_device_ptr<float>(),
         volumes->get_device_ptr<float>(),
         mu,
         lambda,
         dt,
         num_elements,
+        num_particles,
         grad->get_device_ptr<float>());
 
     cudaDeviceSynchronize();
@@ -350,7 +514,8 @@ __device__ Eigen::Matrix3f project_psd_nh(const Eigen::Matrix3f& H)
             eigenvalues(i) = 0.0f;
     }
 
-    Eigen::Matrix3f result = eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
+    Eigen::Matrix3f result =
+        eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
     return result;
 }
 
@@ -386,8 +551,8 @@ __device__ void compute_element_hessian(
     }
 
     // Compute elasticity tensor components
-    // This is a simplified version - full implementation would compute dP/dF tensor
-    // For Neo-Hookean: ∂²Ψ/∂F∂F involves material tangent moduli
+    // This is a simplified version - full implementation would compute dP/dF
+    // tensor For Neo-Hookean: ∂²Ψ/∂F∂F involves material tangent moduli
 
     // Simplified approach: numerical or analytical tangent stiffness
     // Here we use a simplified form that's positive definite
@@ -403,14 +568,17 @@ __device__ void compute_element_hessian(
             if (i == j) {
                 // Diagonal blocks
                 K_ij = (mu + lambda) * Eigen::Matrix3f::Identity();
-            } else if (i == 0 || j == 0) {
+            }
+            else if (i == 0 || j == 0) {
                 // Blocks involving vertex 0
                 K_ij = -mu * Eigen::Matrix3f::Identity();
-            } else {
+            }
+            else {
                 // Off-diagonal blocks between vertices 1,2,3
                 int idx_i = i - 1;
                 int idx_j = j - 1;
-                K_ij = mu * Dm_inv_mat.col(idx_i) * Dm_inv_mat.col(idx_j).transpose();
+                K_ij = mu * Dm_inv_mat.col(idx_i) *
+                       Dm_inv_mat.col(idx_j).transpose();
             }
 
             // Apply volume scaling and project to PSD
@@ -444,9 +612,11 @@ __device__ int find_entry_position_nh(
 
         if (row == target_row && col == target_col) {
             return mid;
-        } else if (row < target_row || (row == target_row && col < target_col)) {
+        }
+        else if (row < target_row || (row == target_row && col < target_col)) {
             left = mid + 1;
-        } else {
+        }
+        else {
             right = mid - 1;
         }
     }
@@ -456,14 +626,20 @@ __device__ int find_entry_position_nh(
 
 // Build CSR structure for Neo-Hookean Hessian
 NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     int num_particles,
     int num_elements)
 {
     NeoHookeanCSRStructure structure;
     int n = num_particles * 3;
 
-    const int* tet_ptr = tetrahedra->get_device_ptr<int>();
+    const unsigned* adj_ptr = adjacency->get_device_ptr<unsigned>();
+    const unsigned* off_ptr = offsets->get_device_ptr<unsigned>();
+    const int* elem_to_v_ptr = element_to_vertex->get_device_ptr<int>();
+    const int* elem_to_lf_ptr = element_to_local_face->get_device_ptr<int>();
 
     // Each tetrahedron contributes 12x12 = 144 entries
     int num_mass_entries = n;
@@ -481,50 +657,64 @@ NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
     int* write_offset = d_write_offset->get_device_ptr<int>();
 
     // Generate all (row, col) pairs
-    cuda::GPUParallelFor("generate_entries_nh", total_entries, [=] __device__(int idx) {
-        if (idx < num_mass_entries) {
-            // Mass diagonal entries
-            rows[idx] = idx;
-            cols[idx] = idx;
-        } else {
-            // Element entries
-            int elem_entry_idx = idx - num_mass_entries;
-            int elem_idx = elem_entry_idx / 144;
-            int local_idx = elem_entry_idx % 144;
+    cuda::GPUParallelFor(
+        "generate_entries_nh", total_entries, [=] __device__(int idx) {
+            if (idx < num_mass_entries) {
+                // Mass diagonal entries
+                rows[idx] = idx;
+                cols[idx] = idx;
+            }
+            else {
+                // Element entries
+                int elem_entry_idx = idx - num_mass_entries;
+                int elem_idx = elem_entry_idx / 144;
+                int local_idx = elem_entry_idx % 144;
 
-            int local_row = local_idx / 12;
-            int local_col = local_idx % 12;
+                int local_row = local_idx / 12;
+                int local_col = local_idx % 12;
 
-            const int* tet = &tet_ptr[elem_idx * 4];
-            int global_row = tet[local_row / 3] * 3 + (local_row % 3);
-            int global_col = tet[local_col / 3] * 3 + (local_col % 3);
+                // Use precomputed mapping
+                int v_apex = elem_to_v_ptr[elem_idx];
+                int local_face_idx = elem_to_lf_ptr[elem_idx];
 
-            rows[idx] = global_row;
-            cols[idx] = global_col;
-        }
-    });
+                unsigned offset = off_ptr[v_apex];
+                unsigned face_a = adj_ptr[offset + 1 + local_face_idx * 3 + 0];
+                unsigned face_b = adj_ptr[offset + 1 + local_face_idx * 3 + 1];
+                unsigned face_c = adj_ptr[offset + 1 + local_face_idx * 3 + 2];
+                int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
+
+                int global_row = tet[local_row / 3] * 3 + (local_row % 3);
+                int global_col = tet[local_col / 3] * 3 + (local_col % 3);
+
+                rows[idx] = global_row;
+                cols[idx] = global_col;
+            }
+        });
 
     // Sort and deduplicate
     thrust::device_ptr<int> rows_ptr(rows);
     thrust::device_ptr<int> cols_ptr(cols);
 
-    auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
+    auto zip_begin =
+        thrust::make_zip_iterator(thrust::make_tuple(rows_ptr, cols_ptr));
     auto zip_end = zip_begin + total_entries;
 
-    thrust::sort(zip_begin, zip_end, [] __device__(const auto& a, const auto& b) {
-        int r1 = thrust::get<0>(a);
-        int c1 = thrust::get<1>(a);
-        int r2 = thrust::get<0>(b);
-        int c2 = thrust::get<1>(b);
-        return (r1 < r2) || (r1 == r2 && c1 < c2);
-    });
+    thrust::sort(
+        zip_begin, zip_end, [] __device__(const auto& a, const auto& b) {
+            int r1 = thrust::get<0>(a);
+            int c1 = thrust::get<1>(a);
+            int r2 = thrust::get<0>(b);
+            int c2 = thrust::get<1>(b);
+            return (r1 < r2) || (r1 == r2 && c1 < c2);
+        });
 
     cudaDeviceSynchronize();
 
-    auto new_end = thrust::unique(zip_begin, zip_end, [] __device__(const auto& a, const auto& b) {
-        return thrust::get<0>(a) == thrust::get<0>(b) &&
-               thrust::get<1>(a) == thrust::get<1>(b);
-    });
+    auto new_end = thrust::unique(
+        zip_begin, zip_end, [] __device__(const auto& a, const auto& b) {
+            return thrust::get<0>(a) == thrust::get<0>(b) &&
+                   thrust::get<1>(a) == thrust::get<1>(b);
+        });
 
     int nnz = new_end - zip_begin;
     cudaDeviceSynchronize();
@@ -533,7 +723,8 @@ NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
     structure.col_indices = cuda::create_cuda_linear_buffer<int>(nnz);
     structure.row_offsets = cuda::create_cuda_linear_buffer<int>(n + 1);
     structure.mass_value_positions = cuda::create_cuda_linear_buffer<int>(n);
-    structure.element_value_positions = cuda::create_cuda_linear_buffer<int>(num_elements * 144);
+    structure.element_value_positions =
+        cuda::create_cuda_linear_buffer<int>(num_elements * 144);
 
     cudaMemcpy(
         structure.col_indices->get_device_ptr<int>(),
@@ -542,17 +733,23 @@ NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
         cudaMemcpyDeviceToDevice);
 
     // Build row_offsets
-    thrust::device_ptr<int> row_offsets_ptr(structure.row_offsets->get_device_ptr<int>());
+    thrust::device_ptr<int> row_offsets_ptr(
+        structure.row_offsets->get_device_ptr<int>());
     thrust::fill(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, 0);
 
     int* row_offsets_raw = structure.row_offsets->get_device_ptr<int>();
-    thrust::for_each(thrust::device, rows_ptr, rows_ptr + nnz, [=] __device__(int row) {
-        atomicAdd(&row_offsets_raw[row + 1], 1);
-    });
+    thrust::for_each(
+        thrust::device, rows_ptr, rows_ptr + nnz, [=] __device__(int row) {
+            atomicAdd(&row_offsets_raw[row + 1], 1);
+        });
 
     cudaDeviceSynchronize();
 
-    thrust::exclusive_scan(thrust::device, row_offsets_ptr, row_offsets_ptr + n + 1, row_offsets_ptr);
+    thrust::exclusive_scan(
+        thrust::device,
+        row_offsets_ptr,
+        row_offsets_ptr + n + 1,
+        row_offsets_ptr);
     cudaDeviceSynchronize();
 
     // Build mass diagonal positions
@@ -561,25 +758,40 @@ NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
     int* mass_positions = structure.mass_value_positions->get_device_ptr<int>();
 
     cuda::GPUParallelFor("build_mass_positions_nh", n, [=] __device__(int dof) {
-        mass_positions[dof] = find_entry_position_nh(unique_rows, unique_cols, nnz, dof, dof);
+        mass_positions[dof] =
+            find_entry_position_nh(unique_rows, unique_cols, nnz, dof, dof);
     });
 
     // Build element positions
-    int* elem_positions = structure.element_value_positions->get_device_ptr<int>();
+    int* elem_positions =
+        structure.element_value_positions->get_device_ptr<int>();
 
-    cuda::GPUParallelFor("build_element_positions_nh", num_elements * 144, [=] __device__(int idx) {
-        int elem_idx = idx / 144;
-        int local_idx = idx % 144;
+    cuda::GPUParallelFor(
+        "build_element_positions_nh",
+        num_elements * 144,
+        [=] __device__(int idx) {
+            int elem_idx = idx / 144;
+            int local_idx = idx % 144;
 
-        int local_row = local_idx / 12;
-        int local_col = local_idx % 12;
+            int local_row = local_idx / 12;
+            int local_col = local_idx % 12;
 
-        const int* tet = &tet_ptr[elem_idx * 4];
-        int global_row = tet[local_row / 3] * 3 + (local_row % 3);
-        int global_col = tet[local_col / 3] * 3 + (local_col % 3);
+            // Use precomputed mapping
+            int v_apex = elem_to_v_ptr[elem_idx];
+            int local_face_idx = elem_to_lf_ptr[elem_idx];
 
-        elem_positions[idx] = find_entry_position_nh(unique_rows, unique_cols, nnz, global_row, global_col);
-    });
+            unsigned offset = off_ptr[v_apex];
+            unsigned face_a = adj_ptr[offset + 1 + local_face_idx * 3 + 0];
+            unsigned face_b = adj_ptr[offset + 1 + local_face_idx * 3 + 1];
+            unsigned face_c = adj_ptr[offset + 1 + local_face_idx * 3 + 2];
+            int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
+
+            int global_row = tet[local_row / 3] * 3 + (local_row % 3);
+            int global_col = tet[local_col / 3] * 3 + (local_col % 3);
+
+            elem_positions[idx] = find_entry_position_nh(
+                unique_rows, unique_cols, nnz, global_row, global_col);
+        });
 
     structure.num_rows = n;
     structure.num_cols = n;
@@ -591,7 +803,10 @@ NeoHookeanCSRStructure build_hessian_structure_nh_gpu(
 // Fill Hessian values kernel
 __global__ void fill_hessian_values_nh_kernel(
     const float* x_curr,
-    const int* tetrahedra,
+    const unsigned* adjacency,
+    const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
     const float* Dm_inv,
     const float* volumes,
     const int* value_positions,
@@ -605,12 +820,21 @@ __global__ void fill_hessian_values_nh_kernel(
     if (elem_idx >= num_elements)
         return;
 
-    const int* tet = &tetrahedra[elem_idx * 4];
+    // Use precomputed mapping
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
+    unsigned offset = offsets[v_apex];
+    unsigned face_a = adjacency[offset + 1 + local_face_idx * 3 + 0];
+    unsigned face_b = adjacency[offset + 1 + local_face_idx * 3 + 1];
+    unsigned face_c = adjacency[offset + 1 + local_face_idx * 3 + 2];
+    int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
     const float* Dm_inv_local = &Dm_inv[elem_idx * 9];
     float volume = volumes[elem_idx];
 
     Eigen::Matrix<float, 12, 12> K_elem;
-    compute_element_hessian(x_curr, tet, Dm_inv_local, volume, mu, lambda, K_elem);
+    compute_element_hessian(
+        x_curr, tet, Dm_inv_local, volume, mu, lambda, K_elem);
 
     // Scale by dt^2
     K_elem *= (dt * dt);
@@ -629,7 +853,10 @@ void update_hessian_values_nh_gpu(
     const NeoHookeanCSRStructure& csr_structure,
     cuda::CUDALinearBufferHandle x_curr,
     cuda::CUDALinearBufferHandle M_diag,
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,
     cuda::CUDALinearBufferHandle volumes,
     float mu,
@@ -642,19 +869,22 @@ void update_hessian_values_nh_gpu(
     int num_dofs = num_particles * 3;
 
     // Zero out values
-    cudaMemset(values->get_device_ptr<float>(), 0, csr_structure.nnz * sizeof(float));
+    cudaMemset(
+        values->get_device_ptr<float>(), 0, csr_structure.nnz * sizeof(float));
 
     // Fill mass diagonal
     const float* M_diag_ptr = M_diag->get_device_ptr<float>();
-    const int* mass_positions = csr_structure.mass_value_positions->get_device_ptr<int>();
+    const int* mass_positions =
+        csr_structure.mass_value_positions->get_device_ptr<int>();
     float* values_ptr = values->get_device_ptr<float>();
 
-    cuda::GPUParallelFor("fill_mass_diagonal_nh", num_dofs, [=] __device__(int dof) {
-        int pos = mass_positions[dof];
-        if (pos >= 0) {
-            values_ptr[pos] = M_diag_ptr[dof];
-        }
-    });
+    cuda::GPUParallelFor(
+        "fill_mass_diagonal_nh", num_dofs, [=] __device__(int dof) {
+            int pos = mass_positions[dof];
+            if (pos >= 0) {
+                values_ptr[pos] = M_diag_ptr[dof];
+            }
+        });
 
     // Fill element contributions
     int block_size = 256;
@@ -662,7 +892,10 @@ void update_hessian_values_nh_gpu(
 
     fill_hessian_values_nh_kernel<<<num_blocks, block_size>>>(
         x_curr->get_device_ptr<float>(),
-        tetrahedra->get_device_ptr<int>(),
+        adjacency->get_device_ptr<unsigned>(),
+        offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
         Dm_inv->get_device_ptr<float>(),
         volumes->get_device_ptr<float>(),
         csr_structure.element_value_positions->get_device_ptr<int>(),
@@ -681,7 +914,10 @@ void update_hessian_values_nh_gpu(
 
 __global__ void compute_element_energy_kernel(
     const float* x_curr,
-    const int* tetrahedra,
+    const unsigned* adjacency,
+    const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
     const float* Dm_inv,
     const float* volumes,
     float mu,
@@ -693,7 +929,17 @@ __global__ void compute_element_energy_kernel(
     if (elem_idx >= num_elements)
         return;
 
-    const int* tet = &tetrahedra[elem_idx * 4];
+    // Use precomputed mapping
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
+    unsigned offset = offsets[v_apex];
+    int tet[4];
+    tet[0] = v_apex;
+    tet[1] = adjacency[offset + 1 + local_face_idx * 3 + 0];
+    tet[2] = adjacency[offset + 1 + local_face_idx * 3 + 1];
+    tet[3] = adjacency[offset + 1 + local_face_idx * 3 + 2];
+
     const float* Dm_inv_local = &Dm_inv[elem_idx * 9];
     float volume = volumes[elem_idx];
 
@@ -709,7 +955,10 @@ float compute_energy_nh_gpu(
     cuda::CUDALinearBufferHandle x_tilde,
     cuda::CUDALinearBufferHandle M_diag,
     cuda::CUDALinearBufferHandle f_ext,
-    cuda::CUDALinearBufferHandle tetrahedra,
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
     cuda::CUDALinearBufferHandle Dm_inv,
     cuda::CUDALinearBufferHandle volumes,
     float mu,
@@ -733,13 +982,15 @@ float compute_energy_nh_gpu(
     float* potential_ptr = d_potential_terms->get_device_ptr<float>();
 
     // Compute inertial energy
-    cuda::GPUParallelFor("compute_inertial_energy_nh", n, [=] __device__(int i) {
-        float diff = x_ptr[i] - x_tilde_ptr[i];
-        inertial_ptr[i] = 0.5f * M_ptr[i] * diff * diff;
-    });
+    cuda::GPUParallelFor(
+        "compute_inertial_energy_nh", n, [=] __device__(int i) {
+            float diff = x_ptr[i] - x_tilde_ptr[i];
+            inertial_ptr[i] = 0.5f * M_ptr[i] * diff * diff;
+        });
 
     thrust::device_ptr<float> d_inertial_thrust(inertial_ptr);
-    float E_inertial = thrust::reduce(thrust::device, d_inertial_thrust, d_inertial_thrust + n);
+    float E_inertial = thrust::reduce(
+        thrust::device, d_inertial_thrust, d_inertial_thrust + n);
 
     // Compute elastic energy
     cudaMemset(element_energy_ptr, 0, num_elements * sizeof(float));
@@ -749,7 +1000,10 @@ float compute_energy_nh_gpu(
 
     compute_element_energy_kernel<<<num_blocks, block_size>>>(
         x_ptr,
-        tetrahedra->get_device_ptr<int>(),
+        adjacency->get_device_ptr<unsigned>(),
+        offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
         Dm_inv->get_device_ptr<float>(),
         volumes->get_device_ptr<float>(),
         mu,
@@ -760,15 +1014,18 @@ float compute_energy_nh_gpu(
     cudaDeviceSynchronize();
 
     thrust::device_ptr<float> d_element_thrust(element_energy_ptr);
-    float E_elastic = thrust::reduce(thrust::device, d_element_thrust, d_element_thrust + num_elements);
+    float E_elastic = thrust::reduce(
+        thrust::device, d_element_thrust, d_element_thrust + num_elements);
 
     // Compute potential energy
-    cuda::GPUParallelFor("compute_potential_energy_nh", n, [=] __device__(int i) {
-        potential_ptr[i] = -dt * dt * x_ptr[i] * f_ptr[i];
-    });
+    cuda::GPUParallelFor(
+        "compute_potential_energy_nh", n, [=] __device__(int i) {
+            potential_ptr[i] = -dt * dt * x_ptr[i] * f_ptr[i];
+        });
 
     thrust::device_ptr<float> d_potential_thrust(potential_ptr);
-    float E_potential = thrust::reduce(thrust::device, d_potential_thrust, d_potential_thrust + n);
+    float E_potential = thrust::reduce(
+        thrust::device, d_potential_thrust, d_potential_thrust + n);
 
     float total_energy = E_inertial + dt * dt * E_elastic + E_potential;
 
@@ -783,6 +1040,8 @@ __global__ void compute_Dm_inv_kernel(
     const float* positions,
     const unsigned* adjacency,
     const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
     int num_elements,
     float* Dm_inv,
     float* volumes)
@@ -791,38 +1050,36 @@ __global__ void compute_Dm_inv_kernel(
     if (elem_idx >= num_elements)
         return;
 
-    // Extract tetrahedron from adjacency list
-    // Find which vertex and which opposite face this element corresponds to
-    int current_elem = 0;
-    int v_apex = 0;
-    int local_face_idx = 0;
-    
-    for (int v = 0; v < 100000; v++) {  // Upper bound on vertices
-        unsigned offset = offsets[v];
-        unsigned count = adjacency[offset];
-        
-        if (current_elem + count > elem_idx) {
-            v_apex = v;
-            local_face_idx = elem_idx - current_elem;
-            break;
-        }
-        current_elem += count;
-    }
-    
+    // Use precomputed mapping
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
     // Extract face vertices
     unsigned offset = offsets[v_apex];
     unsigned face_a = adjacency[offset + 1 + local_face_idx * 3 + 0];
     unsigned face_b = adjacency[offset + 1 + local_face_idx * 3 + 1];
     unsigned face_c = adjacency[offset + 1 + local_face_idx * 3 + 2];
-    
+
     // Tetrahedron vertices: apex + face (v_apex, face_a, face_b, face_c)
-    int tet[4] = {(int)v_apex, (int)face_a, (int)face_b, (int)face_c};
+    int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
 
     // Get rest positions
-    Eigen::Vector3f x0(positions[tet[0] * 3 + 0], positions[tet[0] * 3 + 1], positions[tet[0] * 3 + 2]);
-    Eigen::Vector3f x1(positions[tet[1] * 3 + 0], positions[tet[1] * 3 + 1], positions[tet[1] * 3 + 2]);
-    Eigen::Vector3f x2(positions[tet[2] * 3 + 0], positions[tet[2] * 3 + 1], positions[tet[2] * 3 + 2]);
-    Eigen::Vector3f x3(positions[tet[3] * 3 + 0], positions[tet[3] * 3 + 1], positions[tet[3] * 3 + 2]);
+    Eigen::Vector3f x0(
+        positions[tet[0] * 3 + 0],
+        positions[tet[0] * 3 + 1],
+        positions[tet[0] * 3 + 2]);
+    Eigen::Vector3f x1(
+        positions[tet[1] * 3 + 0],
+        positions[tet[1] * 3 + 1],
+        positions[tet[1] * 3 + 2]);
+    Eigen::Vector3f x2(
+        positions[tet[2] * 3 + 0],
+        positions[tet[2] * 3 + 1],
+        positions[tet[2] * 3 + 2]);
+    Eigen::Vector3f x3(
+        positions[tet[3] * 3 + 0],
+        positions[tet[3] * 3 + 1],
+        positions[tet[3] * 3 + 2]);
 
     // Compute Dm = [x1-x0, x2-x0, x3-x0]
     Eigen::Matrix3f Dm;
@@ -846,7 +1103,11 @@ __global__ void compute_Dm_inv_kernel(
     }
 }
 
-std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+std::tuple<
+    cuda::CUDALinearBufferHandle,
+    cuda::CUDALinearBufferHandle,
+    cuda::CUDALinearBufferHandle,
+    cuda::CUDALinearBufferHandle>
 compute_reference_data_gpu(
     cuda::CUDALinearBufferHandle positions,
     cuda::CUDALinearBufferHandle adjacency,
@@ -855,21 +1116,69 @@ compute_reference_data_gpu(
 {
     auto Dm_inv = cuda::create_cuda_linear_buffer<float>(num_elements * 9);
     auto volumes = cuda::create_cuda_linear_buffer<float>(num_elements);
+    auto element_to_vertex = cuda::create_cuda_linear_buffer<int>(num_elements);
+    auto element_to_local_face =
+        cuda::create_cuda_linear_buffer<int>(num_elements);
 
     int block_size = 256;
+    int num_vertices = offsets->getDesc().element_count - 1;
+
+    // Build prefix sum of element counts per vertex
+    auto element_base_indices =
+        cuda::create_cuda_linear_buffer<int>(num_vertices + 1);
+    const unsigned* adj_ptr = adjacency->get_device_ptr<unsigned>();
+    const unsigned* off_ptr = offsets->get_device_ptr<unsigned>();
+    int* base_ptr = element_base_indices->get_device_ptr<int>();
+    int* elem_to_v_ptr = element_to_vertex->get_device_ptr<int>();
+    int* elem_to_lf_ptr = element_to_local_face->get_device_ptr<int>();
+
+    // Extract element counts from adjacency
+    cuda::GPUParallelFor("extract_counts", num_vertices, [=] __device__(int v) {
+        base_ptr[v] = adj_ptr[off_ptr[v]];  // First entry is count
+    });
+    cudaMemset(base_ptr + num_vertices, 0, sizeof(int));  // Last entry
+    cudaDeviceSynchronize();
+
+    // Compute prefix sum to get base element index for each vertex
+    thrust::device_ptr<int> base_thrust(base_ptr);
+    thrust::exclusive_scan(
+        thrust::device,
+        base_thrust,
+        base_thrust + num_vertices + 1,
+        base_thrust);
+    cudaDeviceSynchronize();
+
+    // Now build mapping using prefix sum
+    cuda::GPUParallelFor("build_mapping", num_vertices, [=] __device__(int v) {
+        unsigned offset = off_ptr[v];
+        unsigned count = adj_ptr[offset];
+        int base_elem = base_ptr[v];
+
+        for (unsigned local_idx = 0; local_idx < count; local_idx++) {
+            int elem_idx = base_elem + local_idx;
+            elem_to_v_ptr[elem_idx] = v;
+            elem_to_lf_ptr[elem_idx] = local_idx;
+        }
+    });
+    cudaDeviceSynchronize();
+
+    // Then compute Dm_inv using mapping
     int num_blocks = (num_elements + block_size - 1) / block_size;
 
     compute_Dm_inv_kernel<<<num_blocks, block_size>>>(
         positions->get_device_ptr<float>(),
         adjacency->get_device_ptr<unsigned>(),
         offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
         num_elements,
         Dm_inv->get_device_ptr<float>(),
         volumes->get_device_ptr<float>());
 
     cudaDeviceSynchronize();
 
-    return std::make_tuple(Dm_inv, volumes);
+    return std::make_tuple(
+        Dm_inv, volumes, element_to_vertex, element_to_local_face);
 }
 
 // ============================================================================
@@ -884,7 +1193,8 @@ void negate_nh_gpu(
     const float* in_ptr = input->get_device_ptr<float>();
     float* out_ptr = output->get_device_ptr<float>();
 
-    cuda::GPUParallelFor("negate_nh", size, [=] __device__(int i) { out_ptr[i] = -in_ptr[i]; });
+    cuda::GPUParallelFor(
+        "negate_nh", size, [=] __device__(int i) { out_ptr[i] = -in_ptr[i]; });
 }
 
 void axpy_nh_gpu(
@@ -904,7 +1214,10 @@ void axpy_nh_gpu(
 }
 
 struct square_op_nh {
-    __device__ float operator()(float x) const { return x * x; }
+    __device__ float operator()(float x) const
+    {
+        return x * x;
+    }
 };
 
 float compute_vector_norm_nh_gpu(cuda::CUDALinearBufferHandle vec, int size)

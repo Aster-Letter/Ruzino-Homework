@@ -420,7 +420,7 @@ __global__ void fill_volume_adjacency_kernel(
     }
 }
 
-std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle, unsigned>
 compute_volume_adjacency_gpu(
     cuda::CUDALinearBufferHandle vertices,
     cuda::CUDALinearBufferHandle triangles)
@@ -559,7 +559,15 @@ compute_volume_adjacency_gpu(
         num_vertices * sizeof(unsigned),
         cudaMemcpyDeviceToDevice);
 
-    return std::make_tuple(adjacency_buffer, offset_buffer);
+    // Calculate total number of tetrahedra (sum of all face counts)
+    unsigned total_elements = thrust::reduce(
+        thrust::device,
+        face_counts.begin(),
+        face_counts.end(),
+        0u,
+        thrust::plus<unsigned>());
+
+    return std::make_tuple(adjacency_buffer, offset_buffer, total_elements);
 }
 
 // Functor for comparing edge pairs

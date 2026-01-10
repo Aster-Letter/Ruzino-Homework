@@ -27,8 +27,9 @@ compute_surface_adjacency_gpu(
 // Format: [count_v0, a1,b1,c1, a2,b2,c2, ... | count_v1, ... ]
 // - adjacency_list: flattened triplets of opposite face vertices
 // - offset_buffer: starting position for each vertex
+// - num_elements: total number of tetrahedra
 RZSIM_CUDA_API
-std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle>
+std::tuple<cuda::CUDALinearBufferHandle, cuda::CUDALinearBufferHandle, unsigned>
 compute_volume_adjacency_gpu(
     cuda::CUDALinearBufferHandle vertices,
     cuda::CUDALinearBufferHandle triangles);  // triangle indices [v0,v1,v2, ...]

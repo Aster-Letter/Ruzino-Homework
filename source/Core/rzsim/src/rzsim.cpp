@@ -42,7 +42,9 @@ get_volume_adjacency_gpu(const Geometry& g)
     auto vertex_buffer = cuda::create_cuda_linear_buffer(vertices);
     auto triangle_buffer = cuda::create_cuda_linear_buffer(faceVertexIndices);
     
-    return rzsim_cuda::compute_volume_adjacency_gpu(vertex_buffer, triangle_buffer);
+    auto [adjacency, offsets, num_elements] = rzsim_cuda::compute_volume_adjacency_gpu(vertex_buffer, triangle_buffer);
+    // Discard num_elements for backward compatibility
+    return std::make_tuple(adjacency, offsets);
 }
 
 std::tuple<std::vector<unsigned>, std::vector<unsigned>>
