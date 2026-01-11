@@ -16,8 +16,9 @@ Added test cpp file will be scanned into <filename>_test.exe automatically.
 ## Test Instructions
 Run the following command in Ruzino/Binaries/Release:
 ```
-.\.\headless_render.exe -u ..\..\Assets\Ground.usdc -j ..\..\Assets\render_nodes_save.json -o profile_sponza.png -w 1920 -h 1080 -s 16 -v
+.\headless_render.exe -u ..\..\Assets\soft_body_neo.usdc -j ..\..\Assets\render_nodes_save.json -o test_gpu.png -w 400 -h 400 -s 1 -f 2 -n -v
 ```
+f = 2 means render 2 frames, which will trigger the soft body simulation in between.
 
 Or
 ```

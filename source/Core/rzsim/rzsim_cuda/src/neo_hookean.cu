@@ -48,6 +48,7 @@ void setup_external_forces_nh_gpu(
 
     cuda::GPUParallelFor(
         "setup_external_forces_nh", num_particles * 3, [=] __device__(int i) {
+            // Gravity acts on z-component (i % 3 == 2)
             f_ext_ptr[i] = (i % 3 == 2) ? mass * gravity : 0.0f;
         });
 }
@@ -218,6 +219,8 @@ __device__ void add_element_gradient(
               F[1] * (F[3] * F[8] - F[5] * F[6]) +
               F[2] * (F[3] * F[7] - F[4] * F[6]);
 
+
+
     if (fabsf(J) <= 1e-6f) {
         // Zero gradient
         for (int i = 0; i < 12; i++)
@@ -240,20 +243,24 @@ __device__ void add_element_gradient(
 
     float log_J = logf(J);
 
+
+
     // P = mu * (F - F_inv_T) + lambda * log_J * F_inv_T
     float P[9];
     for (int i = 0; i < 9; i++) {
         P[i] = mu * (F[i] - F_inv_T[i]) + lambda * log_J * F_inv_T[i];
     }
 
-    // H = -V * P * Dm_inv^T
+
+
+    // H = V * P * Dm_inv^T (gradient of elastic energy w.r.t. vertex positions)
     float H[9];
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
             H[i * 3 + j] = 0.0f;
             for (int k = 0; k < 3; k++) {
                 // Dm_inv^T[k,j] = Dm_inv[j*3 + k]
-                H[i * 3 + j] += -volume * P[i * 3 + k] * Dm_inv[j * 3 + k];
+                H[i * 3 + j] += volume * P[i * 3 + k] * Dm_inv[j * 3 + k];
             }
         }
     }
@@ -377,7 +384,10 @@ __global__ void accumulate_elastic_forces_kernel(
         return;
     }
 
-    // Add scaled elastic forces to gradient (dt^2 scaling)
+    // Add elastic forces to gradient
+    // Note: No dt^2 scaling here because the implicit integration energy
+    // E = 1/2 * (x - x_tilde)^T M (x - x_tilde) + dt^2 * Psi(x) - dt^2 * f_ext^T x
+    // already includes dt^2 in the elastic energy term
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             int idx = tet[i] * 3 + j;
@@ -521,6 +531,9 @@ __device__ Eigen::Matrix3f project_psd_nh(const Eigen::Matrix3f& H)
 }
 
 // Compute element Hessian (12x12) for Neo-Hookean model
+// Using St. Venant-Kirchhoff (SVK) Hessian as approximation
+// This is standard practice: use Neo-Hookean for gradient (forces)
+// but SVK for Hessian (stiffness matrix) because it's simpler and SPD
 __device__ void compute_element_hessian(
     const float* x_curr,
     const int* tet,
@@ -534,14 +547,10 @@ __device__ void compute_element_hessian(
     compute_deformation_gradient(x_curr, tet, Dm_inv, F);
 
     float J = F.determinant();
-    if (J <= 1e-10f) {
+    if (J <= 1e-10f || !isfinite(J)) {
         K_elem.setZero();
         return;
     }
-
-    Eigen::Matrix3f F_inv = F.inverse();
-    Eigen::Matrix3f F_inv_T = F_inv.transpose();
-    float log_J = logf(J);
 
     // Load Dm_inv
     Eigen::Matrix3f Dm_inv_mat;
@@ -551,44 +560,50 @@ __device__ void compute_element_hessian(
         }
     }
 
-    // Compute elasticity tensor components
-    // This is a simplified version - full implementation would compute dP/dF
-    // tensor For Neo-Hookean: ∂²Ψ/∂F∂F involves material tangent moduli
-
-    // Simplified approach: numerical or analytical tangent stiffness
-    // Here we use a simplified form that's positive definite
-
+    // St. Venant-Kirchhoff (SVK) elasticity tensor for tetrahedral FEM
+    // This gives a symmetric positive-definite Hessian
+    // C_ijkl = lambda * delta_ij * delta_kl + mu * (delta_ik * delta_jl + delta_il * delta_jk)
+    
     K_elem.setZero();
-
-    // Build 12x12 stiffness using 3x3 blocks
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            Eigen::Matrix3f K_ij;
-            K_ij.setZero();
-
-            if (i == j) {
-                // Diagonal blocks
-                K_ij = (mu + lambda) * Eigen::Matrix3f::Identity();
+    
+    // Build element stiffness matrix
+    // K_ab^(alpha,beta) = V * sum_{i,j,k,l} dF_ij/dx_a^alpha * C_ijkl * dF_kl/dx_b^beta
+    // For linear tetrahedron: dF/dx relates to Dm_inv
+    
+    for (int a = 0; a < 4; a++) {
+        for (int b = 0; b < 4; b++) {
+            Eigen::Matrix3f K_ab;
+            K_ab.setZero();
+            
+            // Shape function gradients in reference configuration
+            Eigen::Vector3f grad_Na, grad_Nb;
+            if (a == 0) {
+                grad_Na = -(Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
+            } else {
+                grad_Na = Dm_inv_mat.col(a - 1);
             }
-            else if (i == 0 || j == 0) {
-                // Blocks involving vertex 0
-                K_ij = -mu * Eigen::Matrix3f::Identity();
+            
+            if (b == 0) {
+                grad_Nb = -(Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
+            } else {
+                grad_Nb = Dm_inv_mat.col(b - 1);
             }
-            else {
-                // Off-diagonal blocks between vertices 1,2,3
-                int idx_i = i - 1;
-                int idx_j = j - 1;
-                K_ij = mu * Dm_inv_mat.col(idx_i) *
-                       Dm_inv_mat.col(idx_j).transpose();
-            }
-
-            // Apply volume scaling and project to PSD
-            K_ij = volume * project_psd_nh(K_ij);
-
+            
+            // Compute 3x3 stiffness block using SVK constitutive model
+            // For linear FEM: K_ab^(alpha,beta) = V * sum_{i,j} grad_Na^i C_{i alpha j beta} grad_Nb^j
+            // where C_{ijkl} = lambda * delta_ij * delta_kl + mu * (delta_ik * delta_jl + delta_il * delta_jk)
+            
+            float dot_product = grad_Na.dot(grad_Nb);
+            K_ab = volume * lambda * (grad_Na * grad_Nb.transpose());
+            K_ab += volume * mu * (grad_Na * grad_Nb.transpose() + Eigen::Matrix3f::Identity() * dot_product);
+            
+            // Project to PSD
+            K_ab = project_psd_nh(K_ab);
+            
             // Fill into 12x12 matrix
-            for (int a = 0; a < 3; a++) {
-                for (int b = 0; b < 3; b++) {
-                    K_elem(i * 3 + a, j * 3 + b) = K_ij(a, b);
+            for (int alpha = 0; alpha < 3; alpha++) {
+                for (int beta = 0; beta < 3; beta++) {
+                    K_elem(a * 3 + alpha, b * 3 + beta) = K_ab(alpha, beta);
                 }
             }
         }
@@ -956,7 +971,7 @@ __global__ void fill_hessian_values_nh_kernel(
     compute_element_hessian(
         x_curr, tet, Dm_inv_local, volume, mu, lambda, K_elem);
 
-    // Scale by dt^2
+    // Scale by dt^2 (same as gradient)
     K_elem *= (dt * dt);
 
     // Write to CSR values array
@@ -1214,11 +1229,11 @@ __global__ void compute_Dm_inv_kernel(
     // Compute inverse
     Eigen::Matrix3f Dm_inv_mat = Dm.inverse();
 
-    // Store in column-major order
+    // Store in row-major order (NOT transposed!)
     float* Dm_inv_local = &Dm_inv[elem_idx * 9];
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            Dm_inv_local[j * 3 + i] = Dm_inv_mat(i, j);
+            Dm_inv_local[i * 3 + j] = Dm_inv_mat(i, j);
         }
     }
 }
