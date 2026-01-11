@@ -124,7 +124,8 @@ __device__ void compute_pk1_stress(
         return;
     }
 
-    Eigen::Matrix3f F_inv_T = F.inverse().transpose();
+    Eigen::Matrix3f F_inv = F.inverse();
+    Eigen::Matrix3f F_inv_T = F_inv.transpose();
 
     // Check inverse validity
     bool valid = true;
@@ -165,7 +166,7 @@ __device__ void compute_pk1_stress(
 }
 
 // Compute gradient contribution from one tetrahedron
-// Using raw float arrays instead of Eigen to avoid CUDA device code issues
+// Now using Eigen properly - it works fine in CUDA device code!
 __device__ void add_element_gradient(
     const float* x_curr,
     const int* tet,
@@ -175,106 +176,54 @@ __device__ void add_element_gradient(
     float lambda,
     float* grad_local)
 {
-    // Compute F = Ds * Dm_inv manually
-    // Ds = [x1-x0, x2-x0, x3-x0]
+    // Compute F using Eigen
+    Eigen::Matrix3f F;
+    compute_deformation_gradient(x_curr, tet, Dm_inv, F);
 
-    // Get vertex positions
-    float x0[3] = { x_curr[tet[0] * 3 + 0],
-                    x_curr[tet[0] * 3 + 1],
-                    x_curr[tet[0] * 3 + 2] };
-    float x1[3] = { x_curr[tet[1] * 3 + 0],
-                    x_curr[tet[1] * 3 + 1],
-                    x_curr[tet[1] * 3 + 2] };
-    float x2[3] = { x_curr[tet[2] * 3 + 0],
-                    x_curr[tet[2] * 3 + 1],
-                    x_curr[tet[2] * 3 + 2] };
-    float x3[3] = { x_curr[tet[3] * 3 + 0],
-                    x_curr[tet[3] * 3 + 1],
-                    x_curr[tet[3] * 3 + 2] };
+    // Compute PK1 stress using the existing function
+    Eigen::Matrix3f P;
+    compute_pk1_stress(F, mu, lambda, P);
 
-    // Ds columns
-    float ds0[3] = { x1[0] - x0[0], x1[1] - x0[1], x1[2] - x0[2] };
-    float ds1[3] = { x2[0] - x0[0], x2[1] - x0[1], x2[2] - x0[2] };
-    float ds2[3] = { x3[0] - x0[0], x3[1] - x0[1], x3[2] - x0[2] };
-
-    // F = Ds * Dm_inv (row-major 3x3 matrix)
-    float F[9];
+    // Check if stress is valid
+    bool valid = true;
     for (int i = 0; i < 3; i++) {
-        // F[i, 0] = ds0[i] * Dm_inv[0,0] + ds1[i] * Dm_inv[1,0] + ds2[i] *
-        // Dm_inv[2,0]
-        F[i * 3 + 0] =
-            ds0[i] * Dm_inv[0] + ds1[i] * Dm_inv[3] + ds2[i] * Dm_inv[6];
-        // F[i, 1] = ds0[i] * Dm_inv[0,1] + ds1[i] * Dm_inv[1,1] + ds2[i] *
-        // Dm_inv[2,1]
-        F[i * 3 + 1] =
-            ds0[i] * Dm_inv[1] + ds1[i] * Dm_inv[4] + ds2[i] * Dm_inv[7];
-        // F[i, 2] = ds0[i] * Dm_inv[0,2] + ds1[i] * Dm_inv[1,2] + ds2[i] *
-        // Dm_inv[2,2]
-        F[i * 3 + 2] =
-            ds0[i] * Dm_inv[2] + ds1[i] * Dm_inv[5] + ds2[i] * Dm_inv[8];
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite(P(i, j))) {
+                valid = false;
+                break;
+            }
+        }
+        if (!valid)
+            break;
     }
 
-    // Compute J = det(F)
-    float J = F[0] * (F[4] * F[8] - F[5] * F[7]) -
-              F[1] * (F[3] * F[8] - F[5] * F[6]) +
-              F[2] * (F[3] * F[7] - F[4] * F[6]);
-
-
-
-    if (fabsf(J) <= 1e-6f) {
-        // Zero gradient
+    if (!valid) {
         for (int i = 0; i < 12; i++)
             grad_local[i] = 0.0f;
         return;
     }
 
-    // Compute F_inv_T (F^{-T}) manually
-    float invJ = 1.0f / J;
-    float F_inv_T[9];
-    F_inv_T[0] = (F[4] * F[8] - F[5] * F[7]) * invJ;
-    F_inv_T[1] = (F[5] * F[6] - F[3] * F[8]) * invJ;
-    F_inv_T[2] = (F[3] * F[7] - F[4] * F[6]) * invJ;
-    F_inv_T[3] = (F[2] * F[7] - F[1] * F[8]) * invJ;
-    F_inv_T[4] = (F[0] * F[8] - F[2] * F[6]) * invJ;
-    F_inv_T[5] = (F[1] * F[6] - F[0] * F[7]) * invJ;
-    F_inv_T[6] = (F[1] * F[5] - F[2] * F[4]) * invJ;
-    F_inv_T[7] = (F[2] * F[3] - F[0] * F[5]) * invJ;
-    F_inv_T[8] = (F[0] * F[4] - F[1] * F[3]) * invJ;
-
-    float log_J = logf(J);
-
-
-
-    // P = mu * (F - F_inv_T) + lambda * log_J * F_inv_T
-    float P[9];
-    for (int i = 0; i < 9; i++) {
-        P[i] = mu * (F[i] - F_inv_T[i]) + lambda * log_J * F_inv_T[i];
-    }
-
-
-
-    // H = V * P * Dm_inv^T (gradient of elastic energy w.r.t. vertex positions)
-    float H[9];
+    // Load Dm_inv as Eigen matrix
+    Eigen::Matrix3f Dm_inv_mat;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            H[i * 3 + j] = 0.0f;
-            for (int k = 0; k < 3; k++) {
-                // Dm_inv^T[k,j] = Dm_inv[j*3 + k]
-                H[i * 3 + j] += volume * P[i * 3 + k] * Dm_inv[j * 3 + k];
-            }
+            Dm_inv_mat(i, j) = Dm_inv[j * 3 + i];  // Column-major
         }
     }
 
-    // Forces on vertices 1, 2, 3
+    // H = V * P * Dm_inv^T (gradient of elastic energy w.r.t. vertex positions)
+    Eigen::Matrix3f H = volume * P * Dm_inv_mat.transpose();
+
+    // Forces on vertices 1, 2, 3 (columns of H)
     for (int i = 0; i < 3; i++) {
-        grad_local[1 * 3 + i] = H[i * 3 + 0];
-        grad_local[2 * 3 + i] = H[i * 3 + 1];
-        grad_local[3 * 3 + i] = H[i * 3 + 2];
+        grad_local[1 * 3 + i] = H(i, 0);
+        grad_local[2 * 3 + i] = H(i, 1);
+        grad_local[3 * 3 + i] = H(i, 2);
     }
 
-    // Force on vertex 0 (equilibrium)
+    // Force on vertex 0 (equilibrium: sum of forces = 0)
     for (int i = 0; i < 3; i++) {
-        grad_local[0 * 3 + i] = -(H[i * 3 + 0] + H[i * 3 + 1] + H[i * 3 + 2]);
+        grad_local[0 * 3 + i] = -(H(i, 0) + H(i, 1) + H(i, 2));
     }
 }
 
@@ -386,8 +335,8 @@ __global__ void accumulate_elastic_forces_kernel(
 
     // Add elastic forces to gradient
     // Note: No dt^2 scaling here because the implicit integration energy
-    // E = 1/2 * (x - x_tilde)^T M (x - x_tilde) + dt^2 * Psi(x) - dt^2 * f_ext^T x
-    // already includes dt^2 in the elastic energy term
+    // E = 1/2 * (x - x_tilde)^T M (x - x_tilde) + dt^2 * Psi(x) - dt^2 *
+    // f_ext^T x already includes dt^2 in the elastic energy term
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             int idx = tet[i] * 3 + j;
@@ -562,44 +511,52 @@ __device__ void compute_element_hessian(
 
     // St. Venant-Kirchhoff (SVK) elasticity tensor for tetrahedral FEM
     // This gives a symmetric positive-definite Hessian
-    // C_ijkl = lambda * delta_ij * delta_kl + mu * (delta_ik * delta_jl + delta_il * delta_jk)
-    
+    // C_ijkl = lambda * delta_ij * delta_kl + mu * (delta_ik * delta_jl +
+    // delta_il * delta_jk)
+
     K_elem.setZero();
-    
+
     // Build element stiffness matrix
-    // K_ab^(alpha,beta) = V * sum_{i,j,k,l} dF_ij/dx_a^alpha * C_ijkl * dF_kl/dx_b^beta
-    // For linear tetrahedron: dF/dx relates to Dm_inv
-    
+    // K_ab^(alpha,beta) = V * sum_{i,j,k,l} dF_ij/dx_a^alpha * C_ijkl *
+    // dF_kl/dx_b^beta For linear tetrahedron: dF/dx relates to Dm_inv
+
     for (int a = 0; a < 4; a++) {
         for (int b = 0; b < 4; b++) {
             Eigen::Matrix3f K_ab;
             K_ab.setZero();
-            
+
             // Shape function gradients in reference configuration
             Eigen::Vector3f grad_Na, grad_Nb;
             if (a == 0) {
-                grad_Na = -(Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
-            } else {
+                grad_Na = -(
+                    Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
+            }
+            else {
                 grad_Na = Dm_inv_mat.col(a - 1);
             }
-            
+
             if (b == 0) {
-                grad_Nb = -(Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
-            } else {
+                grad_Nb = -(
+                    Dm_inv_mat.col(0) + Dm_inv_mat.col(1) + Dm_inv_mat.col(2));
+            }
+            else {
                 grad_Nb = Dm_inv_mat.col(b - 1);
             }
-            
+
             // Compute 3x3 stiffness block using SVK constitutive model
-            // For linear FEM: K_ab^(alpha,beta) = V * sum_{i,j} grad_Na^i C_{i alpha j beta} grad_Nb^j
-            // where C_{ijkl} = lambda * delta_ij * delta_kl + mu * (delta_ik * delta_jl + delta_il * delta_jk)
-            
+            // For linear FEM: K_ab^(alpha,beta) = V * sum_{i,j} grad_Na^i C_{i
+            // alpha j beta} grad_Nb^j where C_{ijkl} = lambda * delta_ij *
+            // delta_kl + mu * (delta_ik * delta_jl + delta_il * delta_jk)
+
             float dot_product = grad_Na.dot(grad_Nb);
             K_ab = volume * lambda * (grad_Na * grad_Nb.transpose());
-            K_ab += volume * mu * (grad_Na * grad_Nb.transpose() + Eigen::Matrix3f::Identity() * dot_product);
-            
+            K_ab += volume * mu *
+                    (grad_Na * grad_Nb.transpose() +
+                     Eigen::Matrix3f::Identity() * dot_product);
+
             // Project to PSD
             K_ab = project_psd_nh(K_ab);
-            
+
             // Fill into 12x12 matrix
             for (int alpha = 0; alpha < 3; alpha++) {
                 for (int beta = 0; beta < 3; beta++) {
@@ -1003,6 +960,13 @@ void update_hessian_values_nh_gpu(
 {
     int num_dofs = num_particles * 3;
 
+    fprintf(
+        stderr,
+        "[NeoHookean Hessian] START: num_elements=%d, nnz=%d\n",
+        num_elements,
+        csr_structure.nnz);
+    fflush(stderr);
+
     // Zero out values
     cudaMemset(
         values->get_device_ptr<float>(), 0, csr_structure.nnz * sizeof(float));
@@ -1041,6 +1005,44 @@ void update_hessian_values_nh_gpu(
         values_ptr);
 
     cudaDeviceSynchronize();
+
+    // DEBUG: Check if element_value_positions has -1 values
+    auto elem_pos_host =
+        csr_structure.element_value_positions->get_host_vector<int>();
+    int num_invalid = 0;
+    int num_valid = 0;
+    for (int i = 0; i < num_elements * 144; i++) {
+        if (elem_pos_host[i] < 0) {
+            num_invalid++;
+        }
+        else {
+            num_valid++;
+        }
+    }
+    fprintf(
+        stderr,
+        "[NeoHookean Hessian] element_value_positions: valid=%d, invalid=%d\n",
+        num_valid,
+        num_invalid);
+    fflush(stderr);
+
+    // DEBUG: Check if values are actually filled
+    auto values_host = values->get_host_vector<float>();
+    int num_nonzero = 0;
+    float max_val = 0.0f;
+    for (int i = 0; i < csr_structure.nnz; i++) {
+        if (values_host[i] != 0.0f) {
+            num_nonzero++;
+            max_val = std::max(max_val, std::abs(values_host[i]));
+        }
+    }
+    fprintf(
+        stderr,
+        "[NeoHookean Hessian] nnz=%d, nonzero values=%d, max_abs=%.6e\n",
+        csr_structure.nnz,
+        num_nonzero,
+        max_val);
+    fflush(stderr);
 }
 
 // ============================================================================
@@ -1229,11 +1231,11 @@ __global__ void compute_Dm_inv_kernel(
     // Compute inverse
     Eigen::Matrix3f Dm_inv_mat = Dm.inverse();
 
-    // Store in row-major order (NOT transposed!)
+    // Store in column-major order (Eigen's default, matches loading format)
     float* Dm_inv_local = &Dm_inv[elem_idx * 9];
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            Dm_inv_local[i * 3 + j] = Dm_inv_mat(i, j);
+            Dm_inv_local[j * 3 + i] = Dm_inv_mat(i, j);  // Column-major
         }
     }
 }
@@ -1249,6 +1251,10 @@ compute_reference_data_gpu(
     cuda::CUDALinearBufferHandle offsets,
     int num_elements)
 {
+    // num_elements is the unique number of tetrahedra (total_face_counts / 4)
+    // We need to select ONE representative element per tetrahedron
+    // Strategy: For each tetrahedron, use the vertex with MINIMUM index as apex
+
     auto Dm_inv = cuda::create_cuda_linear_buffer<float>(num_elements * 9);
     auto volumes = cuda::create_cuda_linear_buffer<float>(num_elements);
     auto element_to_vertex = cuda::create_cuda_linear_buffer<int>(num_elements);
@@ -1256,48 +1262,59 @@ compute_reference_data_gpu(
         cuda::create_cuda_linear_buffer<int>(num_elements);
 
     int block_size = 256;
-    int num_vertices = offsets->getDesc().element_count - 1;
+    int num_vertices = offsets->getDesc().element_count;
 
-    // Build prefix sum of element counts per vertex
-    auto element_base_indices =
-        cuda::create_cuda_linear_buffer<int>(num_vertices + 1);
     const unsigned* adj_ptr = adjacency->get_device_ptr<unsigned>();
     const unsigned* off_ptr = offsets->get_device_ptr<unsigned>();
-    int* base_ptr = element_base_indices->get_device_ptr<int>();
     int* elem_to_v_ptr = element_to_vertex->get_device_ptr<int>();
     int* elem_to_lf_ptr = element_to_local_face->get_device_ptr<int>();
 
-    // Extract element counts from adjacency
-    cuda::GPUParallelFor("extract_counts", num_vertices, [=] __device__(int v) {
-        base_ptr[v] = adj_ptr[off_ptr[v]];  // First entry is count
-    });
-    cudaMemset(base_ptr + num_vertices, 0, sizeof(int));  // Last entry
+    // Atomic counter for unique elements
+    auto element_counter = cuda::create_cuda_linear_buffer<int>(1);
+    cudaMemset(
+        reinterpret_cast<void*>(element_counter->get_device_ptr()),
+        0,
+        sizeof(int));
+    int* counter_ptr = element_counter->get_device_ptr<int>();
+
+    // For each vertex, check all its opposite faces
+    // Only create element if this vertex has the MINIMUM index among the 4
+    // vertices
+    cuda::GPUParallelFor(
+        "select_unique_elements", num_vertices, [=] __device__(int v) {
+            unsigned offset = off_ptr[v];
+            unsigned count = adj_ptr[offset];
+
+            for (unsigned local_idx = 0; local_idx < count; local_idx++) {
+                unsigned v0 = adj_ptr[offset + 1 + local_idx * 3 + 0];
+                unsigned v1 = adj_ptr[offset + 1 + local_idx * 3 + 1];
+                unsigned v2 = adj_ptr[offset + 1 + local_idx * 3 + 2];
+
+                // Check if v is the minimum among {v, v0, v1, v2}
+                bool is_min = (v < v0) && (v < v1) && (v < v2);
+
+                if (is_min) {
+                    // This is the unique representative for this tetrahedron
+                    int elem_idx = atomicAdd(counter_ptr, 1);
+                    elem_to_v_ptr[elem_idx] = v;
+                    elem_to_lf_ptr[elem_idx] = local_idx;
+                }
+            }
+        });
     cudaDeviceSynchronize();
 
-    // Compute prefix sum to get base element index for each vertex
-    thrust::device_ptr<int> base_thrust(base_ptr);
-    thrust::exclusive_scan(
-        thrust::device,
-        base_thrust,
-        base_thrust + num_vertices + 1,
-        base_thrust);
-    cudaDeviceSynchronize();
+    // Verify we got exactly num_elements
+    int actual_count = 0;
+    cudaMemcpy(&actual_count, counter_ptr, sizeof(int), cudaMemcpyDeviceToHost);
+    if (actual_count != num_elements) {
+        printf(
+            "[NeoHookean ERROR] Expected %d elements but got %d unique "
+            "elements!\n",
+            num_elements,
+            actual_count);
+    }
 
-    // Now build mapping using prefix sum
-    cuda::GPUParallelFor("build_mapping", num_vertices, [=] __device__(int v) {
-        unsigned offset = off_ptr[v];
-        unsigned count = adj_ptr[offset];
-        int base_elem = base_ptr[v];
-
-        for (unsigned local_idx = 0; local_idx < count; local_idx++) {
-            int elem_idx = base_elem + local_idx;
-            elem_to_v_ptr[elem_idx] = v;
-            elem_to_lf_ptr[elem_idx] = local_idx;
-        }
-    });
-    cudaDeviceSynchronize();
-
-    // Then compute Dm_inv using mapping
+    // Then compute Dm_inv using the selected elements
     int num_blocks = (num_elements + block_size - 1) / block_size;
 
     compute_Dm_inv_kernel<<<num_blocks, block_size>>>(

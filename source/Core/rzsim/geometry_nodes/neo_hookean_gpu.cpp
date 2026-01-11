@@ -75,6 +75,31 @@ struct NeoHookeanGPUStorage {
         face_vertex_indices_buffer =
             cuda::create_cuda_linear_buffer(face_vertex_indices);
         face_counts_buffer = cuda::create_cuda_linear_buffer(face_counts);
+        // DEBUG: Print input mesh info
+        spdlog::info("[NeoHookean] ========== INITIALIZATION DEBUG ==========");
+        spdlog::info("[NeoHookean] Input vertices: {}", num_particles);
+        spdlog::info(
+            "[NeoHookean] Input triangles: {}", face_vertex_indices.size() / 3);
+        spdlog::info("[NeoHookean] Vertex positions:");
+        for (int i = 0; i < std::min(4, (int)positions.size()); i++) {
+            spdlog::info(
+                "  v[{}] = ({:.6f}, {:.6f}, {:.6f})",
+                i,
+                positions[i].x,
+                positions[i].y,
+                positions[i].z);
+        }
+        spdlog::info("[NeoHookean] Triangle indices:");
+        for (int i = 0; i < std::min(4, (int)face_vertex_indices.size() / 3);
+             i++) {
+            spdlog::info(
+                "  tri[{}] = ({}, {}, {})",
+                i,
+                face_vertex_indices[i * 3 + 0],
+                face_vertex_indices[i * 3 + 1],
+                face_vertex_indices[i * 3 + 2]);
+        }
+
         // Compute volume adjacency (tetrahedra reconstruction)
         spdlog::info(
             "[NeoHookean] Computing volume adjacency from {} triangles...",
@@ -89,6 +114,22 @@ struct NeoHookeanGPUStorage {
         spdlog::info(
             "[NeoHookean] Extracted {} tetrahedra from adjacency map",
             num_elements);
+
+        // DEBUG: Print adjacency structure
+        auto adjacency_host = adjacency_buffer->get_host_vector<unsigned>();
+        auto offsets_host = offsets_buffer->get_host_vector<unsigned>();
+        spdlog::info("[NeoHookean] Adjacency structure:");
+        for (int v = 0; v < num_particles; v++) {
+            unsigned offset = offsets_host[v];
+            unsigned count = adjacency_host[offset];
+            spdlog::info("  Vertex {} has {} opposite faces", v, count);
+            for (unsigned i = 0; i < count; i++) {
+                unsigned v0 = adjacency_host[offset + 1 + i * 3 + 0];
+                unsigned v1 = adjacency_host[offset + 1 + i * 3 + 1];
+                unsigned v2 = adjacency_host[offset + 1 + i * 3 + 2];
+                spdlog::info("    opposite[{}]: ({}, {}, {})", i, v0, v1, v2);
+            }
+        }
 
         if (num_elements == 0) {
             spdlog::error(
@@ -142,18 +183,45 @@ struct NeoHookeanGPUStorage {
                 "[NeoHookean] Volume[{}] = {:.6f}", i, volumes_host[i]);
         }
 
-        
         element_to_vertex_buffer = element_to_vertex;
         auto etov_host = element_to_vertex_buffer->get_host_vector<int>();
         element_to_local_face_buffer = element_to_local_face;
         auto etolf_host = element_to_local_face_buffer->get_host_vector<int>();
 
-        spdlog::info("[NeoHookean] Reference data computed successfully");
+        // DEBUG: Print element mapping
+        spdlog::info("[NeoHookean] Element to vertex/face mapping:");
+        for (int e = 0; e < std::min(8, (int)etov_host.size()); e++) {
+            int apex_v = etov_host[e];
+            int local_face = etolf_host[e];
+            unsigned offset = offsets_host[apex_v];
+            unsigned v0 = adjacency_host[offset + 1 + local_face * 3 + 0];
+            unsigned v1 = adjacency_host[offset + 1 + local_face * 3 + 1];
+            unsigned v2 = adjacency_host[offset + 1 + local_face * 3 + 2];
+            spdlog::info(
+                "  Element[{}]: apex={}, local_face={}, tet=({},{},{},{})",
+                e,
+                apex_v,
+                local_face,
+                apex_v,
+                v0,
+                v1,
+                v2);
+        }
 
-        normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
-            face_vertex_indices.size());
+        // DEBUG: Print Dm_inv for first element
+        if (num_elements > 0) {
+            spdlog::info("[NeoHookean] Dm_inv matrix for element 0:");
+            for (int i = 0; i < 3; i++) {
+                spdlog::info(
+                    "  [{:.6f}, {:.6f}, {:.6f}]",
+                    Dm_inv_host[i * 3 + 0],
+                    Dm_inv_host[i * 3 + 1],
+                    Dm_inv_host[i * 3 + 2]);
+            }
+        }
 
-        // Build CSR structure once
+        // Build Hessian CSR structure
+        spdlog::info("[NeoHookean] Building Hessian CSR structure...");
         hessian_structure = rzsim_cuda::build_hessian_structure_nh_gpu(
             adjacency_buffer,
             offsets_buffer,
@@ -161,8 +229,13 @@ struct NeoHookeanGPUStorage {
             element_to_local_face_buffer,
             num_particles,
             num_elements);
+        spdlog::info(
+            "[NeoHookean] Hessian structure built: nnz={}, num_rows={}, "
+            "num_cols={}",
+            hessian_structure.nnz,
+            hessian_structure.num_rows,
+            hessian_structure.num_cols);
 
-        // Allocate values buffer
         hessian_values =
             cuda::create_cuda_linear_buffer<float>(hessian_structure.nnz);
 
