@@ -16,6 +16,27 @@ namespace Solver {
 
 // 在 namespace 级别定义静态函数
 namespace {
+    // Inline diagonal preconditioner
+    inline void applyDiagonalPreconditioner(
+        int n,
+        Ruzino::cuda::CUDALinearBufferHandle d_z,
+        Ruzino::cuda::CUDALinearBufferHandle d_r,
+        Ruzino::cuda::CUDALinearBufferHandle d_diagonal)
+    {
+        float* z_ptr = reinterpret_cast<float*>(d_z->get_device_ptr());
+        float* r_ptr = reinterpret_cast<float*>(d_r->get_device_ptr());
+        float* diag_ptr = reinterpret_cast<float*>(d_diagonal->get_device_ptr());
+
+        Ruzino::cuda::GPUParallelFor(
+            "CG_diagonal_precond", n, GPU_LAMBDA_Ex(int i) {
+                float diag_safe = diag_ptr[i];
+                if (abs(diag_safe) < 1e-10f) {
+                    diag_safe = (diag_safe >= 0.0f) ? 1e-10f : -1e-10f;
+                }
+                z_ptr[i] = r_ptr[i] / diag_safe;
+            });
+    }
+
     SolverResult performCGIterationsImpl(
         cublasHandle_t cublasHandle,
         cusparseHandle_t cusparseHandle,
@@ -80,14 +101,6 @@ namespace {
             CUSPARSE_SPMV_ALG_DEFAULT,
             (void*)dBuffer->get_device_ptr());
 
-        cudaError_t sync_err = cudaDeviceSynchronize();
-        if (sync_err != cudaSuccess) {
-            result.error_message =
-                std::string("SpMV sync error: ") + cudaGetErrorString(sync_err);
-            result.converged = false;
-            return result;
-        }
-
         cublasSaxpy(
             cublasHandle,
             n,
@@ -108,21 +121,7 @@ namespace {
 
         // 如果需要对角预条件，可以用GPU kernel
         if (config.use_preconditioner) {
-            // 获取device指针用于GPU kernel
-            float* z_ptr = reinterpret_cast<float*>(d_z->get_device_ptr());
-            float* r_ptr = reinterpret_cast<float*>(d_r->get_device_ptr());
-            float* diag_ptr =
-                reinterpret_cast<float*>(d_diagonal->get_device_ptr());
-
-            Ruzino::cuda::GPUParallelFor(
-                "CG_diagonal_precond", n, GPU_LAMBDA_Ex(int i) {
-                    // z[i] = r[i] / diagonal[i] with safe division
-                    float diag_safe = diag_ptr[i];
-                    if (abs(diag_safe) < 1e-10f) {
-                        diag_safe = (diag_safe >= 0.0f) ? 1e-10f : -1e-10f;
-                    }
-                    z_ptr[i] = r_ptr[i] / diag_safe;
-                });
+            applyDiagonalPreconditioner(n, d_z, d_r, d_diagonal);
         }
 
         // p = z
@@ -149,14 +148,6 @@ namespace {
 
         // Check if already converged
         if (initial_residual / b_norm < config.tolerance) {
-            // Synchronize to check for any GPU errors before returning
-            cudaError_t sync_err = cudaDeviceSynchronize();
-            if (sync_err != cudaSuccess) {
-                result.error_message =
-                    std::string("GPU error: ") + cudaGetErrorString(sync_err);
-                result.converged = false;
-                return result;
-            }
             result.converged = true;
             result.iterations = 0;
             result.final_residual = initial_residual / b_norm;
@@ -224,34 +215,12 @@ namespace {
                 reinterpret_cast<float*>(d_r->get_device_ptr()),
                 1);
 
-            // z = r (no preconditioning for simplicity)
-            cublasScopy(
-                cublasHandle,
-                n,
-                reinterpret_cast<float*>(d_r->get_device_ptr()),
-                1,
-                reinterpret_cast<float*>(d_z->get_device_ptr()),
-                1);
-
             // Apply preconditioner: z = M^(-1) * r
             if (config.use_preconditioner) {
-                // 获取device指针用于GPU kernel
-                float* z_ptr = reinterpret_cast<float*>(d_z->get_device_ptr());
-                float* r_ptr = reinterpret_cast<float*>(d_r->get_device_ptr());
-                float* diag_ptr =
-                    reinterpret_cast<float*>(d_diagonal->get_device_ptr());
-
-                Ruzino::cuda::GPUParallelFor(
-                    "CG_diagonal_precond", n, GPU_LAMBDA_Ex(int i) {
-                        // Add small regularization to prevent division by very small diagonals
-                        float diag_safe = diag_ptr[i];
-                        if (abs(diag_safe) < 1e-10f) {
-                            diag_safe = (diag_safe >= 0.0f) ? 1e-10f : -1e-10f;
-                        }
-                        z_ptr[i] = r_ptr[i] / diag_safe;
-                    });
+                applyDiagonalPreconditioner(n, d_z, d_r, d_diagonal);
             }
             else {
+                // z = r (no preconditioning)
                 cublasScopy(
                     cublasHandle,
                     n,
@@ -292,8 +261,8 @@ namespace {
                 break;
             }
 
-            // 检查收敛停滞
-            if (iter > 100 && iter % 1000 == 0) {
+            // 检查收敛停滞 - 降低检查频率以减少开销
+            if (iter > 100 && iter % 5000 == 0) {
                 float progress_rate =
                     relative_residual / (initial_residual / b_norm);
                 if (progress_rate > 0.99f) {  // 几乎没有进展
