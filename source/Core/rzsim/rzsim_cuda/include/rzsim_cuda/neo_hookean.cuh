@@ -31,7 +31,34 @@ void explicit_step_nh_gpu(
     int num_particles,
     cuda::CUDALinearBufferHandle x_tilde);
 
-// Setup external forces (gravity)
+// Compute lumped mass matrix from density and element volumes
+RZSIM_CUDA_API
+void compute_lumped_mass_matrix_gpu(
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
+    cuda::CUDALinearBufferHandle volumes,
+    float density,
+    int num_particles,
+    int num_elements,
+    cuda::CUDALinearBufferHandle mass_matrix);
+
+// Setup external forces using FEM integration
+RZSIM_CUDA_API
+void setup_external_forces_fem_gpu(
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
+    cuda::CUDALinearBufferHandle volumes,
+    float density,
+    float gravity,
+    int num_particles,
+    int num_elements,
+    cuda::CUDALinearBufferHandle f_ext);
+
+// Setup external forces (gravity) - old per-vertex method
 RZSIM_CUDA_API
 void setup_external_forces_nh_gpu(
     float mass,

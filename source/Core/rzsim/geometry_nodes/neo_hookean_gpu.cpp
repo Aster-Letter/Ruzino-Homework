@@ -66,7 +66,7 @@ struct NeoHookeanGPUStorage {
         const std::vector<glm::vec3>& positions,
         const std::vector<int>& face_vertex_indices,
         const std::vector<int>& face_counts,
-        float mass)
+        float density)
     {
         num_particles = positions.size();
 
@@ -104,9 +104,8 @@ struct NeoHookeanGPUStorage {
         f_ext_buffer =
             cuda::create_cuda_linear_buffer<float>(num_particles * 3);
 
-        // Create mass matrix (diagonal with mass value per DOF)
-        std::vector<float> mass_diag(num_particles * 3, mass);
-        mass_matrix_buffer = cuda::create_cuda_linear_buffer(mass_diag);
+        // Mass matrix will be computed from density and volumes after reference data is ready
+        mass_matrix_buffer = cuda::create_cuda_linear_buffer<float>(num_particles * 3);
 
         // Compute reference shape matrices and volumes
         auto [Dm_inv, volumes, element_to_vertex, element_to_local_face] =
@@ -120,6 +119,20 @@ struct NeoHookeanGPUStorage {
         volumes_buffer = volumes;
         element_to_vertex_buffer = element_to_vertex;
         element_to_local_face_buffer = element_to_local_face;
+
+        // Compute lumped mass matrix from density and element volumes
+        // For each element: m_elem = density * volume
+        // Distribute equally to 4 vertices: m_vertex += m_elem / 4
+        rzsim_cuda::compute_lumped_mass_matrix_gpu(
+            adjacency_buffer,
+            offsets_buffer,
+            element_to_vertex_buffer,
+            element_to_local_face_buffer,
+            volumes_buffer,
+            density,
+            num_particles,
+            num_elements,
+            mass_matrix_buffer);
 
         // Build Hessian CSR structure
         hessian_structure = rzsim_cuda::build_hessian_structure_nh_gpu(
@@ -162,7 +175,7 @@ struct NeoHookeanGPUStorage {
 NODE_DECLARATION_FUNCTION(neo_hookean_gpu)
 {
     b.add_input<Geometry>("Geometry");
-    b.add_input<float>("Mass").default_val(1.0f).min(0.01f).max(100.0f);
+    b.add_input<float>("Density").default_val(1000.0f).min(1.0f).max(10000.0f);
     b.add_input<float>("Young's Modulus").default_val(5e4f).min(1e3f).max(1e9f);
     b.add_input<float>("Poisson's Ratio")
         .default_val(0.35f)
@@ -190,11 +203,16 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
     auto& global_payload = params.get_global_payload<GeomPayload&>();
     auto& storage = params.get_storage<NeoHookeanGPUStorage&>();
 
+    // Open log file for debugging
+    static std::ofstream debug_log("neo_hookean_debug.log", std::ios::out);
+    static int frame_count = 0;
+    frame_count++;
+
     // Get inputs
     auto input_geom = params.get_input<Geometry>("Geometry");
     input_geom.apply_transform();
 
-    float mass = params.get_input<float>("Mass");
+    float density = params.get_input<float>("Density");
     float youngs_modulus = params.get_input<float>("Young's Modulus");
     float poisson_ratio = params.get_input<float>("Poisson's Ratio");
     float damping = params.get_input<float>("Damping");
@@ -240,7 +258,7 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
 
     // Initialize buffers only once or when particle count changes
     if (!storage.initialized || storage.num_particles != num_particles) {
-        storage.initialize(positions, face_vertex_indices, face_counts, mass);
+        storage.initialize(positions, face_vertex_indices, face_counts, density);
     }
 
     if (!storage.initialized || storage.num_elements == 0) {
@@ -258,13 +276,91 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
     auto d_gradients = storage.gradients_buffer;
     auto d_f_ext = storage.f_ext_buffer;
 
+    // Log initial state
+    if (frame_count == 1) {
+        auto initial_pos = d_positions->get_host_vector<glm::vec3>();
+        auto initial_vel = d_velocities->get_host_vector<glm::vec3>();
+        debug_log << "\n===== INITIAL STATE (Frame " << frame_count << ") =====\n";
+        debug_log << "Number of particles: " << num_particles << "\n";
+        debug_log << "Number of elements: " << storage.num_elements << "\n";
+        debug_log << "dt = " << dt << ", substeps = " << substeps << ", dt_sub = " << (dt/substeps) << "\n";
+        debug_log << "mu = " << mu << ", lambda = " << lambda << "\n";
+        debug_log << "density = " << density << ", gravity = " << gravity << "\n\n";
+        
+        debug_log << "Initial positions:\n";
+        for (int i = 0; i < num_particles; i++) {
+            debug_log << "  Vertex " << i << ": [" 
+                     << initial_pos[i].x << ", " 
+                     << initial_pos[i].y << ", " 
+                     << initial_pos[i].z << "]\n";
+        }
+        
+        debug_log << "\nInitial velocities:\n";
+        for (int i = 0; i < num_particles; i++) {
+            debug_log << "  Vertex " << i << ": [" 
+                     << initial_vel[i].x << ", " 
+                     << initial_vel[i].y << ", " 
+                     << initial_vel[i].z << "]\n";
+        }
+        
+        // Log reference data (Dm_inv and volumes)
+        auto Dm_inv_host = storage.Dm_inv_buffer->get_host_vector<float>();
+        auto volumes_host = storage.volumes_buffer->get_host_vector<float>();
+        auto elem_to_v = storage.element_to_vertex_buffer->get_host_vector<int>();
+        auto elem_to_lf = storage.element_to_local_face_buffer->get_host_vector<int>();
+        auto mass_host = storage.mass_matrix_buffer->get_host_vector<float>();
+        
+        debug_log << "\nMass matrix (per vertex, per DOF):\n";
+        for (int i = 0; i < num_particles; i++) {
+            debug_log << "  Vertex " << i << ": m = [" 
+                     << mass_host[i*3+0] << ", "
+                     << mass_host[i*3+1] << ", "
+                     << mass_host[i*3+2] << "]\n";
+        }
+        
+        debug_log << "\nReference data (Dm_inv and volumes):\n";
+        for (int e = 0; e < storage.num_elements; e++) {
+            debug_log << "  Element " << e << ": volume = " << volumes_host[e] << "\n";
+            debug_log << "    apex vertex = " << elem_to_v[e] 
+                     << ", local_face = " << elem_to_lf[e] << "\n";
+            debug_log << "    Dm_inv =\n";
+            for (int i = 0; i < 3; i++) {
+                debug_log << "      [" 
+                         << Dm_inv_host[e*9 + i*3 + 0] << ", "
+                         << Dm_inv_host[e*9 + i*3 + 1] << ", "
+                         << Dm_inv_host[e*9 + i*3 + 2] << "]\n";
+            }
+        }
+        
+        // Log external forces
+        auto f_ext_host = d_f_ext->get_host_vector<float>();
+        debug_log << "\nExternal forces (from FEM integration):\n";
+        for (int i = 0; i < num_particles; i++) {
+            debug_log << "  Vertex " << i << ": f_ext = [" 
+                     << f_ext_host[i*3+0] << ", "
+                     << f_ext_host[i*3+1] << ", "
+                     << f_ext_host[i*3+2] << "]\n";
+        }
+        
+        debug_log.flush();
+    }
+
     // Substep loop
     float dt_sub = dt / substeps;
 
     for (int substep = 0; substep < substeps; ++substep) {
-        // Setup external forces on GPU
-        rzsim_cuda::setup_external_forces_nh_gpu(
-            mass, gravity, num_particles, d_f_ext);
+        // Setup external forces on GPU (using proper FEM integration)
+        rzsim_cuda::setup_external_forces_fem_gpu(
+            storage.adjacency_buffer,
+            storage.offsets_buffer,
+            storage.element_to_vertex_buffer,
+            storage.element_to_local_face_buffer,
+            storage.volumes_buffer,
+            density,
+            gravity,
+            num_particles,
+            storage.num_elements,
+            d_f_ext);
 
         // Compute x_tilde = x + dt_sub * v on GPU
         rzsim_cuda::explicit_step_nh_gpu(
@@ -300,18 +396,49 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
             float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
                 d_gradients, num_particles * 3);
 
-            /*
-            // DEBUG: Print gradient values on first iteration
-            if (iter == 0) {
+            // Detailed logging for first substep and first few iterations
+            if (substep == 0 && iter < 3) {
                 auto grad_host = d_gradients->get_host_vector<float>();
-                spdlog::info("[NeoHookean] DEBUG: Gradient vector (first 12
-            DOFs):"); for (int i = 0; i < std::min(12, num_particles*3); i++) {
-                    if (fabsf(grad_host[i]) > 1e-8f) {
-                        spdlog::info("  grad[{}] = {:.6f}", i, grad_host[i]);
-                    }
+                auto x_curr_host = storage.x_new_buffer->get_host_vector<float>();
+                auto x_tilde_host = d_next_positions->get_host_vector<float>();
+                
+                debug_log << "\n========== Frame " << frame_count << ", Substep " << substep 
+                         << ", Iteration " << iter << " ==========\n";
+                debug_log << "Gradient (all " << num_particles * 3 << " DOFs):\n";
+                for (int i = 0; i < num_particles; i++) {
+                    debug_log << "  Vertex " << i << ": grad = [" 
+                             << grad_host[i*3+0] << ", " 
+                             << grad_host[i*3+1] << ", " 
+                             << grad_host[i*3+2] << "]\n";
                 }
+                
+                debug_log << "\nCurrent positions (x_new):\n";
+                for (int i = 0; i < num_particles; i++) {
+                    debug_log << "  Vertex " << i << ": x = [" 
+                             << x_curr_host[i*3+0] << ", " 
+                             << x_curr_host[i*3+1] << ", " 
+                             << x_curr_host[i*3+2] << "]\n";
+                }
+                
+                debug_log << "\nPredicted positions (x_tilde = x + dt*v):\n";
+                for (int i = 0; i < num_particles; i++) {
+                    debug_log << "  Vertex " << i << ": x_tilde = [" 
+                             << x_tilde_host[i*3+0] << ", " 
+                             << x_tilde_host[i*3+1] << ", " 
+                             << x_tilde_host[i*3+2] << "]\n";
+                }
+                
+                debug_log << "\nDisplacement (x_new - x_tilde):\n";
+                for (int i = 0; i < num_particles; i++) {
+                    debug_log << "  Vertex " << i << ": dx = [" 
+                             << (x_curr_host[i*3+0] - x_tilde_host[i*3+0]) << ", " 
+                             << (x_curr_host[i*3+1] - x_tilde_host[i*3+1]) << ", " 
+                             << (x_curr_host[i*3+2] - x_tilde_host[i*3+2]) << "]\n";
+                }
+                
+                debug_log << "\nGradient norm: " << grad_norm << "\n";
+                debug_log.flush();
             }
-            */
 
             spdlog::info("[NeoHookean] Gradient norm: {}", grad_norm);
 
@@ -436,6 +563,27 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 }
             }
 
+            // Log Hessian diagonal for debugging
+            if (substep == 0 && iter < 3) {
+                auto hess_vals_debug = storage.hessian_values->get_host_vector<float>();
+                auto hess_row_offsets = storage.hessian_structure.row_offsets->get_host_vector<int>();
+                auto hess_cols = storage.hessian_structure.col_indices->get_host_vector<int>();
+                
+                debug_log << "\nHessian diagonal:\n";
+                for (int i = 0; i < num_particles * 3; i++) {
+                    int row_start = hess_row_offsets[i];
+                    int row_end = hess_row_offsets[i + 1];
+                    for (int j = row_start; j < row_end; j++) {
+                        if (hess_cols[j] == i) {
+                            debug_log << "  H[" << i << "," << i << "] = " 
+                                     << hess_vals_debug[j] << "\n";
+                            break;
+                        }
+                    }
+                }
+                debug_log.flush();
+            }
+
             // Debug: Check elastic contribution to Hessian
             // For initial state with no deformation, elastic contribution
             // should be near zero
@@ -545,6 +693,30 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 spdlog::warn(
                     "[NeoHookean] CG solver did not converge in iteration {}",
                     iter);
+            }
+
+            // Log Newton direction
+            if (substep == 0 && iter < 3) {
+                auto newton_dir_host = storage.newton_direction_buffer->get_host_vector<float>();
+                debug_log << "\nNewton direction (solution to H * d = -g):\n";
+                for (int i = 0; i < num_particles; i++) {
+                    debug_log << "  Vertex " << i << ": d = [" 
+                             << newton_dir_host[i*3+0] << ", " 
+                             << newton_dir_host[i*3+1] << ", " 
+                             << newton_dir_host[i*3+2] << "]\n";
+                }
+                
+                // Compute direction magnitude and orientation
+                float total_dx = 0, total_dy = 0, total_dz = 0;
+                for (int i = 0; i < num_particles; i++) {
+                    total_dx += newton_dir_host[i*3+0];
+                    total_dy += newton_dir_host[i*3+1];
+                    total_dz += newton_dir_host[i*3+2];
+                }
+                debug_log << "\nTotal displacement: [" << total_dx << ", " 
+                         << total_dy << ", " << total_dz << "]\n";
+                debug_log << "Expected: vertical (z-direction) only\n";
+                debug_log.flush();
             }
 
             // Line search with energy descent

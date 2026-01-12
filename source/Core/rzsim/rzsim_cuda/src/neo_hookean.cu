@@ -38,6 +38,156 @@ void explicit_step_nh_gpu(
         });
 }
 
+// Compute lumped mass matrix from density and element volumes
+// For each tetrahedral element: m_elem = density * volume
+// Distribute equally to 4 vertices using lumped mass matrix
+__global__ void compute_lumped_mass_kernel(
+    const unsigned* adjacency,
+    const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
+    const float* volumes,
+    float density,
+    int num_elements,
+    float* mass_matrix)
+{
+    int elem_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (elem_idx >= num_elements)
+        return;
+
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
+    unsigned offset = offsets[v_apex];
+    unsigned face_a = adjacency[offset + 1 + local_face_idx * 3 + 0];
+    unsigned face_b = adjacency[offset + 1 + local_face_idx * 3 + 1];
+    unsigned face_c = adjacency[offset + 1 + local_face_idx * 3 + 2];
+
+    int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
+    float volume = volumes[elem_idx];
+    
+    // Element mass distributed equally to 4 vertices (lumped mass matrix)
+    float elem_mass = density * volume;
+    float mass_per_vertex = elem_mass / 4.0f;
+
+    // Accumulate to each vertex (3 DOFs per vertex)
+    for (int i = 0; i < 4; i++) {
+        int vid = tet[i];
+        atomicAdd(&mass_matrix[vid * 3 + 0], mass_per_vertex);
+        atomicAdd(&mass_matrix[vid * 3 + 1], mass_per_vertex);
+        atomicAdd(&mass_matrix[vid * 3 + 2], mass_per_vertex);
+    }
+}
+
+void compute_lumped_mass_matrix_gpu(
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
+    cuda::CUDALinearBufferHandle volumes,
+    float density,
+    int num_particles,
+    int num_elements,
+    cuda::CUDALinearBufferHandle mass_matrix)
+{
+    // Zero out mass matrix first
+    cudaMemset(
+        mass_matrix->get_device_ptr<float>(),
+        0,
+        num_particles * 3 * sizeof(float));
+
+    int block_size = 256;
+    int num_blocks = (num_elements + block_size - 1) / block_size;
+
+    compute_lumped_mass_kernel<<<num_blocks, block_size>>>(
+        adjacency->get_device_ptr<unsigned>(),
+        offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
+        volumes->get_device_ptr<float>(),
+        density,
+        num_elements,
+        mass_matrix->get_device_ptr<float>());
+
+    cudaDeviceSynchronize();
+}
+
+// Setup external forces using FEM integration
+// For body force f = density * g, the force on each vertex is:
+// F_i = ∫_Ω N_i * ρ * g dV
+// For linear tetrahedron with lumped integration: F_i = (ρ * V / 4) * g
+__global__ void setup_external_forces_fem_kernel(
+    const unsigned* adjacency,
+    const unsigned* offsets,
+    const int* element_to_vertex,
+    const int* element_to_local_face,
+    const float* volumes,
+    float density,
+    float gravity,
+    int num_elements,
+    float* f_ext)
+{
+    int elem_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (elem_idx >= num_elements)
+        return;
+
+    int v_apex = element_to_vertex[elem_idx];
+    int local_face_idx = element_to_local_face[elem_idx];
+
+    unsigned offset = offsets[v_apex];
+    unsigned face_a = adjacency[offset + 1 + local_face_idx * 3 + 0];
+    unsigned face_b = adjacency[offset + 1 + local_face_idx * 3 + 1];
+    unsigned face_c = adjacency[offset + 1 + local_face_idx * 3 + 2];
+
+    int tet[4] = { v_apex, (int)face_a, (int)face_b, (int)face_c };
+    float volume = volumes[elem_idx];
+    
+    // Force per vertex from gravity (lumped)
+    // f = (ρ * V / 4) * g, where g = [0, 0, gravity]
+    float force_z = (density * volume / 4.0f) * gravity;
+
+    // Accumulate to each vertex (only z component)
+    for (int i = 0; i < 4; i++) {
+        int vid = tet[i];
+        atomicAdd(&f_ext[vid * 3 + 2], force_z);
+    }
+}
+
+void setup_external_forces_fem_gpu(
+    cuda::CUDALinearBufferHandle adjacency,
+    cuda::CUDALinearBufferHandle offsets,
+    cuda::CUDALinearBufferHandle element_to_vertex,
+    cuda::CUDALinearBufferHandle element_to_local_face,
+    cuda::CUDALinearBufferHandle volumes,
+    float density,
+    float gravity,
+    int num_particles,
+    int num_elements,
+    cuda::CUDALinearBufferHandle f_ext)
+{
+    // Zero out force vector first
+    cudaMemset(
+        f_ext->get_device_ptr<float>(),
+        0,
+        num_particles * 3 * sizeof(float));
+
+    int block_size = 256;
+    int num_blocks = (num_elements + block_size - 1) / block_size;
+
+    setup_external_forces_fem_kernel<<<num_blocks, block_size>>>(
+        adjacency->get_device_ptr<unsigned>(),
+        offsets->get_device_ptr<unsigned>(),
+        element_to_vertex->get_device_ptr<int>(),
+        element_to_local_face->get_device_ptr<int>(),
+        volumes->get_device_ptr<float>(),
+        density,
+        gravity,
+        num_elements,
+        f_ext->get_device_ptr<float>());
+
+    cudaDeviceSynchronize();
+}
+
 void setup_external_forces_nh_gpu(
     float mass,
     float gravity,
