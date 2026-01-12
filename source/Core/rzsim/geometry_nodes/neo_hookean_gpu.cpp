@@ -1,4 +1,5 @@
 #include <RHI/cuda.hpp>
+#include <fstream>
 #include <glm/glm.hpp>
 #include <limits>
 
@@ -316,14 +317,9 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
     float dt = global_payload.delta_time;
 
     // Convert Young's modulus and Poisson's ratio to Lamé parameters
-    float mu_full = youngs_modulus / (2.0f * (1.0f + poisson_ratio));
-    float lambda_full =
-        youngs_modulus * poisson_ratio /
-        ((1.0f + poisson_ratio) * (1.0f - 2.0f * poisson_ratio));
-
-    // Scale down for numerical stability
-    float mu = mu_full * 0.01f;
-    float lambda = lambda_full * 0.01f;
+    float mu = youngs_modulus / (2.0f * (1.0f + poisson_ratio));
+    float lambda = youngs_modulus * poisson_ratio /
+                   ((1.0f + poisson_ratio) * (1.0f - 2.0f * poisson_ratio));
 
     spdlog::info(
         "[NeoHookean] Material parameters: mu={:.3f}, lambda={:.3f}",
@@ -430,159 +426,10 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 storage.num_elements,
                 d_gradients);
 
-            cudaError_t err_after = cudaGetLastError();
-            if (err_after != cudaSuccess) {
-                spdlog::error(
-                    "[NeoHookean] CUDA error AFTER gradient kernel: {}",
-                    cudaGetErrorString(err_after));
-                break;
-            }
-            cudaDeviceSynchronize();
-            err_after = cudaGetLastError();
-            if (err_after != cudaSuccess) {
-                spdlog::error(
-                    "[NeoHookean] CUDA error AFTER gradient sync: {}",
-                    cudaGetErrorString(err_after));
-                break;
-            }
-            if (err_after != cudaSuccess) {
-                spdlog::error(
-                    "[NeoHookean] CUDA error AFTER gradient sync: {}",
-                    cudaGetErrorString(err_after));
-                break;
-            }
-            spdlog::info("[NeoHookean] Gradient computed successfully");
-
-            // Check gradient norm for convergence
-            spdlog::info("[NeoHookean] Computing gradient norm...");
-
-            /*
-            // DEBUG: Print first element's deformation on first iteration
-            if (iter == 0) {
-                spdlog::info("[NeoHookean] ========== DEBUG INFO (iteration 0)
-            ==========");
-
-                auto x_curr_debug =
-            storage.x_new_buffer->get_host_vector<float>(); auto x_tilde_debug =
-            d_next_positions->get_host_vector<float>(); auto v_debug =
-            d_velocities->get_host_vector<glm::vec3>();
-
-                spdlog::info("[NeoHookean] DEBUG: Initial velocities (first 4
-            particles):"); for (int i = 0; i < std::min(4, num_particles); i++)
-            { spdlog::info("  v[{}] = ({:.6f}, {:.6f}, {:.6f})", i,
-            v_debug[i].x, v_debug[i].y, v_debug[i].z);
-                }
-
-                float max_xtilde_diff = 0.0f;
-                for (int i = 0; i < num_particles*3; i++) {
-                    max_xtilde_diff = std::max(max_xtilde_diff,
-            fabsf(x_tilde_debug[i] - x_curr_debug[i]));
-                }
-                spdlog::info("[NeoHookean] DEBUG: max|x_tilde - x| = {:.6e}",
-            max_xtilde_diff);
-
-                auto M_diag_host =
-            storage.mass_matrix_buffer->get_host_vector<float>();
-                spdlog::info("[NeoHookean] DEBUG: M_diag[0] = {:.6f}, mass_input
-            = {:.6f}", M_diag_host[0], mass);
-
-                auto Dm_inv_debug =
-            storage.Dm_inv_buffer->get_host_vector<float>(); auto adj_debug =
-            storage.adjacency_buffer->get_host_vector<unsigned>(); auto
-            off_debug = storage.offsets_buffer->get_host_vector<unsigned>();
-                auto etov_debug =
-            storage.element_to_vertex_buffer->get_host_vector<int>(); auto
-            etolf_debug =
-            storage.element_to_local_face_buffer->get_host_vector<int>();
-
-                // First element
-                int v_apex = etov_debug[0];
-                int local_face = etolf_debug[0];
-                unsigned offset = off_debug[v_apex];
-                int v1 = adj_debug[offset + 1 + local_face * 3 + 0];
-                int v2 = adj_debug[offset + 1 + local_face * 3 + 1];
-                int v3 = adj_debug[offset + 1 + local_face * 3 + 2];
-
-                spdlog::info("[NeoHookean] DEBUG: Element 0 vertices: {} {} {}
-            {}", v_apex, v1, v2, v3); spdlog::info("[NeoHookean] DEBUG: Vertex
-            positions:"); spdlog::info("  v{}: ({:.6f}, {:.6f}, {:.6f})",
-            v_apex, x_curr_debug[v_apex*3], x_curr_debug[v_apex*3+1],
-            x_curr_debug[v_apex*3+2]); spdlog::info("  v{}: ({:.6f}, {:.6f},
-            {:.6f})", v1, x_curr_debug[v1*3], x_curr_debug[v1*3+1],
-            x_curr_debug[v1*3+2]); spdlog::info("  v{}: ({:.6f}, {:.6f},
-            {:.6f})", v2, x_curr_debug[v2*3], x_curr_debug[v2*3+1],
-            x_curr_debug[v2*3+2]); spdlog::info("  v{}: ({:.6f}, {:.6f},
-            {:.6f})", v3, x_curr_debug[v3*3], x_curr_debug[v3*3+1],
-            x_curr_debug[v3*3+2]);
-
-                // Compute F manually
-                float x0[3] = {x_curr_debug[v_apex*3], x_curr_debug[v_apex*3+1],
-            x_curr_debug[v_apex*3+2]}; float x1[3] = {x_curr_debug[v1*3],
-            x_curr_debug[v1*3+1], x_curr_debug[v1*3+2]}; float x2[3] =
-            {x_curr_debug[v2*3], x_curr_debug[v2*3+1], x_curr_debug[v2*3+2]};
-                float x3[3] = {x_curr_debug[v3*3], x_curr_debug[v3*3+1],
-            x_curr_debug[v3*3+2]};
-
-                float ds0[3] = {x1[0]-x0[0], x1[1]-x0[1], x1[2]-x0[2]};
-                float ds1[3] = {x2[0]-x0[0], x2[1]-x0[1], x2[2]-x0[2]};
-                float ds2[3] = {x3[0]-x0[0], x3[1]-x0[1], x3[2]-x0[2]};
-
-                const float* Dm_inv_elem = &Dm_inv_debug[0];
-
-                spdlog::info("[NeoHookean] DEBUG: Dm_inv matrix (element 0):");
-                spdlog::info("  [{:.6f}, {:.6f}, {:.6f}]", Dm_inv_elem[0],
-            Dm_inv_elem[1], Dm_inv_elem[2]); spdlog::info("  [{:.6f}, {:.6f},
-            {:.6f}]", Dm_inv_elem[3], Dm_inv_elem[4], Dm_inv_elem[5]);
-                spdlog::info("  [{:.6f}, {:.6f}, {:.6f}]", Dm_inv_elem[6],
-            Dm_inv_elem[7], Dm_inv_elem[8]);
-
-                float F[9];
-                for (int i = 0; i < 3; i++) {
-                    F[i*3+0] = ds0[i] * Dm_inv_elem[0] + ds1[i] * Dm_inv_elem[3]
-            + ds2[i] * Dm_inv_elem[6]; F[i*3+1] = ds0[i] * Dm_inv_elem[1] +
-            ds1[i] * Dm_inv_elem[4] + ds2[i] * Dm_inv_elem[7]; F[i*3+2] = ds0[i]
-            * Dm_inv_elem[2] + ds1[i] * Dm_inv_elem[5] + ds2[i] *
-            Dm_inv_elem[8];
-                }
-
-                float det_F = F[0]*(F[4]*F[8] - F[5]*F[7]) - F[1]*(F[3]*F[8] -
-            F[5]*F[6]) + F[2]*(F[3]*F[7] - F[4]*F[6]);
-
-                // Compute ||F - I||
-                float F_minus_I_norm_sq = 0.0f;
-                for (int i = 0; i < 3; i++) {
-                    for (int j = 0; j < 3; j++) {
-                        float delta = (i == j) ? 1.0f : 0.0f;
-                        float diff = F[i*3 + j] - delta;
-                        F_minus_I_norm_sq += diff * diff;
-                    }
-                }
-                float F_minus_I_norm = sqrtf(F_minus_I_norm_sq);
-
-                spdlog::info("[NeoHookean] DEBUG: F matrix:");
-                spdlog::info("  F[0,0]={:.6f}, F[0,1]={:.6f}, F[0,2]={:.6f}",
-            F[0], F[1], F[2]); spdlog::info("  F[1,0]={:.6f}, F[1,1]={:.6f},
-            F[1,2]={:.6f}", F[3], F[4], F[5]); spdlog::info("  F[2,0]={:.6f},
-            F[2,1]={:.6f}, F[2,2]={:.6f}", F[6], F[7], F[8]);
-                spdlog::info("[NeoHookean] DEBUG: det(F) = {:.6f}, ||F-I|| =
-            {:.6f}", det_F, F_minus_I_norm);
-            }
-            */
-
             cudaError_t err = cudaGetLastError();
-            if (err != cudaSuccess) {
-                spdlog::error(
-                    "[NeoHookean] CUDA error before norm: {}",
-                    cudaGetErrorString(err));
-            }
+
             float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
                 d_gradients, num_particles * 3);
-            err = cudaGetLastError();
-            if (err != cudaSuccess) {
-                spdlog::error(
-                    "[NeoHookean] CUDA error after norm: {}",
-                    cudaGetErrorString(err));
-            }
 
             /*
             // DEBUG: Print gradient values on first iteration
@@ -636,6 +483,94 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 storage.num_elements,
                 storage.hessian_values);
             spdlog::info("[NeoHookean] Hessian updated");
+
+            // DEBUG: Export dense Hessian (disabled for performance)
+            constexpr bool enable_hessian_export = false;
+            if (enable_hessian_export && substep == 0 && iter == 0) {
+                spdlog::info(
+                    "[NeoHookean] !!! Exporting dense Hessian to CSV...");
+
+                auto hess_vals =
+                    storage.hessian_values->get_host_vector<float>();
+                auto row_offsets = storage.hessian_structure.row_offsets
+                                       ->get_host_vector<int>();
+                auto col_indices = storage.hessian_structure.col_indices
+                                       ->get_host_vector<int>();
+                int n = storage.hessian_structure.num_rows;
+
+                spdlog::info(
+                    "[NeoHookean] Matrix size: {}x{}, nnz={}",
+                    n,
+                    n,
+                    storage.hessian_structure.nnz);
+
+                // Convert CSR to dense
+                std::vector<std::vector<float>> dense(
+                    n, std::vector<float>(n, 0.0f));
+                for (int i = 0; i < n; i++) {
+                    int row_start = row_offsets[i];
+                    int row_end = row_offsets[i + 1];
+                    for (int j = row_start; j < row_end; j++) {
+                        int col = col_indices[j];
+                        dense[i][col] = hess_vals[j];
+                    }
+                }
+
+                spdlog::info("[NeoHookean] Writing to CSV file...");
+                // Write to CSV
+                std::ofstream csv("hessian_debug.csv");
+                if (!csv.is_open()) {
+                    spdlog::error(
+                        "[NeoHookean] Failed to open hessian_debug.csv for "
+                        "writing!");
+                }
+                else {
+                    for (int i = 0; i < n; i++) {
+                        for (int j = 0; j < n; j++) {
+                            csv << dense[i][j];
+                            if (j < n - 1)
+                                csv << ",";
+                        }
+                        csv << "\n";
+                    }
+                    csv.close();
+                    spdlog::info(
+                        "[NeoHookean] !!! Dense Hessian written to "
+                        "hessian_debug.csv ({}x{})",
+                        n,
+                        n);
+                }
+
+                // Write to Mathematica format
+                spdlog::info("[NeoHookean] Writing to Mathematica format...");
+                std::ofstream mma("hessian_debug.m");
+                if (!mma.is_open()) {
+                    spdlog::error(
+                        "[NeoHookean] Failed to open hessian_debug.m for "
+                        "writing!");
+                }
+                else {
+                    mma << "{";
+                    for (int i = 0; i < n; i++) {
+                        mma << "{";
+                        for (int j = 0; j < n; j++) {
+                            mma << dense[i][j];
+                            if (j < n - 1)
+                                mma << ", ";
+                        }
+                        mma << "}";
+                        if (i < n - 1)
+                            mma << ",\n";
+                    }
+                    mma << "}";
+                    mma.close();
+                    spdlog::info(
+                        "[NeoHookean] !!! Dense Hessian written to "
+                        "hessian_debug.m ({}x{})",
+                        n,
+                        n);
+                }
+            }
 
             // Debug: Check elastic contribution to Hessian
             // For initial state with no deformation, elastic contribution
@@ -706,24 +641,22 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 "direction...");
 
             // Solve H * p = -grad using CUDA CG
-            float cg_tol = std::max(1e-9f, grad_norm * 1e-3f);
+            // Use more relaxed tolerance since we're in an outer Newton loop
+            float cg_tol = std::max(1e-6f, grad_norm * 0.1f);
 
             Ruzino::Solver::SolverConfig solver_config;
             solver_config.tolerance = cg_tol;
-            solver_config.max_iterations = 1000;
+            solver_config.max_iterations = 500;  // Increased from 1000
             solver_config.use_preconditioner = true;
-            solver_config.verbose =
-                false;  // Disable verbose to avoid performance issues
+            solver_config.verbose = false;
 
             // Negate gradient for RHS
-            spdlog::info("[NeoHookean] Negating gradient...");
             rzsim_cuda::negate_nh_gpu(
                 d_gradients, storage.neg_gradient_buffer, num_particles * 3);
 
             // Check RHS norm
             float rhs_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
                 storage.neg_gradient_buffer, num_particles * 3);
-            spdlog::info("[NeoHookean] RHS norm: {}", rhs_norm);
 
             // Zero out the solution buffer before solving
             cudaMemset(
@@ -733,7 +666,6 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 num_particles * 3 * sizeof(float));
 
             // Solve on GPU
-            spdlog::info("[NeoHookean] Solving linear system with CG... ");
             auto result = storage.solver->solveGPU(
                 storage.hessian_structure.num_rows,
                 storage.hessian_structure.nnz,
@@ -753,11 +685,6 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 spdlog::warn(
                     "[NeoHookean] CG solver did not converge in iteration {}",
                     iter);
-            }
-            else {
-                spdlog::info(
-                    "[NeoHookean] CG solver converged in {} iterations",
-                    result.iterations);
             }
 
             // Check solution norm
@@ -793,12 +720,35 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                 "[NeoHookean] Current energy: {:.6f}, grad_norm: {:.6f}",
                 E_current,
                 grad_norm);
+            
+            // DEBUG: For first iteration, check if problem is quadratic
+            if (substep == 0 && iter == 0) {
+                spdlog::info("[NeoHookean] === QUADRATIC PROBLEM DEBUG ===");
+                spdlog::info("[NeoHookean] First iteration should be exact for quadratic problem!");
+                
+                // Check gradient dot newton_direction (should be negative)
+                auto grad_host = d_gradients->get_host_vector<float>();
+                auto p_host = storage.newton_direction_buffer->get_host_vector<float>();
+                float grad_dot_p = 0.0f;
+                for (int i = 0; i < num_particles * 3; i++) {
+                    grad_dot_p += grad_host[i] * p_host[i];
+                }
+                spdlog::info("[NeoHookean] grad · p = {:.6e} (should be NEGATIVE for descent)", grad_dot_p);
+                
+                // Compute predicted energy decrease (quadratic model)
+                // E(x+p) ≈ E(x) + grad·p + 0.5*p·H·p
+                // For Newton step: H*p = -grad, so p·H·p = -p·grad = -grad·p
+                // Thus: E(x+p) ≈ E(x) + grad·p - 0.5*grad·p = E(x) + 0.5*grad·p
+                float predicted_decrease = 0.5f * grad_dot_p;
+                spdlog::info("[NeoHookean] Predicted energy decrease: {:.6e}", -predicted_decrease);
+                spdlog::info("[NeoHookean] Predicted E(x+p): {:.6f}", E_current + predicted_decrease);
+            }
 
             float E_candidate = std::numeric_limits<float>::infinity();
             float alpha = 1.0f;  // Start with full Newton step
             int ls_iter = 0;
 
-            while (E_candidate > E_current + 1e-7f && ls_iter < 200) {
+            while (E_candidate > E_current && ls_iter < 200) {
                 // x_candidate = x_new + alpha * p
                 rzsim_cuda::axpy_nh_gpu(
                     alpha,
@@ -827,7 +777,8 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
                     storage.element_energies_buffer,
                     storage.potential_terms_buffer);
 
-                bool accept = E_candidate <= E_current + 1e-7f;
+
+                bool accept = E_candidate <= E_current;
                 if (accept) {
                     storage.x_new_buffer->copy_from_device(
                         storage.x_candidate_buffer.Get());

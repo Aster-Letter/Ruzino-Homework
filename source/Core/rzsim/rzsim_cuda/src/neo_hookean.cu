@@ -255,7 +255,7 @@ __global__ void compute_gradient_nh_kernel(
     grad[i * 3 + 2] =
         M_diag[i * 3 + 2] * (x_curr[i * 3 + 2] - x_tilde[i * 3 + 2]);
 
-    // Subtract external forces
+    // Subtract external forces (with dt² scaling like mass-spring)
     grad[i * 3 + 0] -= dt * dt * f_ext[i * 3 + 0];
     grad[i * 3 + 1] -= dt * dt * f_ext[i * 3 + 1];
     grad[i * 3 + 2] -= dt * dt * f_ext[i * 3 + 2];
@@ -334,9 +334,7 @@ __global__ void accumulate_elastic_forces_kernel(
     }
 
     // Add elastic forces to gradient
-    // Note: No dt^2 scaling here because the implicit integration energy
-    // E = 1/2 * (x - x_tilde)^T M (x - x_tilde) + dt^2 * Psi(x) - dt^2 *
-    // f_ext^T x already includes dt^2 in the elastic energy term
+    // Like mass-spring: gradient includes dt² scaling for elastic term
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             int idx = tet[i] * 3 + j;
@@ -928,7 +926,7 @@ __global__ void fill_hessian_values_nh_kernel(
     compute_element_hessian(
         x_curr, tet, Dm_inv_local, volume, mu, lambda, K_elem);
 
-    // Scale by dt^2 (same as gradient)
+    // Scale by dt² (same as mass-spring)
     K_elem *= (dt * dt);
 
     // Write to CSR values array
@@ -971,7 +969,7 @@ void update_hessian_values_nh_gpu(
     cudaMemset(
         values->get_device_ptr<float>(), 0, csr_structure.nnz * sizeof(float));
 
-    // Fill mass diagonal
+    // Fill mass diagonal (like mass-spring: M + regularization)
     const float* M_diag_ptr = M_diag->get_device_ptr<float>();
     const int* mass_positions =
         csr_structure.mass_value_positions->get_device_ptr<int>();
@@ -981,7 +979,8 @@ void update_hessian_values_nh_gpu(
         "fill_mass_diagonal_nh", num_dofs, [=] __device__(int dof) {
             int pos = mass_positions[dof];
             if (pos >= 0) {
-                values_ptr[pos] = M_diag_ptr[dof];
+                float regularization = 1e-6f;
+                values_ptr[pos] = M_diag_ptr[dof] + regularization;
             }
         });
 
@@ -1118,7 +1117,7 @@ float compute_energy_nh_gpu(
     float* element_energy_ptr = d_element_energies->get_device_ptr<float>();
     float* potential_ptr = d_potential_terms->get_device_ptr<float>();
 
-    // Compute inertial energy
+    // Compute inertial energy: 1/2 * M * (x - x_tilde)² (like mass-spring)
     cuda::GPUParallelFor(
         "compute_inertial_energy_nh", n, [=] __device__(int i) {
             float diff = x_ptr[i] - x_tilde_ptr[i];
@@ -1154,7 +1153,7 @@ float compute_energy_nh_gpu(
     float E_elastic = thrust::reduce(
         thrust::device, d_element_thrust, d_element_thrust + num_elements);
 
-    // Compute potential energy
+    // Compute potential energy: -dt² * f^T * x (like mass-spring)
     cuda::GPUParallelFor(
         "compute_potential_energy_nh", n, [=] __device__(int i) {
             potential_ptr[i] = -dt * dt * x_ptr[i] * f_ptr[i];
@@ -1164,6 +1163,7 @@ float compute_energy_nh_gpu(
     float E_potential = thrust::reduce(
         thrust::device, d_potential_thrust, d_potential_thrust + n);
 
+    // Total energy (like mass-spring): E = 1/2*M*(x-x_tilde)² + dt²*Ψ(x) - dt²*f^T*x
     float total_energy = E_inertial + dt * dt * E_elastic + E_potential;
 
     return total_energy;
