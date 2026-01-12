@@ -75,6 +75,8 @@ struct NeoHookeanGPUStorage {
         face_vertex_indices_buffer =
             cuda::create_cuda_linear_buffer(face_vertex_indices);
         face_counts_buffer = cuda::create_cuda_linear_buffer(face_counts);
+        normals_buffer = cuda::create_cuda_linear_buffer<glm::vec3>(
+            face_vertex_indices.size());
 
         // Compute volume adjacency (tetrahedra reconstruction)
         unsigned num_elements_gpu;
@@ -530,9 +532,16 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
     if (mesh_component) {
         mesh_component->set_vertices(final_positions);
 
-        // Clear normals to avoid USD mismatch warnings
-        // Set empty normals array - USD will automatically recompute them
-        mesh_component->set_normals(std::vector<glm::vec3>());
+        // Recalculate normals on GPU
+        rzsim_cuda::compute_normals_gpu(
+            storage.positions_buffer,
+            storage.face_vertex_indices_buffer,
+            storage.face_counts_buffer,
+            flip_normal,
+            storage.normals_buffer);
+
+        auto normals = storage.normals_buffer->get_host_vector<glm::vec3>();
+        mesh_component->set_normals(normals);
     }
     else {
         auto points_component = input_geom.get_component<PointsComponent>();
