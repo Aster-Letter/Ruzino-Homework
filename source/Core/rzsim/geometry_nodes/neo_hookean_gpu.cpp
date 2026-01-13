@@ -319,8 +319,9 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
             auto dof = num_particles * 3;
             grad_norm = grad_norm / dof;
 
-            newton_iter_count = iter + 1;
+            newton_iter_count = iter;
 
+            // Run at least one iteration
             if (iter > 0 && grad_norm < tolerance) {
                 converged = true;
                 break;
