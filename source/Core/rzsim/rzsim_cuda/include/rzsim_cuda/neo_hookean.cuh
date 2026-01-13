@@ -160,6 +160,12 @@ void axpy_nh_gpu(
     int size);
 
 RZSIM_CUDA_API
+void scale_vector_gpu(
+    cuda::CUDALinearBufferHandle vec,
+    float scale,
+    int size);
+
+RZSIM_CUDA_API
 float compute_vector_norm_nh_gpu(cuda::CUDALinearBufferHandle vec, int size);
 
 // Update velocities and apply damping: v = (x_new - x_old) / dt * damping

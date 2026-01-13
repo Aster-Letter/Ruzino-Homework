@@ -1446,6 +1446,18 @@ void axpy_nh_gpu(
     });
 }
 
+void scale_vector_gpu(
+    cuda::CUDALinearBufferHandle vec,
+    float scale,
+    int size)
+{
+    float* vec_ptr = vec->get_device_ptr<float>();
+
+    cuda::GPUParallelFor("scale_vector", size, [=] __device__(int i) {
+        vec_ptr[i] *= scale;
+    });
+}
+
 struct square_op_nh {
     __device__ float operator()(float x) const
     {

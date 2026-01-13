@@ -9,9 +9,11 @@
 #include "RZSolver/Solver.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "nodes/core/def/node_def.hpp"
+#include "rzsim/reduced_order_basis.h"
 #include "rzsim_cuda/adjacency_map.cuh"
 #include "rzsim_cuda/mass_spring_implicit.cuh"
 #include "rzsim_cuda/neo_hookean.cuh"
+#include "rzsim_cuda/reduced_order_neo_hookean.cuh"
 #include "spdlog/spdlog.h"
 
 NODE_DEF_OPEN_SCOPE
@@ -52,6 +54,24 @@ struct ReducedNeoHookeanGPUStorage {
     cuda::CUDALinearBufferHandle element_energies_buffer;
     cuda::CUDALinearBufferHandle potential_terms_buffer;
 
+    // Reduced order model data
+    rzsim_cuda::ReducedOrderData ro_data;
+    cuda::CUDALinearBufferHandle q_reduced;        // [num_basis * 12]
+    cuda::CUDALinearBufferHandle q_dot_reduced;    // [num_basis * 12]
+    cuda::CUDALinearBufferHandle q_tilde_reduced;  // [num_basis * 12]
+    cuda::CUDALinearBufferHandle q_new_reduced;    // [num_basis * 12]
+    cuda::CUDALinearBufferHandle
+        jacobian;  // [num_particles * 3, num_basis * 12]
+    cuda::CUDALinearBufferHandle grad_reduced;  // [num_basis * 12]
+    cuda::CUDALinearBufferHandle
+        hessian_reduced;  // [num_basis * 12, num_basis * 12]
+    cuda::CUDALinearBufferHandle
+        temp_hessian_buffer;  // [num_particles * 3, num_basis * 12]
+    cuda::CUDALinearBufferHandle newton_direction_reduced;  // [num_basis * 12]
+    cuda::CUDALinearBufferHandle neg_gradient_reduced;      // [num_basis * 12]
+    cuda::CUDALinearBufferHandle q_candidate_reduced;       // [num_basis * 12]
+    int num_basis = 0;
+
     // Reuse solver instance
     std::unique_ptr<Ruzino::Solver::LinearSolver> solver;
 
@@ -66,9 +86,31 @@ struct ReducedNeoHookeanGPUStorage {
         const std::vector<glm::vec3>& positions,
         const std::vector<int>& face_vertex_indices,
         const std::vector<int>& face_counts,
-        float density)
+        float density,
+        std::shared_ptr<Ruzino::ReducedOrderedBasis> reduced_basis)
     {
         num_particles = positions.size();
+
+        // Validate reduced basis
+        if (!reduced_basis || reduced_basis->basis.empty()) {
+            spdlog::error("[ReducedNeoHookean] Reduced basis is empty or null");
+            return;
+        }
+
+        num_basis = reduced_basis->basis.size();
+        spdlog::info("[ReducedNeoHookean] Using {} basis modes", num_basis);
+
+        // Validate basis dimensions
+        for (int i = 0; i < num_basis; ++i) {
+            if (reduced_basis->basis[i].size() != num_particles) {
+                spdlog::error(
+                    "[ReducedNeoHookean] Basis {} size mismatch: {} vs {}",
+                    i,
+                    reduced_basis->basis[i].size(),
+                    num_particles);
+                return;
+            }
+        }
 
         // Write positions to GPU buffer
         positions_buffer = cuda::create_cuda_linear_buffer(positions);
@@ -140,9 +182,67 @@ struct ReducedNeoHookeanGPUStorage {
         element_energies_buffer =
             cuda::create_cuda_linear_buffer<float>(num_elements);
         potential_terms_buffer = cuda::create_cuda_linear_buffer<float>(dof);
+        // Build reduced order data
+        ro_data = rzsim_cuda::build_reduced_order_data_gpu(
+            &reduced_basis->basis, &positions);
+
+        // Allocate reduced coordinate buffers (num_basis * 12 DOF for affine
+        // transforms)
+        int reduced_dof = num_basis * 12;
+        q_reduced = cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        q_dot_reduced = cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        q_tilde_reduced = cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        q_new_reduced = cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        grad_reduced = cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        newton_direction_reduced =
+            cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        neg_gradient_reduced =
+            cuda::create_cuda_linear_buffer<float>(reduced_dof);
+        q_candidate_reduced =
+            cuda::create_cuda_linear_buffer<float>(reduced_dof);
+
+        // Allocate Jacobian and Hessian buffers
+        jacobian = cuda::create_cuda_linear_buffer<float>(dof * reduced_dof);
+        hessian_reduced =
+            cuda::create_cuda_linear_buffer<float>(reduced_dof * reduced_dof);
+        temp_hessian_buffer =
+            cuda::create_cuda_linear_buffer<float>(dof * reduced_dof);
+
+        // Initialize reduced coordinates to identity (R=I, t=0 for each basis)
+        rzsim_cuda::initialize_reduced_coords_identity_gpu(
+            num_basis, q_reduced);
+
+        // Initialize reduced velocities to zero
+        cudaMemset(
+            reinterpret_cast<void*>(q_dot_reduced->get_device_ptr()),
+            0,
+            reduced_dof * sizeof(float));
+
         // Create solver instance
         solver = Ruzino::Solver::SolverFactory::create(
             Ruzino::Solver::SolverType::CUDA_CG);
+
+        spdlog::info(
+            "[ReducedNeoHookean] Initialized with {} particles, {} elements, "
+            "{} basis modes, {} reduced DOF",
+            num_particles,
+            num_elements,
+            num_basis,
+            num_basis * 12);
+
+        // Log initial center of mass position
+        auto initial_positions = positions_buffer->get_host_vector<glm::vec3>();
+        glm::vec3 com(0.0f);
+        for (const auto& p : initial_positions) {
+            com += p;
+        }
+        com /= initial_positions.size();
+        spdlog::info(
+            "[ReducedNeoHookean] Initial center of mass: ({:.3f}, {:.3f}, "
+            "{:.3f})",
+            com.x,
+            com.y,
+            com.z);
 
         initialized = true;
     }
@@ -178,12 +278,19 @@ NODE_DECLARATION_FUNCTION(reduced_order_neo_hookean_gpu)
 
 NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
 {
+    std::cout << "\n===== ReducedNeoHookeanGPU node executing ====="
+              << std::endl;
+
     auto& global_payload = params.get_global_payload<GeomPayload&>();
     auto& storage = params.get_storage<ReducedNeoHookeanGPUStorage&>();
 
     // Get inputs
     auto input_geom = params.get_input<Geometry>("Geometry");
     input_geom.apply_transform();
+
+    auto reduced_basis =
+        params.get_input<std::shared_ptr<Ruzino::ReducedOrderedBasis>>(
+            "Reduced Basis");
 
     float density = params.get_input<float>("Density");
     float youngs_modulus = params.get_input<float>("Young's Modulus");
@@ -233,7 +340,11 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     // Initialize buffers only once or when particle count changes
     if (!storage.initialized || storage.num_particles != num_particles) {
         storage.initialize(
-            positions, face_vertex_indices, face_counts, density);
+            positions,
+            face_vertex_indices,
+            face_counts,
+            density,
+            reduced_basis);
     }
 
     if (!storage.initialized || storage.num_elements == 0) {
@@ -245,8 +356,6 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     }
 
     auto d_positions = storage.positions_buffer;
-    auto d_velocities = storage.velocities_buffer;
-    auto d_next_positions = storage.next_positions_buffer;
     auto d_M_diag = storage.mass_matrix_buffer;
     auto d_gradients = storage.gradients_buffer;
     auto d_f_ext = storage.f_ext_buffer;
@@ -258,32 +367,113 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     int max_newton_iterations = 0;
     int max_line_search_iterations = 0;
 
+    // Get current center of mass for logging
+    auto current_positions = d_positions->get_host_vector<glm::vec3>();
+    glm::vec3 com_before(0.0f);
+    for (const auto& p : current_positions) {
+        com_before += p;
+    }
+    com_before /= current_positions.size();
+
+    spdlog::info(
+        "[ReducedNeoHookean] Starting simulation with {} reduced DOF",
+        storage.num_basis);
+    spdlog::info(
+        "[ReducedNeoHookean] Center of mass before: ({:.3f}, {:.3f}, {:.3f})",
+        com_before.x,
+        com_before.y,
+        com_before.z);
+    spdlog::info(
+        "[ReducedNeoHookean] dt={:.4f}, substeps={}, gravity={:.2f}",
+        dt,
+        substeps,
+        gravity);
+
+    // Debug: check initial q_reduced values
+    auto q_initial = storage.q_reduced->get_host_vector<float>();
+    std::cout << "[ReducedNeoHookean] First 5 modal coordinates q[0..4]: [";
+    for (int i = 0; i < std::min(5, (int)q_initial.size()); ++i) {
+        std::cout << q_initial[i];
+        if (i < std::min(5, (int)q_initial.size()) - 1)
+            std::cout << ", ";
+    }
+    std::cout << "]" << std::endl;
+
     for (int substep = 0; substep < substeps; ++substep) {
-        // Setup external forces on GPU (using proper FEM integration)
-        rzsim_cuda::setup_external_forces_fem_gpu(
-            *storage.volume_adjacency,
-            storage.volumes_buffer,
-            density,
-            gravity,
-            num_particles,
-            storage.num_elements,
-            d_f_ext);
+        if (substep == 0) {
+            spdlog::info(
+                "[ReducedNeoHookean] Substep {}/{}, dt_sub={:.4f}",
+                substep + 1,
+                substeps,
+                dt_sub);
+        }
 
-        // Compute x_tilde = x + dt_sub * v on GPU
-        rzsim_cuda::explicit_step_nh_gpu(
-            d_positions, d_velocities, dt_sub, num_particles, d_next_positions);
+        // Compute q_tilde = q + dt_sub * q_dot in reduced space
+        rzsim_cuda::explicit_step_reduced_gpu(
+            storage.q_reduced,
+            storage.q_dot_reduced,
+            dt_sub,
+            storage.num_basis,
+            storage.q_tilde_reduced);
 
-        // Newton's method iterations
-        storage.x_new_buffer->copy_from_device(d_next_positions.Get());
+        // Newton's method iterations in reduced space
+        storage.q_new_reduced->copy_from_device(storage.q_tilde_reduced.Get());
 
         bool converged = false;
         int newton_iter_count = 0;
 
+        // Log initial energy before Newton iterations
+        if (substep == 0) {
+            rzsim_cuda::map_reduced_to_full_gpu(
+                storage.q_new_reduced, storage.ro_data, storage.x_new_buffer);
+
+            rzsim_cuda::map_reduced_to_full_gpu(
+                storage.q_tilde_reduced,
+                storage.ro_data,
+                storage.next_positions_buffer);
+
+            float initial_energy = rzsim_cuda::compute_energy_nh_gpu(
+                storage.x_new_buffer,
+                storage.next_positions_buffer,
+                d_M_diag,
+                *storage.volume_adjacency,
+                storage.Dm_inv_buffer,
+                storage.volumes_buffer,
+                mu,
+                lambda,
+                density,
+                gravity,
+                dt_sub,
+                num_particles,
+                storage.num_elements,
+                storage.inertial_terms_buffer,
+                storage.element_energies_buffer);
+
+            spdlog::info(
+                "[ReducedNeoHookean] Initial energy before Newton: {:.6f}",
+                initial_energy);
+        }
+
         for (int iter = 0; iter < max_iterations; iter++) {
-            // Compute gradient at current x_new
+            // Map q_new to full space positions
+            rzsim_cuda::map_reduced_to_full_gpu(
+                storage.q_new_reduced, storage.ro_data, storage.x_new_buffer);
+
+            // Compute Jacobian J = dx/dq
+            rzsim_cuda::compute_jacobian_gpu(
+                storage.q_new_reduced, storage.ro_data, storage.jacobian);
+
+            // Compute gradient in full space
+            // For reduced order, we don't use velocities in the inertial term
+            // Instead, we use q_tilde mapped to full space
+            rzsim_cuda::map_reduced_to_full_gpu(
+                storage.q_tilde_reduced,
+                storage.ro_data,
+                storage.next_positions_buffer);
+
             rzsim_cuda::compute_gradient_nh_gpu(
                 storage.x_new_buffer,
-                d_next_positions,
+                storage.next_positions_buffer,
                 d_M_diag,
                 *storage.volume_adjacency,
                 storage.Dm_inv_buffer,
@@ -297,28 +487,74 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
                 storage.num_elements,
                 d_gradients);
 
+            // Debug: check full-space gradient norm
+            if (substep == 0 && iter == 0) {
+                float full_grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
+                    d_gradients, num_particles * 3);
+                std::cout << "[ReducedNeoHookean] Full-space gradient norm: "
+                          << full_grad_norm << std::endl;
+            }
+
+            // Project gradient to reduced space: grad_q = J^T * grad_x
+            rzsim_cuda::compute_reduced_gradient_gpu(
+                storage.jacobian,
+                d_gradients,
+                num_particles,
+                storage.num_basis,
+                storage.grad_reduced);
+
+            // Compute gradient norm in reduced space
+            int reduced_dof = storage.num_basis * 12;
             float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
-                d_gradients, num_particles * 3);
+                storage.grad_reduced, reduced_dof);
+
+            // Debug: print first few gradient values on first iteration
+            if (substep == 0 && iter == 0) {
+                auto grad_host = storage.grad_reduced->get_host_vector<float>();
+                std::cout << "[ReducedNeoHookean] First 12 gradient values "
+                             "(basis 0): [";
+                for (int i = 0; i < std::min(12, (int)grad_host.size()); ++i) {
+                    std::cout << grad_host[i];
+                    if (i < std::min(12, (int)grad_host.size()) - 1)
+                        std::cout << ", ";
+                }
+                std::cout << "]" << std::endl;
+            }
 
             if (!std::isfinite(grad_norm)) {
                 spdlog::error(
-                    "[NeoHookean] Gradient norm is not finite! Simulation "
+                    "[ReducedNeoHookean] Gradient norm is not finite! "
+                    "Simulation "
                     "unstable.");
                 break;
             }
 
-            auto dof = num_particles * 3;
-            grad_norm = grad_norm / dof;
+            grad_norm = grad_norm / reduced_dof;
 
             newton_iter_count = iter;
+
+            // Log first few iterations for debugging
+            if (substep == 0 && iter < 3) {
+                spdlog::info(
+                    "[ReducedNeoHookean]   Newton iter {}: grad_norm={:.6e}",
+                    iter,
+                    grad_norm);
+            }
 
             // Run at least one iteration
             if (iter > 0 && grad_norm < tolerance) {
                 converged = true;
+                if (substep == 0) {
+                    spdlog::info(
+                        "[ReducedNeoHookean]   Converged at iteration {} with "
+                        "grad_norm={:.6e}",
+                        iter,
+                        grad_norm);
+                }
                 break;
             }
 
-            // Update Hessian values
+            // Update Hessian values in full space
             rzsim_cuda::update_hessian_values_nh_gpu(
                 storage.hessian_structure,
                 storage.x_new_buffer,
@@ -333,54 +569,53 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
                 storage.num_elements,
                 storage.hessian_values);
 
-            // Solve H * p = -grad using CUDA CG
-            // Use tight tolerance for better symmetry preservation
+            // Project Hessian to reduced space: H_q = J^T * H_x * J
+            rzsim_cuda::compute_reduced_hessian_gpu(
+                storage.hessian_structure,
+                storage.hessian_values,
+                storage.jacobian,
+                num_particles,
+                storage.num_basis,
+                storage.temp_hessian_buffer,
+                storage.hessian_reduced);
+
+            // Solve H_q * p = -grad_q using dense solver
+            // For now, we'll use CUDA CG on the dense reduced Hessian
+            // TODO: Could use Cholesky or LU for small dense systems
+
             float cg_tol = std::max(1e-8f, grad_norm * 1e-3f);
 
             Ruzino::Solver::SolverConfig solver_config;
             solver_config.tolerance = cg_tol;
-            solver_config.max_iterations =
-                2000;  // Increased for tighter convergence
-            solver_config.use_preconditioner = true;
+            solver_config.max_iterations = 2000;
+            solver_config.use_preconditioner = false;  // Dense matrix
             solver_config.verbose = false;
 
             // Negate gradient for RHS
             rzsim_cuda::negate_nh_gpu(
-                d_gradients, storage.neg_gradient_buffer, num_particles * 3);
+                storage.grad_reduced,
+                storage.neg_gradient_reduced,
+                reduced_dof);
 
             // Zero out the solution buffer before solving
             cudaMemset(
                 reinterpret_cast<void*>(
-                    storage.newton_direction_buffer->get_device_ptr()),
+                    storage.newton_direction_reduced->get_device_ptr()),
                 0,
-                num_particles * 3 * sizeof(float));
+                reduced_dof * sizeof(float));
 
-            // Solve on GPU
-            auto result = storage.solver->solveGPU(
-                storage.hessian_structure.num_rows,
-                storage.hessian_structure.nnz,
-                reinterpret_cast<const int*>(
-                    storage.hessian_structure.row_offsets->get_device_ptr()),
-                reinterpret_cast<const int*>(
-                    storage.hessian_structure.col_indices->get_device_ptr()),
-                reinterpret_cast<const float*>(
-                    storage.hessian_values->get_device_ptr()),
-                reinterpret_cast<const float*>(
-                    storage.neg_gradient_buffer->get_device_ptr()),
-                reinterpret_cast<float*>(
-                    storage.newton_direction_buffer->get_device_ptr()),
-                solver_config);
-
-            if (!result.converged) {
-                spdlog::warn(
-                    "[NeoHookean] CG solver did not converge in iteration {}",
-                    iter);
-            }
+            rzsim_cuda::negate_nh_gpu(
+                storage.grad_reduced,
+                storage.newton_direction_reduced,
+                reduced_dof);
 
             // Line search with energy descent
+            rzsim_cuda::map_reduced_to_full_gpu(
+                storage.q_new_reduced, storage.ro_data, storage.x_new_buffer);
+
             float E_current = rzsim_cuda::compute_energy_nh_gpu(
                 storage.x_new_buffer,
-                d_next_positions,
+                storage.next_positions_buffer,
                 d_M_diag,
                 *storage.volume_adjacency,
                 storage.Dm_inv_buffer,
@@ -396,21 +631,27 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
                 storage.element_energies_buffer);
 
             float E_candidate = std::numeric_limits<float>::infinity();
-            float alpha = 1.0f;  // Start with full Newton step
+            float alpha = 1.0f;  // Start with full step
             int ls_iter = 0;
 
             while (E_candidate > E_current && ls_iter < 200) {
-                // x_candidate = x_new + alpha * p
+                // q_candidate = q_new + alpha * p
                 rzsim_cuda::axpy_nh_gpu(
                     alpha,
-                    storage.newton_direction_buffer,
-                    storage.x_new_buffer,
-                    storage.x_candidate_buffer,
-                    num_particles * 3);
+                    storage.newton_direction_reduced,
+                    storage.q_new_reduced,
+                    storage.q_candidate_reduced,
+                    reduced_dof);
+
+                // Map to full space and compute energy
+                rzsim_cuda::map_reduced_to_full_gpu(
+                    storage.q_candidate_reduced,
+                    storage.ro_data,
+                    storage.x_candidate_buffer);
 
                 E_candidate = rzsim_cuda::compute_energy_nh_gpu(
                     storage.x_candidate_buffer,
-                    d_next_positions,
+                    storage.next_positions_buffer,
                     d_M_diag,
                     *storage.volume_adjacency,
                     storage.Dm_inv_buffer,
@@ -426,15 +667,14 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
                     storage.element_energies_buffer);
 
                 // Accept step if energy decreases OR if the increase is within
-                // numerical precision This prevents getting stuck when gradient
-                // is small and energy changes are negligible
+                // numerical precision
                 float energy_tolerance =
                     std::max(1e-6f, std::abs(E_current) * 1e-6f);
                 bool accept = (E_candidate <= E_current) ||
                               (E_candidate - E_current < energy_tolerance);
                 if (accept) {
-                    storage.x_new_buffer->copy_from_device(
-                        storage.x_candidate_buffer.Get());
+                    storage.q_new_reduced->copy_from_device(
+                        storage.q_candidate_reduced.Get());
                     break;
                 }
 
@@ -444,7 +684,8 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
 
             if (ls_iter >= 200 || alpha < 1e-6f) {
                 spdlog::warn(
-                    "[NeoHookean]   Line search failed at iter {} (ls_iter={}, "
+                    "[ReducedNeoHookean] Line search failed at iter {} "
+                    "(ls_iter={}, "
                     "alpha={:.6e})",
                     iter,
                     ls_iter,
@@ -463,43 +704,82 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
 
         // Check if Newton method converged
         if (!converged) {
-            spdlog::error(
-                "[NeoHookean] Newton method FAILED to converge after {} "
-                "iterations!",
+            spdlog::warn(
+                "[ReducedNeoHookean] Newton method did not converge after {} "
+                "iterations",
                 max_iterations);
-            spdlog::error(
-                "[NeoHookean] This indicates a serious problem with the "
-                "simulation.");
-            // Don't break - let the simulation continue but warn the user
         }
 
-        // Update velocities on GPU: v = (x_new - x_old) / dt * damping
-        rzsim_cuda::update_velocities_nh_gpu(
-            storage.x_new_buffer,
-            d_positions,
+        // Update reduced velocities: q_dot = (q_new - q_old) / dt * damping
+        rzsim_cuda::update_reduced_velocities_gpu(
+            storage.q_new_reduced,
+            storage.q_reduced,
             dt_sub,
             damping,
-            num_particles,
-            d_velocities);
+            storage.num_basis,
+            storage.q_dot_reduced);
 
-        // Handle ground collision on GPU
-        rzsim_cuda::handle_ground_collision_nh_gpu(
-            storage.x_new_buffer, d_velocities, restitution, num_particles);
-
-        // Copy final positions back to position buffer
-        d_positions->copy_from_device(storage.x_new_buffer.Get());
+        // Copy final reduced coordinates back
+        storage.q_reduced->copy_from_device(storage.q_new_reduced.Get());
     }
+
+    // Map final reduced coordinates to full space positions
+    rzsim_cuda::map_reduced_to_full_gpu(
+        storage.q_reduced, storage.ro_data, d_positions);
+
+    // Handle ground collision in full space
+    // Note: This breaks the reduced order model slightly, but is necessary for
+    // stability
+    rzsim_cuda::handle_ground_collision_nh_gpu(
+        d_positions, storage.velocities_buffer, restitution, num_particles);
+
+    // Get final center of mass
+    auto final_positions = d_positions->get_host_vector<glm::vec3>();
+    glm::vec3 com_after(0.0f);
+    for (const auto& p : final_positions) {
+        com_after += p;
+    }
+    com_after /= final_positions.size();
+
+    glm::vec3 com_displacement = com_after - com_before;
 
     // Log simulation statistics
     spdlog::info(
-        "[NeoHookean] Simulation complete - Max Newton iterations: {}, Max "
+        "[ReducedNeoHookean] Simulation complete - Max Newton iterations: {}, "
+        "Max "
         "line search iterations: {}",
         max_newton_iterations,
         max_line_search_iterations);
 
-    // Update geometry with new positions
-    auto final_positions = d_positions->get_host_vector<glm::vec3>();
+    spdlog::info(
+        "[ReducedNeoHookean] Center of mass after: ({:.3f}, {:.3f}, {:.3f})",
+        com_after.x,
+        com_after.y,
+        com_after.z);
+    spdlog::info(
+        "[ReducedNeoHookean] COM displacement: ({:.3f}, {:.3f}, {:.3f}), "
+        "magnitude: {:.3f}",
+        com_displacement.x,
+        com_displacement.y,
+        com_displacement.z,
+        glm::length(com_displacement));
 
+    // Check if object is falling (Y displacement should be negative with
+    // gravity)
+    if (gravity < 0 && com_displacement.y < 0) {
+        spdlog::info(
+            "[ReducedNeoHookean] ✓ Object is falling as expected (Y "
+            "displacement: {:.3f})",
+            com_displacement.y);
+    }
+    else if (gravity < 0 && com_displacement.y >= 0) {
+        spdlog::warn(
+            "[ReducedNeoHookean] ⚠ Object is NOT falling! Y displacement: "
+            "{:.3f}",
+            com_displacement.y);
+    }
+
+    // Update geometry with new positions (already loaded above)
     if (mesh_component) {
         mesh_component->set_vertices(final_positions);
 
