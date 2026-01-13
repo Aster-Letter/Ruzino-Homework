@@ -347,6 +347,25 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
             reduced_basis);
     }
 
+    // Apply initial translation (0, 0, 0.3) to all bases on the first frame
+    if (global_payload.is_simulating == false) {
+        int reduced_dof = storage.num_basis * 12;
+        auto q_host = storage.q_reduced->get_host_vector<float>();
+
+        // For each basis, add (0, 0, 0.3) to the translation part (indices
+        // 9, 10, 11)
+        for (int i = 0; i < storage.num_basis; ++i) {
+            q_host[i * 12 + 9] += 0.0f;   // tx
+            q_host[i * 12 + 10] += 0.0f;  // ty
+            q_host[i * 12 + 11] += 0.3f;  // tz
+        }
+
+        storage.q_reduced->assign_host_vector(q_host);
+        spdlog::info(
+            "[ReducedNeoHookean] Applied initial translation (0, 0, 0.3) "
+            "to all bases");
+    }
+
     if (!storage.initialized || storage.num_elements == 0) {
         spdlog::warn(
             "[NeoHookean] Neo-Hookean simulation requires tetrahedral mesh. "
@@ -391,10 +410,10 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
 
     // Debug: check initial q_reduced values
     auto q_initial = storage.q_reduced->get_host_vector<float>();
-    std::cout << "[ReducedNeoHookean] First 5 modal coordinates q[0..4]: [";
-    for (int i = 0; i < std::min(5, (int)q_initial.size()); ++i) {
+    std::cout << "[ReducedNeoHookean] First 12 modal coordinates q[0..11]: [";
+    for (int i = 0; i < std::min(12, (int)q_initial.size()); ++i) {
         std::cout << q_initial[i];
-        if (i < std::min(5, (int)q_initial.size()) - 1)
+        if (i < std::min(12, (int)q_initial.size()) - 1)
             std::cout << ", ";
     }
     std::cout << "]" << std::endl;
@@ -727,32 +746,32 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     rzsim_cuda::map_reduced_to_full_gpu(
         storage.q_reduced, storage.ro_data, d_positions);
 
-    // Project reduced velocities to full space before collision handling
-    // v_full = J * q_dot
-    rzsim_cuda::compute_jacobian_gpu(
-        storage.q_reduced,
-        storage.ro_data,
-        storage.jacobian);
-    
-    rzsim_cuda::map_reduced_velocities_to_full_gpu(
-        storage.jacobian,
-        storage.q_dot_reduced,
-        num_particles,
-        storage.num_basis,
-        storage.velocities_buffer);
+    // // Project reduced velocities to full space before collision handling
+    // // v_full = J * q_dot
+    // rzsim_cuda::compute_jacobian_gpu(
+    //     storage.q_reduced,
+    //     storage.ro_data,
+    //     storage.jacobian);
 
-    // Handle ground collision in full space
-    rzsim_cuda::handle_ground_collision_nh_gpu(
-        d_positions, storage.velocities_buffer, restitution, num_particles);
+    // rzsim_cuda::map_reduced_velocities_to_full_gpu(
+    //     storage.jacobian,
+    //     storage.q_dot_reduced,
+    //     num_particles,
+    //     storage.num_basis,
+    //     storage.velocities_buffer);
 
-    // Project modified full-space velocities back to reduced space
-    // dq/dt = J^T * (dx/dt), assuming orthonormal basis (J^T * J ≈ I)
-    rzsim_cuda::compute_reduced_gradient_gpu(
-        storage.jacobian,
-        storage.velocities_buffer,
-        num_particles,
-        storage.num_basis,
-        storage.q_dot_reduced);
+    // // Handle ground collision in full space
+    // rzsim_cuda::handle_ground_collision_nh_gpu(
+    //     d_positions, storage.velocities_buffer, restitution, num_particles);
+
+    // // Project modified full-space velocities back to reduced space
+    // // dq/dt = J^T * (dx/dt), assuming orthonormal basis (J^T * J ≈ I)
+    // rzsim_cuda::compute_reduced_gradient_gpu(
+    //     storage.jacobian,
+    //     storage.velocities_buffer,
+    //     num_particles,
+    //     storage.num_basis,
+    //     storage.q_dot_reduced);
 
     // Get final center of mass
     auto final_positions = d_positions->get_host_vector<glm::vec3>();

@@ -158,11 +158,7 @@ typedef OpenMesh::TriMesh_ArrayKernelT<> MyMesh;
 NODE_DECLARATION_FUNCTION(read_obj_pxr)
 {
     b.add_input<std::string>("Path").default_val("Default");
-    b.add_output<std::vector<glm::vec3>>("Vertices");
-    b.add_output<std::vector<int>>("FaceVertexCounts");
-    b.add_output<std::vector<int>>("FaceVertexIndices");
-    b.add_output<std::vector<glm::vec3>>("Normals");
-    b.add_output<std::vector<glm::vec2>>("Texcoords");
+    b.add_output<Geometry>("Geometry");
 }
 
 NODE_EXECUTION_FUNCTION(read_obj_pxr)
@@ -219,6 +215,12 @@ NODE_EXECUTION_FUNCTION(read_obj_pxr)
     }
     mesh.request_vertex_texcoords2D();
 
+    // 创建 Geometry 对象
+    Geometry geometry;
+    std::shared_ptr<MeshComponent> mesh_component =
+        std::make_shared<MeshComponent>(&geometry);
+    geometry.attach_component(mesh_component);
+
     // 转换顶点数据
     std::vector<glm::vec3> vertices(mesh.n_vertices());
     int vertex_idx = 0;
@@ -227,6 +229,7 @@ NODE_EXECUTION_FUNCTION(read_obj_pxr)
         vertices[vertex_idx] = glm::vec3(point[0], point[1], point[2]);
         vertex_idx++;
     }
+    mesh_component->set_vertices(vertices);
 
     // 转换面数据
     const int vertices_per_face = 3;  // 三角形网格
@@ -244,41 +247,39 @@ NODE_EXECUTION_FUNCTION(read_obj_pxr)
         }
         face_idx++;
     }
+    mesh_component->set_face_vertex_counts(faceVertexCounts);
+    mesh_component->set_face_vertex_indices(faceVertexIndices);
 
     // 转换法线数据
-    std::vector<glm::vec3> normals;
     if (mesh.has_vertex_normals()) {
-        normals.resize(mesh.n_vertices());
+        std::vector<glm::vec3> normals(mesh.n_vertices());
         int normal_idx = 0;
         for (auto vh : mesh.vertices()) {
             auto normal = mesh.normal(vh);
             normals[normal_idx] = glm::vec3(normal[0], normal[1], normal[2]);
             normal_idx++;
         }
+        mesh_component->set_normals(normals);
     }
 
     // 转换纹理坐标数据
-    std::vector<glm::vec2> texcoords;
     if (mesh.has_vertex_texcoords2D()) {
-        texcoords.resize(mesh.n_vertices());
+        std::vector<glm::vec2> texcoords(mesh.n_vertices());
         int texcoord_idx = 0;
         for (auto vh : mesh.vertices()) {
             auto texcoord = mesh.texcoord2D(vh);
             texcoords[texcoord_idx] = glm::vec2(texcoord[0], texcoord[1]);
             texcoord_idx++;
         }
+        mesh_component->set_texcoords_array(texcoords);
     }
-
-    // 设置输出
-    params.set_output("Vertices", std::move(vertices));
-    params.set_output("FaceVertexCounts", std::move(faceVertexCounts));
-    params.set_output("FaceVertexIndices", std::move(faceVertexIndices));
-    params.set_output("Normals", std::move(normals));
-    params.set_output("Texcoords", std::move(texcoords));
 
     // 清理请求的属性
     mesh.release_vertex_normals();
     mesh.release_vertex_texcoords2D();
+
+    // 设置输出
+    params.set_output("Geometry", geometry);
 
     return true;
 }
