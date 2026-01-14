@@ -230,20 +230,6 @@ struct ReducedNeoHookeanGPUStorage {
             num_basis,
             num_basis * 12);
 
-        // Log initial center of mass position
-        auto initial_positions = positions_buffer->get_host_vector<glm::vec3>();
-        glm::vec3 com(0.0f);
-        for (const auto& p : initial_positions) {
-            com += p;
-        }
-        com /= initial_positions.size();
-        spdlog::info(
-            "[ReducedNeoHookean] Initial center of mass: ({:.3f}, {:.3f}, "
-            "{:.3f})",
-            com.x,
-            com.y,
-            com.z);
-
         initialized = true;
     }
 };
@@ -347,22 +333,22 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
             reduced_basis);
     }
 
-    // Apply initial translation (0, 0, 0.3) to all bases on the first frame
+    // Apply initial translation (0, 0, 0.02) to all bases on the first frame
     if (global_payload.is_simulating == false) {
         int reduced_dof = storage.num_basis * 12;
         auto q_host = storage.q_reduced->get_host_vector<float>();
 
-        // For each basis, add (0, 0, 0.3) to the translation part (indices
+        // For each basis, add (0, 0, 0.02) to the translation part (indices
         // 9, 10, 11)
         for (int i = 0; i < storage.num_basis; ++i) {
-            q_host[i * 12 + 9] += 0.0f;   // tx
-            q_host[i * 12 + 10] += 0.0f;  // ty
-            q_host[i * 12 + 11] += 0.3f;  // tz
+            q_host[i * 12 + 9] += 0.0f;    // tx
+            q_host[i * 12 + 10] += 0.0f;   // ty
+            q_host[i * 12 + 11] += 0.02f;  // tz
         }
 
         storage.q_reduced->assign_host_vector(q_host);
         spdlog::info(
-            "[ReducedNeoHookean] Applied initial translation (0, 0, 0.3) "
+            "[ReducedNeoHookean] Applied initial translation (0, 0, 0.02) "
             "to all bases");
     }
 
@@ -386,37 +372,14 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     int max_newton_iterations = 0;
     int max_line_search_iterations = 0;
 
-    // Get current center of mass for logging
-    auto current_positions = d_positions->get_host_vector<glm::vec3>();
-    glm::vec3 com_before(0.0f);
-    for (const auto& p : current_positions) {
-        com_before += p;
-    }
-    com_before /= current_positions.size();
-
     spdlog::info(
         "[ReducedNeoHookean] Starting simulation with {} reduced DOF",
         storage.num_basis);
-    spdlog::info(
-        "[ReducedNeoHookean] Center of mass before: ({:.3f}, {:.3f}, {:.3f})",
-        com_before.x,
-        com_before.y,
-        com_before.z);
     spdlog::info(
         "[ReducedNeoHookean] dt={:.4f}, substeps={}, gravity={:.2f}",
         dt,
         substeps,
         gravity);
-
-    // Debug: check initial q_reduced values
-    auto q_initial = storage.q_reduced->get_host_vector<float>();
-    std::cout << "[ReducedNeoHookean] First 12 modal coordinates q[0..11]: [";
-    for (int i = 0; i < std::min(12, (int)q_initial.size()); ++i) {
-        std::cout << q_initial[i];
-        if (i < std::min(12, (int)q_initial.size()) - 1)
-            std::cout << ", ";
-    }
-    std::cout << "]" << std::endl;
 
     for (int substep = 0; substep < substeps; ++substep) {
         if (substep == 0) {
@@ -526,19 +489,6 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
             int reduced_dof = storage.num_basis * 12;
             float grad_norm = rzsim_cuda::compute_vector_norm_nh_gpu(
                 storage.grad_reduced, reduced_dof);
-
-            // Debug: print first few gradient values on first iteration
-            if (substep == 0 && iter == 0) {
-                auto grad_host = storage.grad_reduced->get_host_vector<float>();
-                std::cout << "[ReducedNeoHookean] First 12 gradient values "
-                             "(basis 0): [";
-                for (int i = 0; i < std::min(12, (int)grad_host.size()); ++i) {
-                    std::cout << grad_host[i];
-                    if (i < std::min(12, (int)grad_host.size()) - 1)
-                        std::cout << ", ";
-                }
-                std::cout << "]" << std::endl;
-            }
 
             if (!std::isfinite(grad_norm)) {
                 spdlog::error(
@@ -761,7 +711,7 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     //     storage.velocities_buffer);
 
     // // Handle ground collision in full space
-    // rzsim_cuda::handle_ground_collision_nh_gpu(
+    // // rzsim_cuda::handle_ground_collision_nh_gpu(
     //     d_positions, storage.velocities_buffer, restitution, num_particles);
 
     // // Project modified full-space velocities back to reduced space
@@ -773,53 +723,17 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
     //     storage.num_basis,
     //     storage.q_dot_reduced);
 
-    // Get final center of mass
-    auto final_positions = d_positions->get_host_vector<glm::vec3>();
-    glm::vec3 com_after(0.0f);
-    for (const auto& p : final_positions) {
-        com_after += p;
-    }
-    com_after /= final_positions.size();
-
-    glm::vec3 com_displacement = com_after - com_before;
-
     // Log simulation statistics
     spdlog::info(
         "[ReducedNeoHookean] Simulation complete - Max Newton iterations: {}, "
-        "Max "
-        "line search iterations: {}",
+        "Max line search iterations: {}",
         max_newton_iterations,
         max_line_search_iterations);
 
-    spdlog::info(
-        "[ReducedNeoHookean] Center of mass after: ({:.3f}, {:.3f}, {:.3f})",
-        com_after.x,
-        com_after.y,
-        com_after.z);
-    spdlog::info(
-        "[ReducedNeoHookean] COM displacement: ({:.3f}, {:.3f}, {:.3f}), "
-        "magnitude: {:.3f}",
-        com_displacement.x,
-        com_displacement.y,
-        com_displacement.z,
-        glm::length(com_displacement));
+    // Get final positions for geometry update
+    auto final_positions = d_positions->get_host_vector<glm::vec3>();
 
-    // Check if object is falling (Y displacement should be negative with
-    // gravity)
-    if (gravity < 0 && com_displacement.y < 0) {
-        spdlog::info(
-            "[ReducedNeoHookean] ✓ Object is falling as expected (Y "
-            "displacement: {:.3f})",
-            com_displacement.y);
-    }
-    else if (gravity < 0 && com_displacement.y >= 0) {
-        spdlog::warn(
-            "[ReducedNeoHookean] ⚠ Object is NOT falling! Y displacement: "
-            "{:.3f}",
-            com_displacement.y);
-    }
-
-    // Update geometry with new positions (already loaded above)
+    // Update geometry with new positions
     if (mesh_component) {
         mesh_component->set_vertices(final_positions);
 

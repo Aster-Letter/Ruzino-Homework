@@ -29,6 +29,9 @@
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/camera.h"
 
+#include <rzpython/rzpython.hpp>
+
+
 // Hydra includes
 #include "pxr/base/gf/camera.h"
 #include "pxr/base/gf/frustum.h"
@@ -397,6 +400,8 @@ std::string LoadJSONScript(const std::string& filename)
 
 int main(int argc, char* argv[])
 {
+    python::initialize();
+
     // 禁止 abort 弹窗，改为直接退出
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
     // 或者设置错误模式，避免 Windows 弹窗
@@ -429,10 +434,7 @@ int main(int argc, char* argv[])
         "Frames per second (for animation delta time)",
         false,
         60.0f);
-    parser.add(
-        "no-save",
-        'n',
-        "Skip saving images (for profiling)");
+    parser.add("no-save", 'n', "Skip saving images (for profiling)");
 
     parser.parse_check(argc, argv);
 
@@ -651,7 +653,8 @@ int main(int argc, char* argv[])
                 // Include frame info in sequence mode
                 if (is_sequence) {
                     printf(
-                        "\r[Frame %d/%d] [%s] %d%% (%d/%d) Sample: %.4fs Avg: %.4fs ",
+                        "\r[Frame %d/%d] [%s] %d%% (%d/%d) Sample: %.4fs Avg: "
+                        "%.4fs ",
                         frame + 1,
                         frames_to_render,
                         bar,
@@ -733,7 +736,11 @@ int main(int argc, char* argv[])
                     auto save_start = std::chrono::high_resolution_clock::now();
 
                     if (!SaveImageToFile(
-                            frame_output, width, height, texture_data, skip_save)) {
+                            frame_output,
+                            width,
+                            height,
+                            texture_data,
+                            skip_save)) {
                         fprintf(
                             stderr,
                             "Error: Failed to save image to %s\n",
@@ -795,4 +802,6 @@ int main(int argc, char* argv[])
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
+
+    python::finalize();
 }
