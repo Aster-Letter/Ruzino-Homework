@@ -7,7 +7,6 @@
 #include "fem_bem/Expression.hpp"
 #include "nodes/core/def/node_def.hpp"
 
-
 using namespace Ruzino;
 using namespace Ruzino::fem_bem;
 
@@ -22,6 +21,8 @@ NODE_DECLARATION_FUNCTION(set_value)
         .default_val(0)
         .min(0)
         .max(1);  // 0: vertex, 1: face
+
+    b.add_input_group<float>("Params").set_runtime_dynamic(true);
     b.add_output<Geometry>("Geometry");
 }
 
@@ -52,6 +53,9 @@ NODE_EXECUTION_FUNCTION(set_value)
         return false;
     }
 
+    // Get dynamic parameters from Params group
+    auto param_group = params.get_input_group<float>("Params");
+
     ParameterMap<float> params_map;
     std::vector<float> values;
 
@@ -62,12 +66,37 @@ NODE_EXECUTION_FUNCTION(set_value)
             return false;
         }
 
+        // Get all existing vertex scalar quantities
+        auto scalar_names = mesh_component->get_vertex_scalar_quantity_names();
+        std::map<std::string, std::vector<float>> existing_quantities;
+        for (const auto& name : scalar_names) {
+            existing_quantities[name] =
+                mesh_component->get_vertex_scalar_quantity(name);
+            spdlog::info("Existing vertex scalar quantity: {}", name);
+        }
+
         values.reserve(vertices.size());
-        for (const auto& vertex : vertices) {
+        for (size_t vertex_idx = 0; vertex_idx < vertices.size();
+             ++vertex_idx) {
+            const auto& vertex = vertices[vertex_idx];
             params_map.clear();
             params_map.insert_unchecked("x", vertex.x);
             params_map.insert_unchecked("y", vertex.y);
             params_map.insert_unchecked("z", vertex.z);
+
+            // Add existing scalar quantities
+            for (const auto& [name, quantity_values] : existing_quantities) {
+                if (vertex_idx < quantity_values.size()) {
+                    params_map.insert_unchecked(
+                        name.c_str(), quantity_values[vertex_idx]);
+                }
+            }
+
+            // Add dynamic parameters as p0, p1, p2...
+            for (size_t i = 0; i < param_group.size(); ++i) {
+                std::string param_name = "p" + std::to_string(i);
+                params_map.insert_unchecked(param_name.c_str(), param_group[i]);
+            }
 
             try {
                 float value = expr.evaluate_at(params_map);
@@ -76,7 +105,7 @@ NODE_EXECUTION_FUNCTION(set_value)
             catch (const std::exception& e) {
                 spdlog::error(
                     "Error evaluating expression at vertex: {}", e.what());
-                values.push_back(0.0f);
+                return false;
             }
         }
         mesh_component->add_vertex_scalar_quantity(result_name, values);
@@ -90,6 +119,15 @@ NODE_EXECUTION_FUNCTION(set_value)
         }
 
         size_t face_count = indices.size() / 3;
+
+        // Get all existing face scalar quantities
+        auto scalar_names = mesh_component->get_face_scalar_quantity_names();
+        std::map<std::string, std::vector<float>> existing_quantities;
+        for (const auto& name : scalar_names) {
+            existing_quantities[name] =
+                mesh_component->get_face_scalar_quantity(name);
+        }
+
         values.reserve(face_count);
 
         for (size_t i = 0; i < face_count; ++i) {
@@ -104,6 +142,20 @@ NODE_EXECUTION_FUNCTION(set_value)
             params_map.insert_unchecked("y", center.y);
             params_map.insert_unchecked("z", center.z);
 
+            // Add existing scalar quantities
+            for (const auto& [name, quantity_values] : existing_quantities) {
+                if (i < quantity_values.size()) {
+                    params_map.insert_unchecked(
+                        name.c_str(), quantity_values[i]);
+                }
+            }
+
+            // Add dynamic parameters as p0, p1, p2...
+            for (size_t j = 0; j < param_group.size(); ++j) {
+                std::string param_name = "p" + std::to_string(j);
+                params_map.insert_unchecked(param_name.c_str(), param_group[j]);
+            }
+
             try {
                 float value = expr.evaluate_at(params_map);
                 values.push_back(value);
@@ -111,6 +163,7 @@ NODE_EXECUTION_FUNCTION(set_value)
             catch (const std::exception& e) {
                 spdlog::error(
                     "Error evaluating expression at face: {}", e.what());
+                return false;
                 values.push_back(0.0f);
             }
         }

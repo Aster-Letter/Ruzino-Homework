@@ -39,7 +39,7 @@ namespace fem_bem {
     template<
         typename T,
         std::size_t MaxSize = 16,
-        std::size_t NameBufferSize = 4>
+        std::size_t NameBufferSize = 16>
     class ParameterMap {
        private:
         // Ultra-compact entry layout optimized for cache lines

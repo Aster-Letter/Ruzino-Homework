@@ -109,8 +109,8 @@ NODE_DECLARATION_FUNCTION(colormap)
         .min(0)
         .max(4);  // 0: viridis, 1: plasma, 2: hot, 3: cool, 4: jet
     b.add_input<bool>("Auto Range").default_val(true);
-    b.add_input<float>("Min Value").default_val(0.0f);
-    b.add_input<float>("Max Value").default_val(1.0f);
+    b.add_input<float>("Min Value").default_val(0.0f).min(-10.f).max(10.0f);
+    b.add_input<float>("Max Value").default_val(1.0f).min(-10.f).max(10.0f);
     b.add_output<Geometry>("Geometry");
 }
 
