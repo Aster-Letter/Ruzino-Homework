@@ -480,16 +480,17 @@ void compute_reduced_hessian_gpu(
     }
 
     // Create dense matrix descriptor for J [full_dof, reduced_dof]
-    // (column-major)
+    // Jacobian is stored in ROW-MAJOR format: J[i,j] = jacobian[i*reduced_dof +
+    // j]
     cusparseDnMatDescr_t matJ_desc;
     status = cusparseCreateDnMat(
         &matJ_desc,
         full_dof,     // rows
         reduced_dof,  // cols
-        full_dof,     // leading dimension (column-major stride)
+        reduced_dof,  // leading dimension (row-major stride)
         jacobian_ptr,
         CUDA_R_32F,
-        CUSPARSE_ORDER_COL);  // column-major
+        CUSPARSE_ORDER_ROW);  // row-major storage
 
     if (status != CUSPARSE_STATUS_SUCCESS) {
         printf(
@@ -502,16 +503,16 @@ void compute_reduced_hessian_gpu(
     }
 
     // Create dense matrix descriptor for temp [full_dof, reduced_dof]
-    // (column-major)
+    // temp will also be in ROW-MAJOR format to match the output of SpMM
     cusparseDnMatDescr_t matTemp_desc;
     status = cusparseCreateDnMat(
         &matTemp_desc,
         full_dof,     // rows
         reduced_dof,  // cols
-        full_dof,     // leading dimension
+        reduced_dof,  // leading dimension (row-major stride)
         temp_buffer_ptr,
         CUDA_R_32F,
-        CUSPARSE_ORDER_COL);  // column-major
+        CUSPARSE_ORDER_ROW);  // row-major storage
 
     if (status != CUSPARSE_STATUS_SUCCESS) {
         printf(
@@ -579,9 +580,6 @@ void compute_reduced_hessian_gpu(
     }
 
     // Step 2: H_q = J^T * temp using cuBLAS gemm
-    // J^T is [reduced_dof, full_dof]
-    // temp is [full_dof, reduced_dof]
-    // H_q is [reduced_dof, reduced_dof]
 
     // Create cuBLAS handle for dense matrix multiply
     cublasHandle_t cublasHandle;
@@ -597,26 +595,26 @@ void compute_reduced_hessian_gpu(
         return;
     }
 
-    // cublasSgemm: C = alpha * op(A) * op(B) + beta * C
-    // We want: H_q = J^T * temp
-    // In column-major: H_q = J^T * temp
-    // cublasSgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta,
-    // C, ldc) C[m,n] = op(A)[m,k] * op(B)[k,n] H_q[reduced_dof, reduced_dof] =
-    // J^T[reduced_dof, full_dof] * temp[full_dof, reduced_dof]
+    // cuBLAS computes: C = alpha * op(A) * op(B) + beta * C
+    // We use: H_q = J^T_col * temp^T_col^T = J^T * temp
+    // A = J (row-major [f,r] → column-major J^T [r,f])
+    // B = temp (row-major [f,r] → column-major temp^T [r,f])
+    // op(A) = A (no transpose needed, already have J^T)
+    // op(B) = B^T (transpose to get temp from temp^T)
     cublas_status = cublasSgemm(
         cublasHandle,
-        CUBLAS_OP_T,  // J transposed
-        CUBLAS_OP_N,  // temp not transposed
-        reduced_dof,  // m: rows of J^T
-        reduced_dof,  // n: cols of temp
-        full_dof,     // k: cols of J^T = rows of temp
+        CUBLAS_OP_N,  // A = J^T (no transpose needed)
+        CUBLAS_OP_T,  // B = temp^T, use transpose to get temp
+        reduced_dof,  // m: rows of A = rows of J^T
+        reduced_dof,  // n: cols of B^T = cols of temp
+        full_dof,     // k: cols of A = rows of B^T
         &alpha,
-        jacobian_ptr,     // J [full_dof, reduced_dof] in column-major
-        full_dof,         // lda: leading dimension of J
-        temp_buffer_ptr,  // temp [full_dof, reduced_dof] in column-major
-        full_dof,         // ldb: leading dimension of temp
+        jacobian_ptr,     // A: J row-major [f,r] = J^T col-major [r,f]
+        reduced_dof,      // lda: leading dimension (row stride in row-major J)
+        temp_buffer_ptr,  // B: temp row-major [f,r] = temp^T col-major [r,f]
+        reduced_dof,  // ldb: leading dimension (row stride in row-major temp)
         &beta,
-        H_q_ptr,       // H_q [reduced_dof, reduced_dof] in column-major
+        H_q_ptr,       // C: H_q row-major [r,r]
         reduced_dof);  // ldc: leading dimension of H_q
 
     if (cublas_status != CUBLAS_STATUS_SUCCESS) {
@@ -728,13 +726,14 @@ void compute_jacobian_gram_matrix_gpu(
 // ============================================================================
 
 __global__ void apply_bc_to_velocities_kernel(
-    const int* bc_dofs,     // [num_bc_dofs] - DOF indices
+    const int* bc_dofs,  // [num_bc_dofs] - DOF indices
     int num_bc_dofs,
     glm::vec3* velocities,  // [num_particles]
     int num_particles)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= num_bc_dofs) return;
+    if (idx >= num_bc_dofs)
+        return;
 
     int dof = bc_dofs[idx];
     int vertex = dof / 3;
@@ -776,14 +775,15 @@ void apply_dirichlet_bc_to_velocities_gpu(
 // ============================================================================
 
 __global__ void apply_bc_to_positions_kernel(
-    const int* bc_dofs,        // [num_bc_dofs] - DOF indices
+    const int* bc_dofs,  // [num_bc_dofs] - DOF indices
     int num_bc_dofs,
-    float* positions,          // [num_particles * 3]
+    float* positions,             // [num_particles * 3]
     const float* rest_positions,  // [num_particles * 3]
     int num_particles)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= num_bc_dofs) return;
+    if (idx >= num_bc_dofs)
+        return;
 
     int dof = bc_dofs[idx];
     if (dof < num_particles * 3) {
@@ -806,7 +806,11 @@ void apply_bc_to_positions_gpu(
     int num_blocks = (num_bc_dofs + threads_per_block - 1) / threads_per_block;
 
     apply_bc_to_positions_kernel<<<num_blocks, threads_per_block>>>(
-        bc_dofs_ptr, num_bc_dofs, positions_ptr, rest_positions_ptr, num_particles);
+        bc_dofs_ptr,
+        num_bc_dofs,
+        positions_ptr,
+        rest_positions_ptr,
+        num_particles);
 
     cudaDeviceSynchronize();
     auto err = cudaGetLastError();

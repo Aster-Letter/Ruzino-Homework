@@ -340,7 +340,7 @@ NODE_EXECUTION_FUNCTION(neo_hookean_gpu)
 
     // If Init Geometry is provided and topology matches, use it as the starting
     // point for simulation
-    if (use_init_geometry) {
+    if (use_init_geometry && global_payload.is_simulating == false) {
         // Write init positions to GPU buffer as simulation starting point
         storage.positions_buffer->assign_host_vector(init_positions);
     }

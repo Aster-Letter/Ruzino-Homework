@@ -33,7 +33,7 @@ class CuSolverBackendTest : public ::testing::Test {
     Eigen::VectorXf b, x;
 };
 
-TEST_F(CuSolverBackendTest, BasicSolve)
+TEST_F(CuSolverBackendTest, BasicSolve_QR)
 {
     try {
         auto solver = SolverFactory::create(SolverType::CUSOLVER_QR);
@@ -59,6 +59,39 @@ TEST_F(CuSolverBackendTest, BasicSolve)
 
         std::cout << "cuSOLVER QR direct solve completed in "
                   << result.solve_time.count() << " μs" << std::endl;
+    }
+    catch (const std::exception& e) {
+        GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
+    }
+}
+
+TEST_F(CuSolverBackendTest, BasicSolve_Cholesky)
+{
+    try {
+        auto solver = SolverFactory::create(SolverType::CUSOLVER_CHOLESKY);
+        ASSERT_NE(solver, nullptr);
+
+        SolverConfig config;
+        config.tolerance = 1e-6f;
+        config.verbose = true;
+
+        auto result = solver->solve(A, b, x, config);
+
+        EXPECT_TRUE(result.converged)
+            << "Cholesky solver failed: " << result.error_message;
+        EXPECT_EQ(result.iterations, 1);
+
+        // Verify solution quality
+        Eigen::VectorXf residual = A * x - b;
+        float residual_norm = residual.norm();
+        EXPECT_LT(
+            residual_norm,
+            2e-3f)  // Slightly relaxed for GPU numerical precision
+            << "Solution residual too large: " << residual_norm;
+
+        std::cout << "cuSOLVER Cholesky solve completed in "
+                  << result.solve_time.count()
+                  << " μs, residual=" << residual_norm << std::endl;
     }
     catch (const std::exception& e) {
         GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
@@ -245,6 +278,189 @@ TEST_F(CuSolverBackendTest, ErrorHandling)
 
         std::cout << "Expected error for singular matrix: "
                   << result.error_message << std::endl;
+    }
+    catch (const std::exception& e) {
+        GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
+    }
+}
+
+// ============================================================================
+// Cholesky-specific tests
+// ============================================================================
+
+TEST_F(CuSolverBackendTest, Cholesky_DetectsNonPositiveDefinite)
+{
+    try {
+        auto solver = SolverFactory::create(SolverType::CUSOLVER_CHOLESKY);
+        ASSERT_NE(solver, nullptr);
+
+        // Create a non-positive-definite matrix (has negative eigenvalue)
+        Eigen::SparseMatrix<float> non_pd(n, n);
+        std::vector<Eigen::Triplet<float>> triplets;
+
+        for (int i = 0; i < n; ++i) {
+            triplets.push_back(
+                Eigen::Triplet<float>(i, i, -2.0f));  // Negative diagonal!
+            if (i > 0)
+                triplets.push_back(Eigen::Triplet<float>(i, i - 1, 1.0f));
+            if (i < n - 1)
+                triplets.push_back(Eigen::Triplet<float>(i, i + 1, 1.0f));
+        }
+        non_pd.setFromTriplets(triplets.begin(), triplets.end());
+
+        Eigen::VectorXf x_test = Eigen::VectorXf::Zero(n);
+        auto result = solver->solve(non_pd, b, x_test);
+
+        EXPECT_FALSE(result.converged)
+            << "Cholesky should fail on non-positive-definite matrix";
+        EXPECT_FALSE(result.error_message.empty());
+        EXPECT_NE(result.error_message.find("not positive"), std::string::npos)
+            << "Error message should mention non-positive-definite: "
+            << result.error_message;
+
+        std::cout << "Cholesky correctly detected non-PD matrix: "
+                  << result.error_message << std::endl;
+    }
+    catch (const std::exception& e) {
+        GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
+    }
+}
+
+TEST_F(CuSolverBackendTest, Cholesky_DenseMatrixSolve)
+{
+    try {
+        auto solver = SolverFactory::create(SolverType::CUSOLVER_CHOLESKY);
+        ASSERT_NE(solver, nullptr);
+
+        // Test dense matrix solve (like in reduced order simulation)
+        int dense_n = 13 * 12;  // Typical reduced DOF size
+
+        // Create a dense SPD matrix
+        Eigen::MatrixXf dense_A =
+            Eigen::MatrixXf::Identity(dense_n, dense_n) * 2.0f;
+        for (int i = 0; i < dense_n - 1; ++i) {
+            dense_A(i, i + 1) = -0.5f;
+            dense_A(i + 1, i) = -0.5f;
+        }
+
+        // Convert to sparse for the solver interface
+        Eigen::SparseMatrix<float> sparse_A = dense_A.sparseView();
+
+        Eigen::VectorXf dense_b = Eigen::VectorXf::Ones(dense_n);
+        Eigen::VectorXf dense_x = Eigen::VectorXf::Zero(dense_n);
+
+        SolverConfig config;
+        config.verbose = true;
+
+        auto result = solver->solve(sparse_A, dense_b, dense_x, config);
+
+        EXPECT_TRUE(result.converged)
+            << "Dense solve failed: " << result.error_message;
+
+        // Verify solution
+        Eigen::VectorXf residual = dense_A * dense_x - dense_b;
+        float residual_norm = residual.norm() / dense_b.norm();
+        EXPECT_LT(residual_norm, 1e-3f)
+            << "Dense solution residual too large: " << residual_norm;
+
+        std::cout << "Dense Cholesky (" << dense_n << "x" << dense_n
+                  << ") solved in " << result.solve_time.count() << " μs, "
+                  << "relative residual=" << residual_norm << std::endl;
+    }
+    catch (const std::exception& e) {
+        GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
+    }
+}
+
+TEST_F(CuSolverBackendTest, Cholesky_CompareWithEigenDirect)
+{
+    try {
+        auto cholesky_solver =
+            SolverFactory::create(SolverType::CUSOLVER_CHOLESKY);
+        auto eigen_solver =
+            SolverFactory::create(SolverType::EIGEN_DIRECT_CHOLESKY);
+
+        ASSERT_NE(cholesky_solver, nullptr);
+        ASSERT_NE(eigen_solver, nullptr);
+
+        Eigen::VectorXf x_cusolver = Eigen::VectorXf::Zero(n);
+        Eigen::VectorXf x_eigen = Eigen::VectorXf::Zero(n);
+
+        SolverConfig config;
+        config.verbose = false;
+
+        auto result_cusolver = cholesky_solver->solve(A, b, x_cusolver, config);
+        auto result_eigen = eigen_solver->solve(A, b, x_eigen, config);
+
+        EXPECT_TRUE(result_cusolver.converged) << result_cusolver.error_message;
+        EXPECT_TRUE(result_eigen.converged) << result_eigen.error_message;
+
+        // Solutions should be nearly identical
+        float solution_diff = (x_cusolver - x_eigen).norm() / x_eigen.norm();
+        EXPECT_LT(solution_diff, 1e-4f)
+            << "cuSOLVER and Eigen Cholesky solutions differ: "
+            << solution_diff;
+
+        std::cout << "cuSOLVER Cholesky: " << result_cusolver.solve_time.count()
+                  << " μs" << std::endl;
+        std::cout << "Eigen Cholesky: " << result_eigen.solve_time.count()
+                  << " μs" << std::endl;
+        std::cout << "Solution difference (relative): " << solution_diff
+                  << std::endl;
+    }
+    catch (const std::exception& e) {
+        GTEST_SKIP() << "Solver not available: " << e.what();
+    }
+}
+
+TEST_F(CuSolverBackendTest, Cholesky_NumericalStability)
+{
+    try {
+        auto solver = SolverFactory::create(SolverType::CUSOLVER_CHOLESKY);
+
+        // Create matrix with varying diagonal magnitudes (tests numerical
+        // stability)
+        int stab_n = 156;  // 13 * 12, typical reduced system size
+        Eigen::SparseMatrix<float> stab_A(stab_n, stab_n);
+        std::vector<Eigen::Triplet<float>> triplets;
+
+        for (int i = 0; i < stab_n; ++i) {
+            // Diagonal elements vary from 1 to 100
+            float diag = 1.0f + (99.0f * i) / stab_n;
+            triplets.push_back(Eigen::Triplet<float>(i, i, diag));
+
+            if (i > 0) {
+                triplets.push_back(
+                    Eigen::Triplet<float>(i, i - 1, -0.1f * diag));
+            }
+            if (i < stab_n - 1) {
+                triplets.push_back(
+                    Eigen::Triplet<float>(i, i + 1, -0.1f * diag));
+            }
+        }
+        stab_A.setFromTriplets(triplets.begin(), triplets.end());
+
+        Eigen::VectorXf stab_b = Eigen::VectorXf::Ones(stab_n);
+        Eigen::VectorXf stab_x = Eigen::VectorXf::Zero(stab_n);
+
+        SolverConfig config;
+        config.verbose = true;
+
+        auto result = solver->solve(stab_A, stab_b, stab_x, config);
+
+        EXPECT_TRUE(result.converged)
+            << "Stability test failed: " << result.error_message;
+
+        // Check relative residual
+        Eigen::VectorXf residual = stab_A * stab_x - stab_b;
+        float rel_residual = residual.norm() / stab_b.norm();
+        EXPECT_LT(rel_residual, 1e-2f)
+            << "Relative residual too large: " << rel_residual;
+
+        std::cout << "Numerical stability test (" << stab_n << "x" << stab_n
+                  << "): relative residual=" << rel_residual
+                  << ", time=" << result.solve_time.count() << " μs"
+                  << std::endl;
     }
     catch (const std::exception& e) {
         GTEST_SKIP() << "CUDA/cuSOLVER not available: " << e.what();
