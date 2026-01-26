@@ -1,6 +1,8 @@
 #pragma once
 
 #include <RHI/internal/cuda_extension.hpp>
+#include <cublas_v2.h>
+#include <cusparse.h>
 
 #include "api.h"
 #include "neo_hookean.cuh"
@@ -60,6 +62,7 @@ void compute_jacobian_gpu(
 // Where grad_x is the full-space gradient [num_particles * 3]
 RZSIM_CUDA_API
 void compute_reduced_gradient_gpu(
+    cublasHandle_t cublas_handle,  // Cached cuBLAS handle
     cuda::CUDALinearBufferHandle
         jacobian,                         // [num_particles * 3, num_basis * 12]
     cuda::CUDALinearBufferHandle grad_x,  // [num_particles * 3]
@@ -72,6 +75,7 @@ void compute_reduced_gradient_gpu(
 // This avoids an extra negate kernel launch
 RZSIM_CUDA_API
 void compute_reduced_neg_gradient_gpu(
+    cublasHandle_t cublas_handle,  // Cached cuBLAS handle
     cuda::CUDALinearBufferHandle
         jacobian,                         // [num_particles * 3, num_basis * 12]
     cuda::CUDALinearBufferHandle grad_x,  // [num_particles * 3]
@@ -99,6 +103,12 @@ void map_reduced_velocities_to_full_gpu(
 // Then compute H_q = J^T * temp [num_basis * 12, num_basis * 12]
 RZSIM_CUDA_API
 void compute_reduced_hessian_gpu(
+    cublasHandle_t cublas_handle,          // Cached cuBLAS handle
+    cusparseHandle_t cusparse_handle,      // Cached cuSPARSE handle
+    cusparseSpMatDescr_t hessian_csr_desc, // Cached Hessian CSR descriptor
+    cusparseDnMatDescr_t jacobian_desc,    // Cached Jacobian descriptor
+    cusparseDnMatDescr_t temp_desc,        // Cached temp buffer descriptor
+    void* cusparse_workspace,              // Cached workspace buffer
     const NeoHookeanCSRStructure& hessian_structure,
     cuda::CUDALinearBufferHandle hessian_values,  // CSR values [nnz]
     cuda::CUDALinearBufferHandle

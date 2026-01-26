@@ -1,4 +1,6 @@
 #include <RHI/cuda.hpp>
+#include <cublas_v2.h>
+#include <cusparse.h>
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <limits>
@@ -87,11 +89,58 @@ struct ReducedNeoHookeanGPUStorage {
     // Barrier function energy buffer
     cuda::CUDALinearBufferHandle barrier_energy_buffer;
 
+    // Cached cuBLAS and cuSPARSE handles
+    cublasHandle_t cublas_handle = nullptr;
+    cusparseHandle_t cusparse_handle = nullptr;
+
+    // Cached matrix descriptors for Hessian computation
+    cusparseSpMatDescr_t hessian_csr_descriptor = nullptr;
+    cusparseDnMatDescr_t jacobian_descriptor = nullptr;
+    cusparseDnMatDescr_t temp_hessian_descriptor = nullptr;
+    cusparseDnMatDescr_t hessian_reduced_descriptor = nullptr;
+
+    // cuSPARSE workspace
+    void* cusparse_workspace = nullptr;
+    size_t cusparse_workspace_size = 0;
+
     bool initialized = false;
     int num_particles = 0;
     int num_elements = 0;
 
     constexpr static bool has_storage = false;
+
+    // Destructor to clean up CUDA resources
+    ~ReducedNeoHookeanGPUStorage()
+    {
+        if (cublas_handle) {
+            cublasDestroy(cublas_handle);
+            cublas_handle = nullptr;
+        }
+        if (cusparse_handle) {
+            cusparseDestroy(cusparse_handle);
+            cusparse_handle = nullptr;
+        }
+        if (hessian_csr_descriptor) {
+            cusparseDestroySpMat(hessian_csr_descriptor);
+            hessian_csr_descriptor = nullptr;
+        }
+        if (jacobian_descriptor) {
+            cusparseDestroyDnMat(jacobian_descriptor);
+            jacobian_descriptor = nullptr;
+        }
+        if (temp_hessian_descriptor) {
+            cusparseDestroyDnMat(temp_hessian_descriptor);
+            temp_hessian_descriptor = nullptr;
+        }
+        if (hessian_reduced_descriptor) {
+            cusparseDestroyDnMat(hessian_reduced_descriptor);
+            hessian_reduced_descriptor = nullptr;
+        }
+        if (cusparse_workspace) {
+            cudaFree(cusparse_workspace);
+            cusparse_workspace = nullptr;
+        }
+    }
 
     // Initialize all GPU buffers and structures
     void initialize(
@@ -267,6 +316,140 @@ struct ReducedNeoHookeanGPUStorage {
         // Create solver instance
         solver = Ruzino::Solver::SolverFactory::create(
             Ruzino::Solver::SolverType::CUSOLVER_CHOLESKY);
+
+        // Create and cache cuBLAS handle
+        cublasStatus_t cublas_status = cublasCreate(&cublas_handle);
+        if (cublas_status != CUBLAS_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create cuBLAS handle: {}",
+                static_cast<int>(cublas_status));
+            return;
+        }
+
+        // Create and cache cuSPARSE handle
+        cusparseStatus_t cusparse_status = cusparseCreate(&cusparse_handle);
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create cuSPARSE handle: {}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        // Create CSR descriptor for Hessian matrix [full_dof, full_dof]
+        const int* row_offsets_ptr =
+            hessian_structure.row_offsets->get_device_ptr<int>();
+        const int* col_indices_ptr =
+            hessian_structure.col_indices->get_device_ptr<int>();
+        float* hessian_values_ptr = hessian_values->get_device_ptr<float>();
+
+        cusparse_status = cusparseCreateCsr(
+            &hessian_csr_descriptor,
+            dof,                    // rows
+            dof,                    // cols
+            hessian_structure.nnz,  // nnz
+            const_cast<int*>(row_offsets_ptr),
+            const_cast<int*>(col_indices_ptr),
+            hessian_values_ptr,
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_BASE_ZERO,
+            CUDA_R_32F);
+
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create CSR descriptor: {}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        // Create dense matrix descriptor for Jacobian [full_dof, reduced_dof]
+        // (row-major)
+        float* jacobian_ptr = jacobian->get_device_ptr<float>();
+        cusparse_status = cusparseCreateDnMat(
+            &jacobian_descriptor,
+            dof,          // rows
+            reduced_dof,  // cols
+            reduced_dof,  // leading dimension (row-major)
+            jacobian_ptr,
+            CUDA_R_32F,
+            CUSPARSE_ORDER_ROW);
+
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create Jacobian descriptor: {}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        // Create dense matrix descriptor for temp buffer [full_dof,
+        // reduced_dof] (row-major)
+        float* temp_buffer_ptr = temp_hessian_buffer->get_device_ptr<float>();
+        cusparse_status = cusparseCreateDnMat(
+            &temp_hessian_descriptor,
+            dof,          // rows
+            reduced_dof,  // cols
+            reduced_dof,  // leading dimension (row-major)
+            temp_buffer_ptr,
+            CUDA_R_32F,
+            CUSPARSE_ORDER_ROW);
+
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create temp Hessian descriptor: "
+                "{}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        // Create dense matrix descriptor for reduced Hessian [reduced_dof,
+        // reduced_dof] (row-major)
+        float* H_q_ptr = hessian_reduced->get_device_ptr<float>();
+        cusparse_status = cusparseCreateDnMat(
+            &hessian_reduced_descriptor,
+            reduced_dof,  // rows
+            reduced_dof,  // cols
+            reduced_dof,  // leading dimension (row-major)
+            H_q_ptr,
+            CUDA_R_32F,
+            CUSPARSE_ORDER_ROW);
+
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to create reduced Hessian "
+                "descriptor: {}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        // Allocate cuSPARSE workspace buffer
+        float alpha = 1.0f;
+        float beta = 0.0f;
+        cusparse_status = cusparseSpMM_bufferSize(
+            cusparse_handle,
+            CUSPARSE_OPERATION_NON_TRANSPOSE,
+            CUSPARSE_OPERATION_NON_TRANSPOSE,
+            &alpha,
+            hessian_csr_descriptor,
+            jacobian_descriptor,
+            &beta,
+            temp_hessian_descriptor,
+            CUDA_R_32F,
+            CUSPARSE_SPMM_ALG_DEFAULT,
+            &cusparse_workspace_size);
+
+        if (cusparse_status != CUSPARSE_STATUS_SUCCESS) {
+            spdlog::error(
+                "[ReducedNeoHookean] Failed to get cuSPARSE workspace size: {}",
+                static_cast<int>(cusparse_status));
+            return;
+        }
+
+        if (cusparse_workspace_size > 0) {
+            cudaMalloc(&cusparse_workspace, cusparse_workspace_size);
+            spdlog::debug(
+                "[ReducedNeoHookean] Allocated cuSPARSE workspace: {} bytes",
+                cusparse_workspace_size);
+        }
 
         spdlog::debug(
             "[ReducedNeoHookean] Initialized with {} particles, {} elements, "
@@ -671,6 +854,7 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
             // (-grad_x) Since we already have negative gradient, just use
             // regular projection
             rzsim_cuda::compute_reduced_gradient_gpu(
+                storage.cublas_handle,
                 storage.jacobian,
                 d_gradients,
                 num_particles,
@@ -762,6 +946,12 @@ NODE_EXECUTION_FUNCTION(reduced_order_neo_hookean_gpu)
             // Project Hessian to reduced space: H_q = J^T * H_x * J
             // Use unmodified Jacobian (BC constraints already in H_x)
             rzsim_cuda::compute_reduced_hessian_gpu(
+                storage.cublas_handle,
+                storage.cusparse_handle,
+                storage.hessian_csr_descriptor,
+                storage.jacobian_descriptor,
+                storage.temp_hessian_descriptor,
+                storage.cusparse_workspace,
                 storage.hessian_structure,
                 storage.hessian_values,
                 storage.jacobian,

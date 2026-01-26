@@ -218,7 +218,7 @@ def test_save_obj(shape_code_value=0.5, output_filename="test_basis_set.obj"):
 
         # Save OBJ file
         output_path = os.path.join(
-            r"C:\Users\Pengfei\WorkSpace\Ruzino\Binaries\Release", output_filename
+            r"C:\Users\Pengfei\WorkSpace\Ruzino\Binaries\Debug", output_filename
         )
 
         print(f"Saving OBJ with shape_code={shape_code_value} to {output_path}")

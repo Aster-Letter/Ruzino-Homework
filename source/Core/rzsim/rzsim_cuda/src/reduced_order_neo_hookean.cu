@@ -259,6 +259,7 @@ void compute_jacobian_gpu(
 // ============================================================================
 
 void compute_reduced_gradient_gpu(
+    cublasHandle_t handle,
     cuda::CUDALinearBufferHandle jacobian,
     cuda::CUDALinearBufferHandle grad_x,
     int num_particles,
@@ -272,24 +273,13 @@ void compute_reduced_gradient_gpu(
     const float* grad_x_ptr = grad_x->get_device_ptr<float>();
     float* grad_q_ptr = grad_q->get_device_ptr<float>();
 
-    // Use cuBLAS gemv for matrix-vector multiply: y = J^T * x
-    // J is row-major [full_dof, reduced_dof] with ld=reduced_dof
-    // In column-major view, this is J^T[reduced_dof, full_dof] with
-    // ld=reduced_dof
-    cublasHandle_t handle;
-    cublasStatus_t status = cublasCreate(&handle);
-    if (status != CUBLAS_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to create cuBLAS handle: %d\n", status);
-        return;
-    }
-
     float alpha = 1.0f;
     float beta = 0.0f;
 
     // cublasSgemv: y = alpha * op(A) * x + beta * y
     // A = J^T (column-major view of row-major J)
     // Shape: [reduced_dof, full_dof], lda = reduced_dof
-    status = cublasSgemv(
+    cublasStatus_t status = cublasSgemv(
         handle,
         CUBLAS_OP_N,  // No transpose (already have J^T in col-major view)
         reduced_dof,  // m: rows of A
@@ -306,11 +296,10 @@ void compute_reduced_gradient_gpu(
     if (status != CUBLAS_STATUS_SUCCESS) {
         printf("[ReducedOrder] cublasSgemv failed: %d\n", status);
     }
-
-    cublasDestroy(handle);
 }
 
 void compute_reduced_neg_gradient_gpu(
+    cublasHandle_t handle,
     cuda::CUDALinearBufferHandle jacobian,
     cuda::CUDALinearBufferHandle grad_x,
     int num_particles,
@@ -324,18 +313,10 @@ void compute_reduced_neg_gradient_gpu(
     const float* grad_x_ptr = grad_x->get_device_ptr<float>();
     float* neg_grad_q_ptr = neg_grad_q->get_device_ptr<float>();
 
-    // Use cuBLAS gemv: y = -J^T * x (alpha = -1)
-    cublasHandle_t handle;
-    cublasStatus_t status = cublasCreate(&handle);
-    if (status != CUBLAS_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to create cuBLAS handle: %d\n", status);
-        return;
-    }
-
     float alpha = -1.0f;  // Negative to get -J^T * grad_x
     float beta = 0.0f;
 
-    status = cublasSgemv(
+    cublasStatus_t status = cublasSgemv(
         handle,
         CUBLAS_OP_N,
         reduced_dof,
@@ -352,8 +333,6 @@ void compute_reduced_neg_gradient_gpu(
     if (status != CUBLAS_STATUS_SUCCESS) {
         printf("[ReducedOrder] cublasSgemv failed: %d\n", status);
     }
-
-    cublasDestroy(handle);
 }
 
 // ============================================================================
@@ -415,6 +394,12 @@ void map_reduced_velocities_to_full_gpu(
 // ============================================================================
 
 void compute_reduced_hessian_gpu(
+    cublasHandle_t cublasHandle,
+    cusparseHandle_t cusparseHandle,
+    cusparseSpMatDescr_t matH_desc,
+    cusparseDnMatDescr_t matJ_desc,
+    cusparseDnMatDescr_t matTemp_desc,
+    void* dBuffer,
     const NeoHookeanCSRStructure& hessian_structure,
     cuda::CUDALinearBufferHandle hessian_values,
     cuda::CUDALinearBufferHandle jacobian,
@@ -426,130 +411,44 @@ void compute_reduced_hessian_gpu(
     int full_dof = num_particles * 3;
     int reduced_dof = num_basis * 12;
 
-    // Create cuSPARSE handle
-    cusparseHandle_t cusparseHandle;
-    cusparseStatus_t status = cusparseCreate(&cusparseHandle);
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to create cuSPARSE handle: %d\n", status);
-        return;
-    }
-
-    const int* row_offsets_ptr =
-        hessian_structure.row_offsets->get_device_ptr<int>();
-    const int* col_indices_ptr =
-        hessian_structure.col_indices->get_device_ptr<int>();
+    // Get device pointers
     const float* hessian_values_ptr = hessian_values->get_device_ptr<float>();
     float* jacobian_ptr = jacobian->get_device_ptr<float>();
     float* temp_buffer_ptr = temp_buffer->get_device_ptr<float>();
     float* H_q_ptr = H_q->get_device_ptr<float>();
 
+    // Update the data pointers in the descriptors (in case buffers were reallocated)
+    cusparseStatus_t status;
+    
+    // Update CSR matrix values pointer
+    status = cusparseCsrSetPointers(
+        matH_desc,
+        const_cast<int*>(hessian_structure.row_offsets->get_device_ptr<int>()),
+        const_cast<int*>(hessian_structure.col_indices->get_device_ptr<int>()),
+        const_cast<float*>(hessian_values_ptr));
+    
+    if (status != CUSPARSE_STATUS_SUCCESS) {
+        printf("[ReducedOrder] Failed to update CSR pointers: %d\n", status);
+        return;
+    }
+
+    // Update dense matrix pointers
+    status = cusparseDnMatSetValues(matJ_desc, jacobian_ptr);
+    if (status != CUSPARSE_STATUS_SUCCESS) {
+        printf("[ReducedOrder] Failed to update Jacobian pointer: %d\n", status);
+        return;
+    }
+
+    status = cusparseDnMatSetValues(matTemp_desc, temp_buffer_ptr);
+    if (status != CUSPARSE_STATUS_SUCCESS) {
+        printf("[ReducedOrder] Failed to update temp buffer pointer: %d\n", status);
+        return;
+    }
+
     // Step 1: temp = H_x * J using cuSPARSE SpMM
-    // H_x is [full_dof, full_dof] sparse CSR
-    // J is [full_dof, reduced_dof] dense (column-major for cuSPARSE)
-    // temp is [full_dof, reduced_dof] dense (column-major)
-
-    // Create sparse matrix descriptor for H_x (CSR format)
-    cusparseSpMatDescr_t matH_desc;
-    status = cusparseCreateCsr(
-        &matH_desc,
-        full_dof,               // rows
-        full_dof,               // cols
-        hessian_structure.nnz,  // nnz
-        const_cast<int*>(row_offsets_ptr),
-        const_cast<int*>(col_indices_ptr),
-        const_cast<float*>(hessian_values_ptr),
-        CUSPARSE_INDEX_32I,  // row offsets type
-        CUSPARSE_INDEX_32I,  // col indices type
-        CUSPARSE_INDEX_BASE_ZERO,
-        CUDA_R_32F);  // data type
-
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf(
-            "[ReducedOrder] Failed to create sparse matrix descriptor: %d\n",
-            status);
-        cusparseDestroy(cusparseHandle);
-        return;
-    }
-
-    // Create dense matrix descriptor for J [full_dof, reduced_dof]
-    // Jacobian is stored in ROW-MAJOR format: J[i,j] = jacobian[i*reduced_dof +
-    // j]
-    cusparseDnMatDescr_t matJ_desc;
-    status = cusparseCreateDnMat(
-        &matJ_desc,
-        full_dof,     // rows
-        reduced_dof,  // cols
-        reduced_dof,  // leading dimension (row-major stride)
-        jacobian_ptr,
-        CUDA_R_32F,
-        CUSPARSE_ORDER_ROW);  // row-major storage
-
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf(
-            "[ReducedOrder] Failed to create Jacobian dense matrix descriptor: "
-            "%d\n",
-            status);
-        cusparseDestroySpMat(matH_desc);
-        cusparseDestroy(cusparseHandle);
-        return;
-    }
-
-    // Create dense matrix descriptor for temp [full_dof, reduced_dof]
-    // temp will also be in ROW-MAJOR format to match the output of SpMM
-    cusparseDnMatDescr_t matTemp_desc;
-    status = cusparseCreateDnMat(
-        &matTemp_desc,
-        full_dof,     // rows
-        reduced_dof,  // cols
-        reduced_dof,  // leading dimension (row-major stride)
-        temp_buffer_ptr,
-        CUDA_R_32F,
-        CUSPARSE_ORDER_ROW);  // row-major storage
-
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf(
-            "[ReducedOrder] Failed to create temp dense matrix descriptor: "
-            "%d\n",
-            status);
-        cusparseDestroyDnMat(matJ_desc);
-        cusparseDestroySpMat(matH_desc);
-        cusparseDestroy(cusparseHandle);
-        return;
-    }
-
-    // Allocate workspace for SpMM
     float alpha = 1.0f;
     float beta = 0.0f;
-    size_t bufferSize = 0;
 
-    status = cusparseSpMM_bufferSize(
-        cusparseHandle,
-        CUSPARSE_OPERATION_NON_TRANSPOSE,  // H_x not transposed
-        CUSPARSE_OPERATION_NON_TRANSPOSE,  // J not transposed
-        &alpha,
-        matH_desc,
-        matJ_desc,
-        &beta,
-        matTemp_desc,
-        CUDA_R_32F,
-        CUSPARSE_SPMM_ALG_DEFAULT,
-        &bufferSize);
-
-    if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to get SpMM buffer size: %d\n", status);
-        cusparseDestroyDnMat(matTemp_desc);
-        cusparseDestroyDnMat(matJ_desc);
-        cusparseDestroySpMat(matH_desc);
-        cusparseDestroy(cusparseHandle);
-        return;
-    }
-
-    void* dBuffer = nullptr;
-    if (bufferSize > 0) {
-        cudaMalloc(&dBuffer, bufferSize);
-    }
-
-    // Perform SpMM: temp = H_x * J
     status = cusparseSpMM(
         cusparseHandle,
         CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -567,33 +466,8 @@ void compute_reduced_hessian_gpu(
         printf("[ReducedOrder] SpMM failed: %d\n", status);
     }
 
-    if (dBuffer) {
-        cudaFree(dBuffer);
-    }
-
     // Step 2: H_q = J^T * temp using cuBLAS gemm
-
-    // Create cuBLAS handle for dense matrix multiply
-    cublasHandle_t cublasHandle;
-    cublasStatus_t cublas_status = cublasCreate(&cublasHandle);
-    if (cublas_status != CUBLAS_STATUS_SUCCESS) {
-        printf(
-            "[ReducedOrder] Failed to create cuBLAS handle: %d\n",
-            cublas_status);
-        cusparseDestroyDnMat(matTemp_desc);
-        cusparseDestroyDnMat(matJ_desc);
-        cusparseDestroySpMat(matH_desc);
-        cusparseDestroy(cusparseHandle);
-        return;
-    }
-
-    // cuBLAS computes: C = alpha * op(A) * op(B) + beta * C
-    // We use: H_q = J^T_col * temp^T_col^T = J^T * temp
-    // A = J (row-major [f,r] → column-major J^T [r,f])
-    // B = temp (row-major [f,r] → column-major temp^T [r,f])
-    // op(A) = A (no transpose needed, already have J^T)
-    // op(B) = B^T (transpose to get temp from temp^T)
-    cublas_status = cublasSgemm(
+    cublasStatus_t cublas_status = cublasSgemm(
         cublasHandle,
         CUBLAS_OP_N,  // A = J^T (no transpose needed)
         CUBLAS_OP_T,  // B = temp^T, use transpose to get temp
@@ -612,13 +486,6 @@ void compute_reduced_hessian_gpu(
     if (cublas_status != CUBLAS_STATUS_SUCCESS) {
         printf("[ReducedOrder] cublasSgemm failed: %d\n", cublas_status);
     }
-
-    // Cleanup
-    cublasDestroy(cublasHandle);
-    cusparseDestroyDnMat(matTemp_desc);
-    cusparseDestroyDnMat(matJ_desc);
-    cusparseDestroySpMat(matH_desc);
-    cusparseDestroy(cusparseHandle);
 }
 
 // ============================================================================
