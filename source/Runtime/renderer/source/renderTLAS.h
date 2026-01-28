@@ -2,9 +2,6 @@
 #include "api.h"
 #include "geometries/mesh.h"
 #include "nvrhi/nvrhi.h"
-#include "pxr/imaging/garch/glApi.h"
-#include "pxr/imaging/hd/renderBuffer.h"
-#include "pxr/pxr.h"
 
 // SceneTypes
 #include "../nodes/shaders/shaders/Scene/BindlessMaterial.slang"

@@ -30,6 +30,13 @@ class CuSolverCholeskySolver : public LinearSolver {
     Ruzino::cuda::CUDALinearBufferHandle d_b_cached;
     Ruzino::cuda::CUDALinearBufferHandle d_x_cached;
 
+    // Cached buffers for solveDenseGPU() method
+    int cached_dense_n = 0;
+    int cached_lwork = 0;
+    float* d_work_cached = nullptr;
+    int* d_info_cached = nullptr;
+    float* d_A_copy_cached = nullptr;
+
    public:
     CuSolverCholeskySolver()
     {
@@ -48,6 +55,14 @@ class CuSolverCholeskySolver : public LinearSolver {
             cusolverSpDestroy(cusolverSpHandle);
             cusolverDnDestroy(cusolverDnHandle);
             cusparseDestroy(cusparseHandle);
+
+            // Free cached dense solver buffers
+            if (d_work_cached)
+                cudaFree(d_work_cached);
+            if (d_info_cached)
+                cudaFree(d_info_cached);
+            if (d_A_copy_cached)
+                cudaFree(d_A_copy_cached);
         }
     }
 
@@ -317,12 +332,9 @@ class CuSolverCholeskySolver : public LinearSolver {
         auto start_time = std::chrono::high_resolution_clock::now();
 
         try {
-            // Allocate workspace for Cholesky factorization
-            int lwork = 0;
-            cusolverStatus_t status;
-
             // Query workspace size
-            status = cusolverDnSpotrf_bufferSize(
+            int lwork = 0;
+            cusolverStatus_t status = cusolverDnSpotrf_bufferSize(
                 cusolverDnHandle,
                 CUBLAS_FILL_MODE_LOWER,  // Use lower triangular part
                 n,
@@ -338,62 +350,49 @@ class CuSolverCholeskySolver : public LinearSolver {
                 return result;
             }
 
-            // Allocate workspace
-            float* d_work = nullptr;
-            cudaMalloc(&d_work, lwork * sizeof(float));
+            // Reallocate cached buffers if size changed
+            if (n != cached_dense_n || lwork != cached_lwork) {
+                // Free old buffers
+                if (d_work_cached)
+                    cudaFree(d_work_cached);
+                if (d_A_copy_cached)
+                    cudaFree(d_A_copy_cached);
 
-            // Allocate device memory for factorization info
-            int* d_info = nullptr;
-            cudaMalloc(&d_info, sizeof(int));
+                // Allocate new buffers
+                cudaMalloc(&d_work_cached, lwork * sizeof(float));
+                cudaMalloc(&d_A_copy_cached, n * n * sizeof(float));
+
+                cached_dense_n = n;
+                cached_lwork = lwork;
+            }
+
+            // Allocate d_info once (fixed size)
+            if (!d_info_cached) {
+                cudaMalloc(&d_info_cached, sizeof(int));
+            }
 
             // Copy A to temporary buffer (will be overwritten with L)
-            float* d_A_copy = nullptr;
-            cudaMalloc(&d_A_copy, n * n * sizeof(float));
             cudaMemcpy(
-                d_A_copy, d_A, n * n * sizeof(float), cudaMemcpyDeviceToDevice);
+                d_A_copy_cached,
+                d_A,
+                n * n * sizeof(float),
+                cudaMemcpyDeviceToDevice);
 
             // Perform Cholesky factorization: A = L * L^T
             status = cusolverDnSpotrf(
                 cusolverDnHandle,
                 CUBLAS_FILL_MODE_LOWER,
                 n,
-                d_A_copy,
+                d_A_copy_cached,
                 n,  // leading dimension
-                d_work,
+                d_work_cached,
                 lwork,
-                d_info);
+                d_info_cached);
 
             if (status != CUSOLVER_STATUS_SUCCESS) {
                 result.converged = false;
                 result.error_message =
                     "cusolverDnSpotrf failed: " + std::to_string(status);
-                cudaFree(d_work);
-                cudaFree(d_info);
-                cudaFree(d_A_copy);
-                return result;
-            }
-
-            // Check if factorization succeeded
-            int h_info = 0;
-            cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-
-            if (h_info != 0) {
-                result.converged = false;
-                if (h_info < 0) {
-                    result.error_message =
-                        "Cholesky factorization: illegal parameter at "
-                        "position " +
-                        std::to_string(-h_info);
-                }
-                else {
-                    result.error_message =
-                        "Matrix not positive definite: leading minor of "
-                        "order " +
-                        std::to_string(h_info) + " is not positive";
-                }
-                cudaFree(d_work);
-                cudaFree(d_info);
-                cudaFree(d_A_copy);
                 return result;
             }
 
@@ -408,30 +407,21 @@ class CuSolverCholeskySolver : public LinearSolver {
                 cusolverDnHandle,
                 CUBLAS_FILL_MODE_LOWER,
                 n,
-                1,         // nrhs (number of right-hand sides)
-                d_A_copy,  // Factorized matrix (L in lower triangle)
-                n,         // lda
-                d_x,       // On input: b, on output: x
-                n,         // ldb
-                d_info);
+                1,                // nrhs (number of right-hand sides)
+                d_A_copy_cached,  // Factorized matrix (L in lower triangle)
+                n,                // lda
+                d_x,              // On input: b, on output: x
+                n,                // ldb
+                d_info_cached);
 
-            cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-
-            if (status != CUSOLVER_STATUS_SUCCESS || h_info != 0) {
+            if (status != CUSOLVER_STATUS_SUCCESS) {
                 result.converged = false;
-                result.error_message = "cusolverDnSpotrs failed: status=" +
-                                       std::to_string(status) +
-                                       ", info=" + std::to_string(h_info);
-                cudaFree(d_work);
-                cudaFree(d_info);
-                cudaFree(d_A_copy);
+                result.error_message =
+                    "cusolverDnSpotrs failed: status=" + std::to_string(status);
                 return result;
             }
 
-            // Cleanup
-            cudaFree(d_work);
-            cudaFree(d_info);
-            cudaFree(d_A_copy);
+            // No cleanup needed - buffers are cached and reused
 
             result.converged = true;
             result.iterations = 1;  // Direct solver

@@ -108,6 +108,7 @@ NODE_EXECUTION_FUNCTION(nn_boundary_detector)
         python::send("model_name", model_path);
         std::string init_result = python::call<std::string>(
             "deducer.initialize_basis_set(model_name)");
+        python::flush_python_output();  // Flush Python print output
         spdlog::info("Basis set initialization: {}", init_result);
 
         // Create or update GPU buffer for vertices
@@ -174,6 +175,7 @@ NODE_EXECUTION_FUNCTION(nn_boundary_detector)
         }
 
         python::call<void>(detection_code);
+        python::flush_python_output();  // Flush Python print output
 
         // Retrieve results as vector<float>
         std::vector<float> boundary_values =

@@ -14,7 +14,7 @@
 
 RUZINO_NAMESPACE_OPEN_SCOPE
 
-struct GPUSceneAssember {
+struct HD_RUZINO_API GPUSceneAssember {
     static void fill_instances(
         const pxr::GfMatrix4f& parent_transform,
         const pxr::VtIntArray& instance_indices,
@@ -46,8 +46,9 @@ struct GPUSceneAssember {
 
     static void initialize_instance()
     {
+        get_instance().shader_factory = std::make_unique<ShaderFactory>();
         get_instance().sa_resource_allocator.shader_factory =
-            &get_instance().shader_factory;
+            get_instance().shader_factory.get();
         get_instance().sa_resource_allocator.device = RHI::get_device();
         get_instance().sa_resource_allocator.shader_factory->add_search_path(
             GPU_ASSEMBLER_SHADER_DIR);
@@ -59,7 +60,7 @@ struct GPUSceneAssember {
     }
 
     ResourceAllocator sa_resource_allocator;
-    ShaderFactory shader_factory;
+    std::unique_ptr<ShaderFactory> shader_factory;
     static GPUSceneAssember instance;
 };
 

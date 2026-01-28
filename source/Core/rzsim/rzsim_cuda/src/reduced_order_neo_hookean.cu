@@ -78,9 +78,80 @@ ReducedOrderData build_reduced_order_data_gpu(
 }
 
 // ============================================================================
-// Kernel: Map reduced coordinates to full space
+// Kernel: Map reduced coordinates to full space (optimized with shared memory)
 // x[v] = rest[v] + Σ_i weight[v,i] * (R_i * rest[v] + t_i - rest[v])
 // ============================================================================
+
+__global__ void map_reduced_to_full_kernel(
+    const float* q_reduced_ptr,
+    const float* basis_weights_ptr,
+    const float* rest_positions_ptr,
+    float* x_full_ptr,
+    int num_particles,
+    int num_basis)
+{
+    // Shared memory to cache q_reduced parameters for all bases in this block
+    // Each basis has 12 parameters
+    extern __shared__ float s_q_reduced[];
+
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Cooperatively load q_reduced into shared memory
+    // Each thread loads a portion
+    int q_size = num_basis * 12;
+    for (int i = threadIdx.x; i < q_size; i += blockDim.x) {
+        s_q_reduced[i] = q_reduced_ptr[i];
+    }
+    __syncthreads();
+
+    if (v >= num_particles)
+        return;
+
+    // Load rest position (coalesced across warp)
+    float rest_x = rest_positions_ptr[3 * v + 0];
+    float rest_y = rest_positions_ptr[3 * v + 1];
+    float rest_z = rest_positions_ptr[3 * v + 2];
+
+    // Initialize with rest position
+    float x = rest_x;
+    float y = rest_y;
+    float z = rest_z;
+
+    // Add contributions from each basis (now reading from shared memory)
+    for (int i = 0; i < num_basis; ++i) {
+        float weight = basis_weights_ptr[v * num_basis + i];
+
+        // Load affine transform parameters from shared memory
+        int base = i * 12;
+        float R00 = s_q_reduced[base + 0];
+        float R01 = s_q_reduced[base + 1];
+        float R02 = s_q_reduced[base + 2];
+        float R10 = s_q_reduced[base + 3];
+        float R11 = s_q_reduced[base + 4];
+        float R12 = s_q_reduced[base + 5];
+        float R20 = s_q_reduced[base + 6];
+        float R21 = s_q_reduced[base + 7];
+        float R22 = s_q_reduced[base + 8];
+        float tx = s_q_reduced[base + 9];
+        float ty = s_q_reduced[base + 10];
+        float tz = s_q_reduced[base + 11];
+
+        // Apply affine transform: R * rest_pos + t
+        float transformed_x = R00 * rest_x + R01 * rest_y + R02 * rest_z + tx;
+        float transformed_y = R10 * rest_x + R11 * rest_y + R12 * rest_z + ty;
+        float transformed_z = R20 * rest_x + R21 * rest_y + R22 * rest_z + tz;
+
+        // Add weighted contribution
+        x += weight * (transformed_x - rest_x);
+        y += weight * (transformed_y - rest_y);
+        z += weight * (transformed_z - rest_z);
+    }
+
+    // Write result (coalesced)
+    x_full_ptr[3 * v + 0] = x;
+    x_full_ptr[3 * v + 1] = y;
+    x_full_ptr[3 * v + 2] = z;
+}
 
 void map_reduced_to_full_gpu(
     cuda::CUDALinearBufferHandle q_reduced,
@@ -97,63 +168,91 @@ void map_reduced_to_full_gpu(
         ro_data.rest_positions->get_device_ptr<float>();
     float* x_full_ptr = x_full->get_device_ptr<float>();
 
-    cuda::GPUParallelFor(
-        "map_reduced_to_full", num_particles, [=] __device__(int v) {
-            // Load rest position
-            float rest_x = rest_positions_ptr[3 * v + 0];
-            float rest_y = rest_positions_ptr[3 * v + 1];
-            float rest_z = rest_positions_ptr[3 * v + 2];
+    // Use 256 threads per block for good occupancy
+    int threads_per_block = 256;
+    int num_blocks =
+        (num_particles + threads_per_block - 1) / threads_per_block;
 
-            // Initialize with rest position
-            float x = rest_x;
-            float y = rest_y;
-            float z = rest_z;
+    // Shared memory size: num_basis * 12 floats
+    int shared_mem_size = num_basis * 12 * sizeof(float);
 
-            // Add contributions from each basis
-            for (int i = 0; i < num_basis; ++i) {
-                float weight = basis_weights_ptr[v * num_basis + i];
+    map_reduced_to_full_kernel<<<
+        num_blocks,
+        threads_per_block,
+        shared_mem_size>>>(
+        q_reduced_ptr,
+        basis_weights_ptr,
+        rest_positions_ptr,
+        x_full_ptr,
+        num_particles,
+        num_basis);
 
-                // Load affine transform parameters for basis i
-                // Rotation matrix R (row-major, 3x3)
-                float R00 = q_reduced_ptr[i * 12 + 0];
-                float R01 = q_reduced_ptr[i * 12 + 1];
-                float R02 = q_reduced_ptr[i * 12 + 2];
-                float R10 = q_reduced_ptr[i * 12 + 3];
-                float R11 = q_reduced_ptr[i * 12 + 4];
-                float R12 = q_reduced_ptr[i * 12 + 5];
-                float R20 = q_reduced_ptr[i * 12 + 6];
-                float R21 = q_reduced_ptr[i * 12 + 7];
-                float R22 = q_reduced_ptr[i * 12 + 8];
-
-                // Translation t
-                float tx = q_reduced_ptr[i * 12 + 9];
-                float ty = q_reduced_ptr[i * 12 + 10];
-                float tz = q_reduced_ptr[i * 12 + 11];
-
-                // Apply affine transform: R * rest_pos + t
-                float transformed_x =
-                    R00 * rest_x + R01 * rest_y + R02 * rest_z + tx;
-                float transformed_y =
-                    R10 * rest_x + R11 * rest_y + R12 * rest_z + ty;
-                float transformed_z =
-                    R20 * rest_x + R21 * rest_y + R22 * rest_z + tz;
-
-                // Add weighted contribution
-                x += weight * (transformed_x - rest_x);
-                y += weight * (transformed_y - rest_y);
-                z += weight * (transformed_z - rest_z);
-            }
-
-            x_full_ptr[3 * v + 0] = x;
-            x_full_ptr[3 * v + 1] = y;
-            x_full_ptr[3 * v + 2] = z;
-        });
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf(
+            "[ReducedOrder] map_reduced_to_full kernel failed: %s\n",
+            cudaGetErrorString(err));
+    }
 }
 
 // ============================================================================
-// Kernel: Compute Jacobian matrix
+// Kernel: Compute Jacobian matrix (optimized for coalesced memory access)
 // J[3v+d, 12i+p] = weight[v,i] * ∂(R_i*rest[v] + t_i)[d] / ∂q[12i+p]
 // ============================================================================
+
+__global__ void compute_jacobian_kernel(
+    const float* basis_weights_ptr,
+    const float* rest_positions_ptr,
+    float* jacobian_ptr,
+    int num_particles,
+    int num_basis)
+{
+    // 2D grid: (vertex, basis) - better memory coalescing
+    int v = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (v >= num_particles || i >= num_basis)
+        return;
+
+    // Load rest position (coalesced read across warp)
+    float rest_x = rest_positions_ptr[3 * v + 0];
+    float rest_y = rest_positions_ptr[3 * v + 1];
+    float rest_z = rest_positions_ptr[3 * v + 2];
+
+    // Load weight (coalesced read)
+    float weight = basis_weights_ptr[v * num_basis + i];
+
+    int reduced_dof = num_basis * 12;
+
+    // Write to Jacobian - now adjacent threads write to nearby memory locations
+    // This dramatically improves write coalescing
+
+    // X-component row (row = 3*v + 0)
+    int row_x = 3 * v + 0;
+    int base_x = row_x * reduced_dof + i * 12;
+    jacobian_ptr[base_x + 0] = weight * rest_x;  // dR00
+    jacobian_ptr[base_x + 1] = weight * rest_y;  // dR01
+    jacobian_ptr[base_x + 2] = weight * rest_z;  // dR02
+    jacobian_ptr[base_x + 9] = weight;           // dtx
+    // Others are zero (already cleared by memset)
+
+    // Y-component row (row = 3*v + 1)
+    int row_y = 3 * v + 1;
+    int base_y = row_y * reduced_dof + i * 12;
+    jacobian_ptr[base_y + 3] = weight * rest_x;  // dR10
+    jacobian_ptr[base_y + 4] = weight * rest_y;  // dR11
+    jacobian_ptr[base_y + 5] = weight * rest_z;  // dR12
+    jacobian_ptr[base_y + 10] = weight;          // dty
+
+    // Z-component row (row = 3*v + 2)
+    int row_z = 3 * v + 2;
+    int base_z = row_z * reduced_dof + i * 12;
+    jacobian_ptr[base_z + 6] = weight * rest_x;  // dR20
+    jacobian_ptr[base_z + 7] = weight * rest_y;  // dR21
+    jacobian_ptr[base_z + 8] = weight * rest_z;  // dR22
+    jacobian_ptr[base_z + 11] = weight;          // dtz
+}
 
 void compute_jacobian_gpu(
     cuda::CUDALinearBufferHandle q_reduced,
@@ -174,84 +273,28 @@ void compute_jacobian_gpu(
         ro_data.rest_positions->get_device_ptr<float>();
     float* jacobian_ptr = jacobian->get_device_ptr<float>();
 
-    cuda::GPUParallelFor(
-        "compute_jacobian", num_particles, [=] __device__(int v) {
-            float rest_x = rest_positions_ptr[3 * v + 0];
-            float rest_y = rest_positions_ptr[3 * v + 1];
-            float rest_z = rest_positions_ptr[3 * v + 2];
+    // Use 2D grid for better memory coalescing
+    // Adjacent threads in X dimension process adjacent vertices
+    // This makes reads/writes more coalesced
+    dim3 threads_per_block(32, 4);  // 128 threads per block
+    dim3 num_blocks(
+        (num_particles + threads_per_block.x - 1) / threads_per_block.x,
+        (num_basis + threads_per_block.y - 1) / threads_per_block.y);
 
-            // For each basis mode
-            for (int i = 0; i < num_basis; ++i) {
-                float weight = basis_weights_ptr[v * num_basis + i];
+    compute_jacobian_kernel<<<num_blocks, threads_per_block>>>(
+        basis_weights_ptr,
+        rest_positions_ptr,
+        jacobian_ptr,
+        num_particles,
+        num_basis);
 
-                // Derivatives w.r.t. rotation matrix elements
-                // x_component: d(x)/d(R[row][col]) = weight * rest[col] if row
-                // == 0 For x-component of vertex v
-                int row_x = 3 * v + 0;
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 0] =
-                    weight * rest_x;  // dR00
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 1] =
-                    weight * rest_y;  // dR01
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 2] =
-                    weight * rest_z;  // dR02
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 3] =
-                    0.0f;  // dR10
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 4] =
-                    0.0f;  // dR11
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 5] =
-                    0.0f;  // dR12
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 6] =
-                    0.0f;  // dR20
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 7] =
-                    0.0f;  // dR21
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 8] =
-                    0.0f;  // dR22
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 9] =
-                    weight;  // dtx
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 10] =
-                    0.0f;  // dty
-                jacobian_ptr[row_x * (num_basis * 12) + i * 12 + 11] =
-                    0.0f;  // dtz
-
-                // For y-component
-                int row_y = 3 * v + 1;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 0] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 1] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 2] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 3] =
-                    weight * rest_x;  // dR10
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 4] =
-                    weight * rest_y;  // dR11
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 5] =
-                    weight * rest_z;  // dR12
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 6] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 7] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 8] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 9] = 0.0f;
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 10] =
-                    weight;  // dty
-                jacobian_ptr[row_y * (num_basis * 12) + i * 12 + 11] = 0.0f;
-
-                // For z-component
-                int row_z = 3 * v + 2;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 0] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 1] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 2] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 3] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 4] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 5] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 6] =
-                    weight * rest_x;  // dR20
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 7] =
-                    weight * rest_y;  // dR21
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 8] =
-                    weight * rest_z;  // dR22
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 9] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 10] = 0.0f;
-                jacobian_ptr[row_z * (num_basis * 12) + i * 12 + 11] =
-                    weight;  // dtz
-            }
-        });
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf(
+            "[ReducedOrder] compute_jacobian kernel failed: %s\n",
+            cudaGetErrorString(err));
+    }
 }
 
 // ============================================================================
@@ -417,16 +460,17 @@ void compute_reduced_hessian_gpu(
     float* temp_buffer_ptr = temp_buffer->get_device_ptr<float>();
     float* H_q_ptr = H_q->get_device_ptr<float>();
 
-    // Update the data pointers in the descriptors (in case buffers were reallocated)
+    // Update the data pointers in the descriptors (in case buffers were
+    // reallocated)
     cusparseStatus_t status;
-    
+
     // Update CSR matrix values pointer
     status = cusparseCsrSetPointers(
         matH_desc,
         const_cast<int*>(hessian_structure.row_offsets->get_device_ptr<int>()),
         const_cast<int*>(hessian_structure.col_indices->get_device_ptr<int>()),
         const_cast<float*>(hessian_values_ptr));
-    
+
     if (status != CUSPARSE_STATUS_SUCCESS) {
         printf("[ReducedOrder] Failed to update CSR pointers: %d\n", status);
         return;
@@ -435,13 +479,16 @@ void compute_reduced_hessian_gpu(
     // Update dense matrix pointers
     status = cusparseDnMatSetValues(matJ_desc, jacobian_ptr);
     if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to update Jacobian pointer: %d\n", status);
+        printf(
+            "[ReducedOrder] Failed to update Jacobian pointer: %d\n", status);
         return;
     }
 
     status = cusparseDnMatSetValues(matTemp_desc, temp_buffer_ptr);
     if (status != CUSPARSE_STATUS_SUCCESS) {
-        printf("[ReducedOrder] Failed to update temp buffer pointer: %d\n", status);
+        printf(
+            "[ReducedOrder] Failed to update temp buffer pointer: %d\n",
+            status);
         return;
     }
 
@@ -686,7 +733,7 @@ void apply_bc_to_positions_gpu(
 // ============================================================================
 
 __global__ void compute_barrier_energy_kernel(
-    const int* bc_dofs,           // [num_bc_dofs]
+    const int* bc_dofs,  // [num_bc_dofs]
     int num_bc_dofs,
     const float* positions,       // [num_particles * 3]
     const float* rest_positions,  // [num_particles * 3]
@@ -696,33 +743,33 @@ __global__ void compute_barrier_energy_kernel(
     float* energy_buffer)  // [num_bc_vertices] output
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     // Process every 3 DOFs (one vertex)
     int vertex_idx = idx * 3;
     if (vertex_idx >= num_bc_dofs)
         return;
-    
+
     // Get the vertex index from the first DOF of this vertex
     int dof = bc_dofs[vertex_idx];
     int vertex = dof / 3;
-    
+
     if (vertex >= num_particles)
         return;
-    
+
     // Compute squared distance
     float dx = positions[vertex * 3 + 0] - rest_positions[vertex * 3 + 0];
     float dy = positions[vertex * 3 + 1] - rest_positions[vertex * 3 + 1];
     float dz = positions[vertex * 3 + 2] - rest_positions[vertex * 3 + 2];
     float dist_sq = dx * dx + dy * dy + dz * dz;
-    
+
     float d_sq = allowed_width * allowed_width;
     float ratio = dist_sq / d_sq;
-    
+
     // Clamp to prevent log(0) or log(negative)
     if (ratio >= 0.99f) {
         ratio = 0.99f;
     }
-    
+
     // E = -k * log(1 - ratio)
     energy_buffer[idx] = -barrier_stiffness * logf(1.0f - ratio);
 }
@@ -739,16 +786,17 @@ float compute_barrier_energy_gpu(
 {
     if (num_bc_dofs == 0)
         return 0.0f;
-    
+
     const int* bc_dofs_ptr = bc_dofs->get_device_ptr<int>();
     const float* positions_ptr = positions->get_device_ptr<float>();
     const float* rest_positions_ptr = rest_positions->get_device_ptr<float>();
     float* energy_buffer_ptr = energy_buffer->get_device_ptr<float>();
-    
+
     int num_bc_vertices = num_bc_dofs / 3;
     int threads_per_block = 256;
-    int num_blocks = (num_bc_vertices + threads_per_block - 1) / threads_per_block;
-    
+    int num_blocks =
+        (num_bc_vertices + threads_per_block - 1) / threads_per_block;
+
     compute_barrier_energy_kernel<<<num_blocks, threads_per_block>>>(
         bc_dofs_ptr,
         num_bc_dofs,
@@ -758,7 +806,7 @@ float compute_barrier_energy_gpu(
         allowed_width,
         num_particles,
         energy_buffer_ptr);
-    
+
     cudaDeviceSynchronize();
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -767,14 +815,14 @@ float compute_barrier_energy_gpu(
             cudaGetErrorString(err));
         return 0.0f;
     }
-    
+
     // Sum up energies
     auto energy_vec = energy_buffer->get_host_vector<float>();
     float total_energy = 0.0f;
     for (int i = 0; i < num_bc_vertices; ++i) {
         total_energy += energy_vec[i];
     }
-    
+
     return total_energy;
 }
 
@@ -784,7 +832,7 @@ float compute_barrier_energy_gpu(
 // ============================================================================
 
 __global__ void add_barrier_gradient_kernel(
-    const int* bc_dofs,           // [num_bc_dofs]
+    const int* bc_dofs,  // [num_bc_dofs]
     int num_bc_dofs,
     const float* positions,       // [num_particles * 3]
     const float* rest_positions,  // [num_particles * 3]
@@ -796,34 +844,37 @@ __global__ void add_barrier_gradient_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_bc_dofs)
         return;
-    
+
     int dof = bc_dofs[idx];
     int vertex = dof / 3;
     int component = dof % 3;
-    
+
     if (vertex >= num_particles)
         return;
-    
+
     // Compute squared distance
     float dx = positions[vertex * 3 + 0] - rest_positions[vertex * 3 + 0];
     float dy = positions[vertex * 3 + 1] - rest_positions[vertex * 3 + 1];
     float dz = positions[vertex * 3 + 2] - rest_positions[vertex * 3 + 2];
     float dist_sq = dx * dx + dy * dy + dz * dz;
-    
+
     float d_sq = allowed_width * allowed_width;
     float denominator = d_sq - dist_sq;
-    
+
     // Clamp to prevent division by zero
     if (denominator < 0.01f * d_sq) {
         denominator = 0.01f * d_sq;
     }
-    
+
     // grad[dof] += k * 2 * diff[component] / denominator
     float diff_component;
-    if (component == 0) diff_component = dx;
-    else if (component == 1) diff_component = dy;
-    else diff_component = dz;
-    
+    if (component == 0)
+        diff_component = dx;
+    else if (component == 1)
+        diff_component = dy;
+    else
+        diff_component = dz;
+
     gradient[dof] += barrier_stiffness * 2.0f * diff_component / denominator;
 }
 
@@ -839,15 +890,15 @@ void add_barrier_gradient_gpu(
 {
     if (num_bc_dofs == 0)
         return;
-    
+
     const int* bc_dofs_ptr = bc_dofs->get_device_ptr<int>();
     const float* positions_ptr = positions->get_device_ptr<float>();
     const float* rest_positions_ptr = rest_positions->get_device_ptr<float>();
     float* gradient_ptr = gradient->get_device_ptr<float>();
-    
+
     int threads_per_block = 256;
     int num_blocks = (num_bc_dofs + threads_per_block - 1) / threads_per_block;
-    
+
     add_barrier_gradient_kernel<<<num_blocks, threads_per_block>>>(
         bc_dofs_ptr,
         num_bc_dofs,
@@ -857,7 +908,7 @@ void add_barrier_gradient_gpu(
         allowed_width,
         num_particles,
         gradient_ptr);
-    
+
     cudaDeviceSynchronize();
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -873,7 +924,7 @@ void add_barrier_gradient_gpu(
 // ============================================================================
 
 __global__ void add_barrier_hessian_diagonal_kernel(
-    const int* bc_dofs,           // [num_bc_dofs]
+    const int* bc_dofs,  // [num_bc_dofs]
     int num_bc_dofs,
     const float* positions,       // [num_particles * 3]
     const float* rest_positions,  // [num_particles * 3]
@@ -885,39 +936,43 @@ __global__ void add_barrier_hessian_diagonal_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_bc_dofs)
         return;
-    
+
     int dof = bc_dofs[idx];
     int vertex = dof / 3;
     int component = dof % 3;
-    
+
     if (vertex >= num_particles)
         return;
-    
+
     // Compute squared distance
     float dx = positions[vertex * 3 + 0] - rest_positions[vertex * 3 + 0];
     float dy = positions[vertex * 3 + 1] - rest_positions[vertex * 3 + 1];
     float dz = positions[vertex * 3 + 2] - rest_positions[vertex * 3 + 2];
     float dist_sq = dx * dx + dy * dy + dz * dz;
-    
+
     float d_sq = allowed_width * allowed_width;
     float denominator = d_sq - dist_sq;
-    
+
     // Clamp to prevent division by zero
     if (denominator < 0.01f * d_sq) {
         denominator = 0.01f * d_sq;
     }
-    
+
     float diff_component;
-    if (component == 0) diff_component = dx;
-    else if (component == 1) diff_component = dy;
-    else diff_component = dz;
-    
+    if (component == 0)
+        diff_component = dx;
+    else if (component == 1)
+        diff_component = dy;
+    else
+        diff_component = dz;
+
     float diff_sq = diff_component * diff_component;
-    
+
     // H_ii += k * 2 * (d^2 - dist_sq + 2*diff_i^2) / (d^2 - dist_sq)^2
     float numerator = denominator + 2.0f * diff_sq;
-    float hessian_contrib = barrier_stiffness * 2.0f * numerator / (denominator * denominator);
-    
+    float hessian_contrib =
+        barrier_stiffness * 2.0f * numerator / (denominator * denominator);
+
     hessian_diagonal[dof] += hessian_contrib;
 }
 
@@ -933,15 +988,15 @@ void add_barrier_hessian_diagonal_gpu(
 {
     if (num_bc_dofs == 0)
         return;
-    
+
     const int* bc_dofs_ptr = bc_dofs->get_device_ptr<int>();
     const float* positions_ptr = positions->get_device_ptr<float>();
     const float* rest_positions_ptr = rest_positions->get_device_ptr<float>();
     float* hessian_diagonal_ptr = hessian_diagonal->get_device_ptr<float>();
-    
+
     int threads_per_block = 256;
     int num_blocks = (num_bc_dofs + threads_per_block - 1) / threads_per_block;
-    
+
     add_barrier_hessian_diagonal_kernel<<<num_blocks, threads_per_block>>>(
         bc_dofs_ptr,
         num_bc_dofs,
@@ -951,7 +1006,7 @@ void add_barrier_hessian_diagonal_gpu(
         allowed_width,
         num_particles,
         hessian_diagonal_ptr);
-    
+
     cudaDeviceSynchronize();
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {

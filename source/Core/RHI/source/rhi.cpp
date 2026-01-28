@@ -30,7 +30,6 @@ int init(bool with_window, bool use_dx12)
     if (!cached_logger.lock()) {
         cached_logger = spdlog::default_logger();
     }
-
     if (device_manager) {
         reference_count++;
         if (auto logger = cached_logger.lock()) {

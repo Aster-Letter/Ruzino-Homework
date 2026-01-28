@@ -1,6 +1,7 @@
 #include <GUI/window.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <spdlog/spdlog.h>
 
 #include <rzpython/rzpython.hpp>
 #include <stdexcept>
@@ -92,6 +93,52 @@ void initialize()
         "_original_stderr = sys.stderr\n"
         "sys.stdout = _console_stdout\n"
         "sys.stderr = _console_stderr\n");
+}
+
+void flush_python_output()
+{
+    if (!initialized) {
+        return;
+    }
+
+    try {
+        // Get stdout content
+        std::string stdout_code =
+            "_console_stdout.getvalue() if '_console_stdout' in dir() else ''";
+        PyObject* stdout_result = PyRun_String(
+            stdout_code.c_str(), Py_eval_input, main_dict, main_dict);
+
+        if (stdout_result && PyUnicode_Check(stdout_result)) {
+            const char* stdout_str = PyUnicode_AsUTF8(stdout_result);
+            if (stdout_str && strlen(stdout_str) > 0) {
+                spdlog::info("[Python stdout] {}", stdout_str);
+                // Clear the buffer
+                python::call<void>(
+                    "_console_stdout.truncate(0); _console_stdout.seek(0)");
+            }
+            Py_DECREF(stdout_result);
+        }
+
+        // Get stderr content
+        std::string stderr_code =
+            "_console_stderr.getvalue() if '_console_stderr' in dir() else ''";
+        PyObject* stderr_result = PyRun_String(
+            stderr_code.c_str(), Py_eval_input, main_dict, main_dict);
+
+        if (stderr_result && PyUnicode_Check(stderr_result)) {
+            const char* stderr_str = PyUnicode_AsUTF8(stderr_result);
+            if (stderr_str && strlen(stderr_str) > 0) {
+                spdlog::warn("[Python stderr] {}", stderr_str);
+                // Clear the buffer
+                python::call<void>(
+                    "_console_stderr.truncate(0); _console_stderr.seek(0)");
+            }
+            Py_DECREF(stderr_result);
+        }
+    }
+    catch (...) {
+        // Silently ignore errors in output flushing
+    }
 }
 
 void finalize()

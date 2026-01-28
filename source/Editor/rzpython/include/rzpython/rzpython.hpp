@@ -4,6 +4,7 @@
 #include <nanobind/ndarray.h>
 
 #include <string>
+#include <vector>
 
 #include "api.h"
 
@@ -39,13 +40,17 @@ template<typename T>
 struct CudaArrayView {
     T* data;
     std::vector<size_t> shape;
-    
+
     CudaArrayView(T* data, std::vector<size_t> shape)
-        : data(data), shape(std::move(shape)) {}
-    
+        : data(data),
+          shape(std::move(shape))
+    {
+    }
+
     // Convenience constructor for 1D arrays
-    CudaArrayView(T* data, size_t size)
-        : data(data), shape{size} {}
+    CudaArrayView(T* data, size_t size) : data(data), shape{ size }
+    {
+    }
 };
 
 // Initialize Python interpreter
@@ -85,6 +90,9 @@ void reference(const std::string& name, T* obj);
 // Send C++ data to Python variable (by value)
 template<typename T>
 void send(const std::string& name, const T& value);
+
+// Flush Python's stdout/stderr and print to C++ console
+RZPYTHON_API void flush_python_output();
 
 }  // namespace python
 
