@@ -170,6 +170,8 @@ NODE_EXECUTION_FUNCTION(path_tracing)
         ProgramDesc program_desc;
         program_desc.set_path("shaders/path_tracing.slang");
         program_desc.shaderType = nvrhi::ShaderType::AllRayTracing;
+#if 0 
+
         program_desc.nvapi_support = true;
 
         // Enable Shader Execution Reordering (SER) via NVAPI
@@ -177,6 +179,7 @@ NODE_EXECUTION_FUNCTION(path_tracing)
         spdlog::info(
             "Enabling Shader Execution Reordering (SER) with NVAPI extension "
             "slot u127");
+#endif
 
         // Define macro for spectrum type
         if (use_sampled_spectrum) {
@@ -548,7 +551,7 @@ void fetch_)" + material.second->GetMaterialName() +
         // Geometry changed but no material/light/size change
         // Update geometry-related buffers in program_vars
         ProgramVars& program_vars = *storage.cached_program_vars;
-        
+
         program_vars["SceneBVH"] =
             params.get_global_payload<RenderGlobalPayload&>()
                 .InstanceCollection->get_tlas();
@@ -556,12 +559,14 @@ void fetch_)" + material.second->GetMaterialName() +
             instance_collection->instance_pool.get_device_buffer();
         program_vars["meshDescBuffer"] =
             instance_collection->mesh_pool.get_device_buffer();
-        
+
         program_vars.finish_setting_vars();
-        
+
         // Reset accumulation
         g.reset_accumulation = true;
-        spdlog::info("Updated geometry buffers (TLAS, instanceDesc, meshDesc) for geometry change");
+        spdlog::info(
+            "Updated geometry buffers (TLAS, instanceDesc, meshDesc) for "
+            "geometry change");
     }
 
     auto rays = params.get_input<nvrhi::BufferHandle>("Rays");

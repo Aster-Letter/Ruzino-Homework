@@ -588,8 +588,8 @@ TEST_F(EcsApiTest, DirtyTracking)
 TEST_F(EcsApiTest, AnimationWriteToUsd)
 {
     // Create a new stage, will error if file doesn't exist (this is normal)
-    auto stage =
-        std::make_unique<Stage>("../../Assets/test_ecs_animation_write.usdc");
+    const auto output_path = get_temp_usd_path("test_ecs_animation_write");
+    auto stage = std::make_unique<Stage>(output_path);
     auto& registry = stage->get_registry();
 
     // Create 3 different geometries
@@ -648,7 +648,7 @@ TEST_F(EcsApiTest, AnimationWriteToUsd)
     stage->sync_entities_to_usd();
 
     // Save USD file to specified path (relative path from Binaries/Release)
-    stage->SaveAs("../../Assets/test_ecs_animation_write.usdc");
+    stage->SaveAs(output_path);
 
     // Verify: check position at last frame
     {
@@ -668,10 +668,7 @@ TEST_F(EcsApiTest, AnimationWriteToUsd)
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "Animation written to: "
-              << std::filesystem::absolute(
-                     "../../Assets/test_ecs_animation_write.usdc")
-                     .string()
-              << std::endl;
+              << std::filesystem::absolute(output_path).string() << std::endl;
     std::cout << "Time range: 0.0 - " << duration << " seconds, " << num_frames
               << " frames" << std::endl;
     std::cout << "FPS: " << fps << std::endl;
