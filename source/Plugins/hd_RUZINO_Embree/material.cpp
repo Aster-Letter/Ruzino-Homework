@@ -3,6 +3,7 @@
 #include "material.h"
 
 #include <spdlog/spdlog.h>
+
 #include "RHI/internal/map.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hio/image.h"
@@ -77,7 +78,8 @@ void Hd_RUZINO_Material::TryLoadTexture(
 {
     for (auto&& input_connection : usd_preview_surface.inputConnections) {
         if (input_connection.first == TfToken(name)) {
-            spdlog::info("Loading texture: " + input_connection.first.GetString());
+            spdlog::info(
+                "Loading texture: " + input_connection.first.GetString());
             auto texture_node =
                 get_input_connection(surfaceNetwork, input_connection);
             assert(texture_node.nodeTypeId == UsdImagingTokens->UsdUVTexture);
@@ -116,6 +118,11 @@ void Hd_RUZINO_Material::TryLoadTexture(
                 UsdImagingTokens->UsdPrimvarReader_float2);
             descriptor.uv_primvar_name =
                 st_read_node.parameters[TfToken("varname")].Get<TfToken>();
+            if (descriptor.uv_primvar_name.empty()) {
+                descriptor.uv_primvar_name =
+                    st_read_node.parameters[TfToken("varname")]
+                        .Get<std::string>();
+            }
         }
     }
 }
@@ -199,9 +206,9 @@ HdDirtyBits Hd_RUZINO_Material::GetInitialDirtyBitsMask() const
     return AllDirty;
 }
 
-#define requireTexCoord(INPUT)              \
+#define requireTexCoord(INPUT)            \
     if (!INPUT.uv_primvar_name.empty()) { \
-        return INPUT.uv_primvar_name;       \
+        return INPUT.uv_primvar_name;     \
     }
 
 std::string Hd_RUZINO_Material::requireTexcoordName()
