@@ -148,8 +148,9 @@ NODE_EXECUTION_FUNCTION(shadow_mapping)
 
     params.set_output("Shadow Maps", shadow_map_texture);
     if (!shader_error.empty()) {
-        throw std::runtime_error(shader_error);
+        return false;
     }
+    return true;
 }
 
 NODE_DECLARATION_UI(shadow_mapping);

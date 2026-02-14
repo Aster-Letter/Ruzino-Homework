@@ -173,8 +173,10 @@ NODE_EXECUTION_FUNCTION(rasterize_impl)
         }
     }
     catch (std::exception e) {
+        spdlog::error("Rasterization failed: {}", e.what());
         return false;
     }
+    return true;
 }
 
 NODE_DECLARATION_UI(rasterize_impl);

@@ -32,7 +32,7 @@
 RUZINO_NAMESPACE_OPEN_SCOPE
 using namespace pxr;
 
-Hd_RUZINO_RenderBufferGL::Hd_RUZINO_RenderBufferGL(SdfPath const &id)
+Hd_RUZINO_RenderBufferGL::Hd_RUZINO_RenderBufferGL(SdfPath const& id)
     : HdRenderBuffer(id),
       _width(0),
       _height(0),
@@ -50,15 +50,15 @@ Hd_RUZINO_RenderBufferGL::~Hd_RUZINO_RenderBufferGL() = default;
 
 /*virtual*/
 void Hd_RUZINO_RenderBufferGL::Sync(
-    HdSceneDelegate *sceneDelegate,
-    HdRenderParam *renderParam,
-    HdDirtyBits *dirtyBits)
+    HdSceneDelegate* sceneDelegate,
+    HdRenderParam* renderParam,
+    HdDirtyBits* dirtyBits)
 {
     HdRenderBuffer::Sync(sceneDelegate, renderParam, dirtyBits);
 }
 
 /*virtual*/
-void Hd_RUZINO_RenderBufferGL::Finalize(HdRenderParam *renderParam)
+void Hd_RUZINO_RenderBufferGL::Finalize(HdRenderParam* renderParam)
 {
     HdRenderBuffer::Finalize(renderParam);
 }
@@ -131,7 +131,7 @@ HdFormat Hd_RUZINO_RenderBufferGL::_GetSampleFormat(HdFormat format)
 
 /*virtual*/
 bool Hd_RUZINO_RenderBufferGL::Allocate(
-    GfVec3i const &dimensions,
+    GfVec3i const& dimensions,
     HdFormat format,
     bool multiSampled)
 {
@@ -187,31 +187,31 @@ bool Hd_RUZINO_RenderBufferGL::Allocate(
 }
 
 template<typename T>
-static void _WriteOutput(HdFormat format, uint8_t *dst, T const *value)
+static void _WriteOutput(HdFormat format, uint8_t* dst, T const* value)
 {
     HdFormat componentFormat = HdGetComponentFormat(format);
     size_t componentCount = HdGetComponentCount(format);
 
     for (size_t c = 0; c < componentCount; ++c) {
         if (componentFormat == HdFormatInt32) {
-            ((int32_t *)dst)[c] = (int32_t)value[c];
+            ((int32_t*)dst)[c] = (int32_t)value[c];
         }
         else if (componentFormat == HdFormatFloat16) {
-            ((uint16_t *)dst)[c] = GfHalf(value[c]).bits();
+            ((uint16_t*)dst)[c] = GfHalf(value[c]).bits();
         }
         else if (componentFormat == HdFormatFloat32) {
-            ((float *)dst)[c] = (float)value[c];
+            ((float*)dst)[c] = (float)value[c];
         }
         else if (componentFormat == HdFormatUNorm8) {
-            ((uint8_t *)dst)[c] = (uint8_t)(value[c] * 255.0f);
+            ((uint8_t*)dst)[c] = (uint8_t)(value[c] * 255.0f);
         }
         else if (componentFormat == HdFormatSNorm8) {
-            ((int8_t *)dst)[c] = (int8_t)(value[c] * 127.0f);
+            ((int8_t*)dst)[c] = (int8_t)(value[c] * 127.0f);
         }
     }
 }
 
-void Hd_RUZINO_RenderBufferGL::Clear(const float *value)
+void Hd_RUZINO_RenderBufferGL::Clear(const float* value)
 {
     uint8_t buffer[16];
     _WriteOutput(_format, buffer, value);
@@ -220,7 +220,7 @@ void Hd_RUZINO_RenderBufferGL::Clear(const float *value)
     glClearTexImage(tex, 0, _GetGLFormat(_format), _GetGLType(_format), buffer);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-void Hd_RUZINO_RenderBufferGL::Clear(const int *value)
+void Hd_RUZINO_RenderBufferGL::Clear(const int* value)
 {
     uint8_t buffer[16];
     _WriteOutput(_format, buffer, value);
@@ -229,7 +229,7 @@ void Hd_RUZINO_RenderBufferGL::Clear(const int *value)
     glClearTexImage(tex, 0, _GetGLFormat(_format), _GetGLType(_format), buffer);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    assert(glGetError() == 0);
+    (glGetError() == 0);
 }
 
 void Hd_RUZINO_RenderBufferGL::Present(GLuint texture)
@@ -340,7 +340,7 @@ GLsizei Hd_RUZINO_RenderBufferGL::GetbufSize()
     return _width * _height * HdDataSizeOfFormat(_format);
 }
 
-void *Hd_RUZINO_RenderBufferGL::Map()
+void* Hd_RUZINO_RenderBufferGL::Map()
 {
     glGetTextureImage(
         tex,

@@ -158,8 +158,9 @@ NODE_EXECUTION_FUNCTION(deferred_lighting)
 
     auto shader_error = shader->shader.get_error();
     if (!shader_error.empty()) {
-        throw std::runtime_error(shader_error);
+        return false;
     }
+    return true;
 }
 
 NODE_DECLARATION_UI(deferred_lighting);

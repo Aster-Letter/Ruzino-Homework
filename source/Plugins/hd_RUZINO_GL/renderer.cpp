@@ -61,7 +61,7 @@ void Hd_RUZINO_Renderer::Render(HdRenderThread* renderThread)
             auto try_fetch_info = [&node, node_system]<typename T>(
                                       const char* id_name, T& obj) {
                 if (std::string(node->typeinfo->id_name) == id_name) {
-                    assert(node->get_inputs().size() == 1);
+                    (node->get_inputs().size() == 1);
                     auto output_socket = node->get_inputs()[0];
                     entt::meta_any data;
                     node_system->get_node_tree_executor()

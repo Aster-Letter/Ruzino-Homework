@@ -119,8 +119,9 @@ NODE_EXECUTION_FUNCTION(environment_pass)
     params.set_output("Color", color_texture);
 
     if (!shader_error.empty()) {
-        throw std::runtime_error(shader_error);
+        return false;
     }
+    return true;
 }
 
 NODE_DECLARATION_UI(environment_pass);

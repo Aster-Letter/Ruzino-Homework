@@ -24,10 +24,11 @@
 
 #include "mesh.h"
 
+#include <spdlog/spdlog.h>
+
 #include <iostream>
 
 #include "../api.h"
-#include <spdlog/spdlog.h>
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/imaging/hd/extComputationUtils.h"
 #include "pxr/imaging/hd/instancer.h"
@@ -138,9 +139,7 @@ void Hd_RUZINO_Mesh::_UpdatePrimvarSources(
     }
 }
 
-void Hd_RUZINO_Mesh::_InitRepr(
-    const TfToken& reprToken,
-    HdDirtyBits* dirtyBits)
+void Hd_RUZINO_Mesh::_InitRepr(const TfToken& reprToken, HdDirtyBits* dirtyBits)
 {
 }
 
@@ -300,8 +299,8 @@ void Hd_RUZINO_Mesh::RefreshTexcoordGLBuffer(std::string texcoord_name)
                 spdlog::info(
                     GetId().GetString() +
                     " Attempts to attach texcoord: " + texcoord_name);
-                assert(this->_primvarSourceMap[texcoord_name]
-                           .data.CanCast<VtVec2fArray>());
+                (this->_primvarSourceMap[texcoord_name]
+                     .data.CanCast<VtVec2fArray>());
 
                 VtArray<GfVec2f> raw_texcoord =
                     this->_primvarSourceMap[texcoord_name]

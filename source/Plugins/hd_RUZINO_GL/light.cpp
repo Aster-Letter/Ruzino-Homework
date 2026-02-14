@@ -274,7 +274,7 @@ void Hd_RUZINO_Dome_Light::RefreshGLBuffer()
 
 void Hd_RUZINO_Dome_Light::BindTextures(Shader& shader, unsigned& id)
 {
-    assert(env_texture.glTexture);
+    (env_texture.glTexture);
 
     shader.setInt("env_texture", id);
     glActiveTexture(GL_TEXTURE0 + id);

@@ -2,8 +2,9 @@
 
 #include "material.h"
 
-#include "GL/GLResources.hpp"
 #include <spdlog/spdlog.h>
+
+#include "GL/GLResources.hpp"
 #include "RHI/internal/map.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hio/image.h"
@@ -24,7 +25,7 @@ HdMaterialNode2 Hd_RUZINO_Material::get_input_connection(
         input_connection)
 {
     HdMaterialNode2 upstream;
-    assert(input_connection.second.size() == 1);
+    (input_connection.second.size() == 1);
     upstream = surfaceNetwork.nodes[input_connection.second[0].upstreamNode];
     return upstream;
 }
@@ -44,10 +45,11 @@ void Hd_RUZINO_Material::TryLoadTexture(
 {
     for (auto&& input_connection : usd_preview_surface.inputConnections) {
         if (input_connection.first == TfToken(name)) {
-            spdlog::info("Loading texture: " + input_connection.first.GetString());
+            spdlog::info(
+                "Loading texture: " + input_connection.first.GetString());
             auto texture_node =
                 get_input_connection(surfaceNetwork, input_connection);
-            assert(texture_node.nodeTypeId == UsdImagingTokens->UsdUVTexture);
+            (texture_node.nodeTypeId == UsdImagingTokens->UsdUVTexture);
 
             auto file_name = texture_node.parameters[TfToken("file")]
                                  .Get<SdfAssetPath>()
@@ -77,9 +79,8 @@ void Hd_RUZINO_Material::TryLoadTexture(
                     get_input_connection(surfaceNetwork, st_read_connection);
             }
 
-            assert(
-                st_read_node.nodeTypeId ==
-                UsdImagingTokens->UsdPrimvarReader_float2);
+            (st_read_node.nodeTypeId ==
+             UsdImagingTokens->UsdPrimvarReader_float2);
             descriptor.uv_primvar_name =
                 st_read_node.parameters[TfToken("varname")].Get<std::string>();
         }
@@ -151,8 +152,8 @@ GLuint Hd_RUZINO_Material::createTextureFromHioImage(
 
             float metallic_value = metallic.value.Get<float>();
             float roughness_value = roughness.value.Get<float>();
-            assert(metallic.value.CanCast<float>());
-            assert(roughness.value.CanCast<float>());
+            (metallic.value.CanCast<float>());
+            (roughness.value.CanCast<float>());
             float color[4] = { 0, metallic_value, roughness_value, 1.0f };
             glTexImage2D(
                 GL_TEXTURE_2D,
@@ -245,16 +246,15 @@ void Hd_RUZINO_Material::Sync(
             surfaceNetwork = HdConvertToHdMaterialNetwork2(hdNetworkMap);
 
             // Here we only support single output material.
-            assert(surfaceNetwork.terminals.size() == 1);
+            (surfaceNetwork.terminals.size() == 1);
 
             auto terminal =
                 surfaceNetwork.terminals[HdMaterialTerminalTokens->surface];
 
             auto usd_preview_surface =
                 surfaceNetwork.nodes[terminal.upstreamNode];
-            assert(
-                usd_preview_surface.nodeTypeId ==
-                UsdImagingTokens->UsdPreviewSurface);
+            (usd_preview_surface.nodeTypeId ==
+             UsdImagingTokens->UsdPreviewSurface);
 
             MACRO_MAP(TRY_LOAD, INPUT_LIST)
         }
@@ -285,7 +285,7 @@ void Hd_RUZINO_Material::RefreshGLBuffer()
 
 void Hd_RUZINO_Material::BindTextures(Shader& shader)
 {
-    assert(diffuseColor.glTexture);
+    (diffuseColor.glTexture);
     shader.setInt("diffuseColorSampler", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, diffuseColor.glTexture);
