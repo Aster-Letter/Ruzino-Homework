@@ -229,6 +229,8 @@ NODE_EXECUTION_FUNCTION(mesh_add_vertex_parameterization_quantity)
         return false;
     }
 
+    meshComponent->set_texcoords_array(vertexParameterization);
+
     meshComponent->add_vertex_parameterization_quantity(
         "DEFAULT_PARAM", vertexParameterization);
     params.set_output("Geometry", std::move(mesh));
