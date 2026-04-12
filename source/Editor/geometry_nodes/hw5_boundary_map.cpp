@@ -1,5 +1,9 @@
 #include <Eigen/Sparse>
 
+#include <cmath>
+#include <stdexcept>
+#include <vector>
+
 #include "GCore/Components/MeshComponent.h"
 #include "GCore/util_openmesh_bind.h"
 #include "geom_node_base.h"
@@ -31,6 +35,118 @@
 
 NODE_DEF_OPEN_SCOPE
 
+namespace {
+
+constexpr float kPi = 3.14159265358979323846f;
+
+std::vector<OpenMesh::VertexHandle> collect_boundary_loop(PolyMesh* mesh)
+{
+    auto start_he = OpenMesh::HalfedgeHandle(-1);
+    for (auto he : mesh->halfedges()) {
+        if (mesh->is_boundary(he)) {
+            start_he = he;
+            break;
+        }
+    }
+
+    if (!start_he.is_valid()) {
+        throw std::runtime_error("Boundary Mapping: Mesh has no boundary loop.");
+    }
+
+    std::vector<OpenMesh::VertexHandle> boundary_vertices;
+    auto current_he = start_he;
+    do {
+        boundary_vertices.push_back(mesh->to_vertex_handle(current_he));
+        current_he = mesh->next_halfedge_handle(current_he);
+    } while (current_he.is_valid() && current_he != start_he);
+
+    if (!current_he.is_valid() || boundary_vertices.size() < 2) {
+        throw std::runtime_error(
+            "Boundary Mapping: Failed to extract a valid boundary loop.");
+    }
+
+    return boundary_vertices;
+}
+
+std::vector<float> compute_normalized_boundary_arc_lengths(
+    PolyMesh* mesh,
+    const std::vector<OpenMesh::VertexHandle>& boundary_vertices)
+{
+    std::vector<float> cumulative_lengths(boundary_vertices.size(), 0.0f);
+    auto total_length = 0.0f;
+
+    for (size_t i = 1; i < boundary_vertices.size(); ++i) {
+        total_length += OpenMesh::norm(
+            mesh->point(boundary_vertices[i]) -
+            mesh->point(boundary_vertices[i - 1]));
+        cumulative_lengths[i] = total_length;
+    }
+
+    total_length += OpenMesh::norm(
+        mesh->point(boundary_vertices.front()) -
+        mesh->point(boundary_vertices.back()));
+
+    if (total_length <= 0.0f) {
+        throw std::runtime_error(
+            "Boundary Mapping: Boundary loop length must be positive.");
+    }
+
+    for (auto& length : cumulative_lengths) {
+        length /= total_length;
+    }
+
+    return cumulative_lengths;
+}
+
+OpenMesh::Vec3f square_point_from_unit_perimeter(float t)
+{
+    if (t < 0.25f) {
+        return OpenMesh::Vec3f(t * 4.0f, 0.0f, 0.0f);
+    }
+    if (t < 0.5f) {
+        return OpenMesh::Vec3f(1.0f, (t - 0.25f) * 4.0f, 0.0f);
+    }
+    if (t < 0.75f) {
+        return OpenMesh::Vec3f(1.0f - (t - 0.5f) * 4.0f, 1.0f, 0.0f);
+    }
+
+    return OpenMesh::Vec3f(0.0f, 1.0f - (t - 0.75f) * 4.0f, 0.0f);
+}
+
+void map_boundary_to_circle(
+    PolyMesh* mesh,
+    const std::vector<OpenMesh::VertexHandle>& boundary_vertices)
+{
+    const auto arc_lengths =
+        compute_normalized_boundary_arc_lengths(mesh, boundary_vertices);
+
+    for (size_t i = 0; i < boundary_vertices.size(); ++i) {
+        const auto theta = 2.0f * kPi * arc_lengths[i];
+        mesh->set_point(
+            boundary_vertices[i],
+            OpenMesh::Vec3f(
+                0.5f * std::cos(theta) + 0.5f,
+                0.5f * std::sin(theta) + 0.5f,
+                0.0f));
+    }
+}
+
+void map_boundary_to_square(
+    PolyMesh* mesh,
+    const std::vector<OpenMesh::VertexHandle>& boundary_vertices)
+{
+    const auto arc_lengths =
+        compute_normalized_boundary_arc_lengths(mesh, boundary_vertices);
+
+    for (size_t i = 0; i < boundary_vertices.size(); ++i) {
+        mesh->set_point(
+            boundary_vertices[i],
+            square_point_from_unit_perimeter(arc_lengths[i]));
+    }
+}
+
+} // namespace
+
 /*
 ** HW4_TODO: Node to map the mesh boundary to a circle.
 */
@@ -53,7 +169,6 @@ NODE_EXECUTION_FUNCTION(hw5_circle_boundary_mapping)
     if (!input.get_component<MeshComponent>()) {
         throw std::runtime_error("Boundary Mapping: Need Geometry Input.");
     }
-    throw std::runtime_error("Not implemented");
 
     /* ----------------------------- Preprocess -------------------------------
     ** Create a halfedge structure (using OpenMesh) for the input mesh. The
@@ -62,6 +177,8 @@ NODE_EXECUTION_FUNCTION(hw5_circle_boundary_mapping)
     ** mesh elements.
     */
     auto halfedge_mesh = operand_to_openmesh(&input);
+    const auto boundary_vertices = collect_boundary_loop(halfedge_mesh.get());
+    map_boundary_to_circle(halfedge_mesh.get(), boundary_vertices);
 
     /* ----------- [HW4_TODO] TASK 2.1: Boundary Mapping (to circle)
      *------------
@@ -129,12 +246,13 @@ NODE_EXECUTION_FUNCTION(hw5_square_boundary_mapping)
     if (!input.get_component<MeshComponent>()) {
         throw std::runtime_error("Input does not contain a mesh");
     }
-    throw std::runtime_error("Not implemented");
 
     /* ----------------------------- Preprocess -------------------------------
     ** Create a halfedge structure (using OpenMesh) for the input mesh.
     */
     auto halfedge_mesh = operand_to_openmesh(&input);
+    const auto boundary_vertices = collect_boundary_loop(halfedge_mesh.get());
+    map_boundary_to_square(halfedge_mesh.get(), boundary_vertices);
 
     /* ----------- [HW4_TODO] TASK 2.2: Boundary Mapping (to square)
      *------------
