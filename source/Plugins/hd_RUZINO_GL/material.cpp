@@ -2,6 +2,8 @@
 
 #include "material.h"
 
+#include <limits>
+
 #include <spdlog/spdlog.h>
 
 #include "GL/GLResources.hpp"
@@ -121,14 +123,30 @@ GLuint Hd_RUZINO_Material::createTextureFromHioImage(
         storageSpec.width = width;
         storageSpec.height = height;
         storageSpec.format = format;
-        storageSpec.data = malloc(width * height * image->GetBytesPerPixel());
+        const size_t bytes_per_pixel =
+            static_cast<size_t>(image->GetBytesPerPixel());
+        const size_t pixel_count = static_cast<size_t>(width) *
+                                   static_cast<size_t>(height);
+        if (bytes_per_pixel != 0 &&
+            pixel_count >
+                std::numeric_limits<size_t>::max() / bytes_per_pixel) {
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDeleteTextures(1, &texture);
+            return 0;
+        }
+
+        storageSpec.data = malloc(pixel_count * bytes_per_pixel);
         if (!storageSpec.data) {
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDeleteTextures(1, &texture);
             return 0;
         }
 
         // Step 3: Read the image data
         if (!image->Read(storageSpec)) {
             free(storageSpec.data);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDeleteTextures(1, &texture);
             return 0;
         }
 

@@ -51,6 +51,84 @@ std::vector<std::pair<polyscope::Structure*, size_t>>
 std::map<std::pair<polyscope::Structure*, size_t>, polyscope::Structure*>
     PolyscopeRenderer::visualization_structure_map;
 
+namespace {
+
+using StbiImagePtr = std::unique_ptr<unsigned char, decltype(&stbi_image_free)>;
+
+struct LoadedTextureImage {
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    StbiImagePtr pixels{ nullptr, stbi_image_free };
+
+    [[nodiscard]] size_t pixel_count() const
+    {
+        return static_cast<size_t>(width) * static_cast<size_t>(height);
+    }
+};
+
+LoadedTextureImage LoadTextureImageRgba(const std::string& texture_file_path)
+{
+    LoadedTextureImage image;
+    image.pixels.reset(stbi_load(
+        texture_file_path.c_str(),
+        &image.width,
+        &image.height,
+        &image.channels,
+        4));
+    return image;
+}
+
+std::vector<std::array<float, 3>> BuildTextureColorBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<std::array<float, 3>> image_color(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        image_color[pixel_index] = {
+            pixels[pix_ind + 0] / 255.f,
+            pixels[pix_ind + 1] / 255.f,
+            pixels[pix_ind + 2] / 255.f,
+        };
+    }
+    return image_color;
+}
+
+std::vector<float> BuildTextureScalarBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<float> image_scalar(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        const float r = pixels[pix_ind + 0] / 255.f;
+        const float g = pixels[pix_ind + 1] / 255.f;
+        const float b = pixels[pix_ind + 2] / 255.f;
+        image_scalar[pixel_index] = (r + g + b) / 3.f;
+    }
+    return image_scalar;
+}
+
+std::vector<std::array<float, 4>> BuildTextureColorAlphaBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<std::array<float, 4>> image_color_alpha(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        image_color_alpha[pixel_index] = {
+            pixels[pix_ind + 0] / 255.f,
+            pixels[pix_ind + 1] / 255.f,
+            pixels[pix_ind + 2] / 255.f,
+            pixels[pix_ind + 3] / 255.f,
+        };
+    }
+    return image_color_alpha;
+}
+
+}  // namespace
+
 // int nPts = 2000;
 // float anotherParam = 0.0;
 
@@ -364,6 +442,31 @@ void RegisterTextureQuantities(
     const pxr::UsdPrim& prim,
     polyscope::SurfaceMesh* surface_mesh)
 {
+    std::vector<std::string> vertex_uv_names;
+    std::vector<std::string> face_corner_uv_names;
+
+    auto primVarAPI = pxr::UsdGeomPrimvarsAPI(prim);
+    auto primvars = primVarAPI.GetPrimvars();
+    for (const auto& primvar : primvars) {
+        std::string full_name = primvar.GetName();
+        if (full_name.find("primvars:polyscope:") != 0) {
+            continue;
+        }
+
+        std::string name_without_prefix = full_name.substr(19);
+        if (name_without_prefix.find("vertex:parameterization:") == 0) {
+            vertex_uv_names.push_back(name_without_prefix.substr(24));
+        }
+        else if (
+            name_without_prefix.find("face_corner:parameterization:") == 0) {
+            face_corner_uv_names.push_back(name_without_prefix.substr(29));
+        }
+    }
+
+    if (vertex_uv_names.empty() && face_corner_uv_names.empty()) {
+        return;
+    }
+
     // 1. 获取材质绑定
     pxr::UsdShadeMaterialBindingAPI bindingAPI(prim);
     auto material = bindingAPI.GetDirectBinding().GetMaterial();
@@ -397,129 +500,85 @@ void RegisterTextureQuantities(
 
     // 获取实际文件路径
     std::string textureFilePath = texturePath.GetAssetPath();
-    // std::cout << "Texture path: " << textureFilePath << std::endl;
-
-    // 7. 加载纹理
-    int width, height, channels;
-    unsigned char* data =
-        stbi_load(textureFilePath.c_str(), &width, &height, &channels, 4);
-    if (!data) {
+    auto image = LoadTextureImageRgba(textureFilePath);
+    if (!image.pixels || image.width <= 0 || image.height <= 0) {
         std::cerr << "failed to load image from " << textureFilePath
                   << std::endl;
         return;
     }
 
-    bool has_alpha = (channels == 4);
+    const bool has_alpha = (image.channels == 4);
+    const size_t pixel_count = image.pixel_count();
 
-    // 将数据转换为float数组
-    std::vector<std::array<float, 3>> image_color(width * height);
-    std::vector<std::array<float, 4>> image_color_alpha(width * height);
-    std::vector<float> image_scalar(width * height);
-
-    for (int j = 0; j < height; j++) {
-        for (int i = 0; i < width; i++) {
-            int pix_ind = (j * width + i) * 4;
-            unsigned char p_r = data[pix_ind + 0];
-            unsigned char p_g = data[pix_ind + 1];
-            unsigned char p_b = data[pix_ind + 2];
-            unsigned char p_a = 255;
-            if (channels == 4) {
-                p_a = data[pix_ind + 3];
-            }
-
-            // color
-            std::array<float, 3> val{ p_r / 255.f, p_g / 255.f, p_b / 255.f };
-            image_color[j * width + i] = val;
-
-            // scalar
-            image_scalar[j * width + i] = (val[0] + val[1] + val[2]) / 3.;
-
-            // color alpha
-            std::array<float, 4> val_a{
-                p_r / 255.f, p_g / 255.f, p_b / 255.f, p_a / 255.f
-            };
-            image_color_alpha[j * width + i] = val_a;
+    auto register_color_quantities = [&](const auto& names, const std::string& prefix) {
+        auto image_color =
+            BuildTextureColorBuffer(image.pixels.get(), pixel_count);
+        for (const auto& uv_name : names) {
+            surface_mesh->addTextureColorQuantity(
+                prefix + uv_name,
+                uv_name,
+                image.width,
+                image.height,
+                image_color,
+                polyscope::ImageOrigin::UpperLeft);
         }
-    }
+    };
+
+    auto register_scalar_quantities = [&](const auto& names, const std::string& prefix) {
+        auto image_scalar =
+            BuildTextureScalarBuffer(image.pixels.get(), pixel_count);
+        for (const auto& uv_name : names) {
+            surface_mesh->addTextureScalarQuantity(
+                prefix + uv_name,
+                uv_name,
+                image.width,
+                image.height,
+                image_scalar,
+                polyscope::ImageOrigin::UpperLeft);
+        }
+    };
+
+    auto register_alpha_quantities = [&](const auto& names, const std::string& prefix) {
+        auto image_color_alpha =
+            BuildTextureColorAlphaBuffer(image.pixels.get(), pixel_count);
+        for (const auto& uv_name : names) {
+            surface_mesh->addTextureColorQuantity(
+                prefix + uv_name,
+                uv_name,
+                image.width,
+                image.height,
+                image_color_alpha,
+                polyscope::ImageOrigin::UpperLeft);
+        }
+    };
 
     try {
-        // 获取 UV 属性名称，从 primvar 中查找
-        auto primVarAPI = pxr::UsdGeomPrimvarsAPI(prim);
-        auto primvars = primVarAPI.GetPrimvars();
+        if (!vertex_uv_names.empty()) {
+            register_color_quantities(
+                vertex_uv_names, "vertex texture color ");
+            register_scalar_quantities(
+                vertex_uv_names, "vertex texture scalar ");
+            if (has_alpha) {
+                register_alpha_quantities(
+                    vertex_uv_names, "vertex texture color alpha ");
+            }
+        }
 
-        for (const auto& primvar : primvars) {
-            std::string full_name = primvar.GetName();
-            if (full_name.find("primvars:polyscope:") == 0) {
-                std::string name_without_prefix = full_name.substr(19);
-
-                // 对顶点 UV
-                if (name_without_prefix.find("vertex:parameterization:") == 0) {
-                    std::string uv_name = name_without_prefix.substr(24);
-                    surface_mesh->addTextureColorQuantity(
-                        "vertex texture color " + uv_name,
-                        uv_name,
-                        width,
-                        height,
-                        image_color,
-                        polyscope::ImageOrigin::UpperLeft);
-
-                    surface_mesh->addTextureScalarQuantity(
-                        "vertex texture scalar " + uv_name,
-                        uv_name,
-                        width,
-                        height,
-                        image_scalar,
-                        polyscope::ImageOrigin::UpperLeft);
-
-                    if (has_alpha) {
-                        surface_mesh->addTextureColorQuantity(
-                            "vertex texture color alpha " + uv_name,
-                            uv_name,
-                            width,
-                            height,
-                            image_color_alpha,
-                            polyscope::ImageOrigin::UpperLeft);
-                    }
-                }
-
-                // 对面角 UV
-                if (name_without_prefix.find("face_corner:parameterization:") ==
-                    0) {
-                    std::string uv_name = name_without_prefix.substr(29);
-                    surface_mesh->addTextureColorQuantity(
-                        "face corner texture color " + uv_name,
-                        uv_name,
-                        width,
-                        height,
-                        image_color,
-                        polyscope::ImageOrigin::UpperLeft);
-
-                    surface_mesh->addTextureScalarQuantity(
-                        "face corner texture scalar " + uv_name,
-                        uv_name,
-                        width,
-                        height,
-                        image_scalar,
-                        polyscope::ImageOrigin::UpperLeft);
-
-                    if (has_alpha) {
-                        surface_mesh->addTextureColorQuantity(
-                            "face corner texture color alpha " + uv_name,
-                            uv_name,
-                            width,
-                            height,
-                            image_color_alpha,
-                            polyscope::ImageOrigin::UpperLeft);
-                    }
-                }
+        if (!face_corner_uv_names.empty()) {
+            register_color_quantities(
+                face_corner_uv_names, "face corner texture color ");
+            register_scalar_quantities(
+                face_corner_uv_names, "face corner texture scalar ");
+            if (has_alpha) {
+                register_alpha_quantities(
+                    face_corner_uv_names,
+                    "face corner texture color alpha ");
             }
         }
     }
     catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
-
-    stbi_image_free(data);
 }
 
 void PolyscopeRenderer::RegisterGeometryFromPrim(const pxr::UsdPrim& prim)

@@ -1,16 +1,20 @@
 #include "texture.h"
 
+#include <limits>
+
 #include <spdlog/spdlog.h>
 
 RUZINO_NAMESPACE_OPEN_SCOPE
 Texture2D::Texture2D()
 {
     texture = nullptr;
+    storageSpec.data = nullptr;
 }
 
 Texture2D::Texture2D(SdfAssetPath path, HioImage::SourceColorSpace colorSpace)
     : textureFileName(path)
 {
+    storageSpec.data = nullptr;
     texture = HioImage::OpenForReading(path.GetAssetPath(), 0, 0, colorSpace);
     if (texture) {
         spdlog::info(
@@ -25,14 +29,37 @@ Texture2D::Texture2D(SdfAssetPath path, HioImage::SourceColorSpace colorSpace)
         storageSpec.format = format;
 
         _component_count = HioGetComponentCount(storageSpec.format);
-        storageSpec.data = malloc(width * height * texture->GetBytesPerPixel());
+        const size_t bytes_per_pixel =
+            static_cast<size_t>(texture->GetBytesPerPixel());
+        const size_t pixel_count = static_cast<size_t>(width) *
+                                   static_cast<size_t>(height);
+        if (bytes_per_pixel != 0 &&
+            pixel_count >
+                std::numeric_limits<size_t>::max() / bytes_per_pixel) {
+            spdlog::error(
+                "Texture {} is too large to allocate safely",
+                textureFileName.GetAssetPath());
+            texture = nullptr;
+            return;
+        }
+
+        storageSpec.data = malloc(pixel_count * bytes_per_pixel);
         if (!storageSpec.data) {
+            spdlog::error(
+                "Failed to allocate CPU texture buffer for {}",
+                textureFileName.GetAssetPath());
+            texture = nullptr;
             return;
         }
 
         // Step 3: Read the image data
         if (!texture->Read(storageSpec)) {
+            spdlog::error(
+                "Failed to read texture data from {}",
+                textureFileName.GetAssetPath());
             free(storageSpec.data);
+            storageSpec.data = nullptr;
+            texture = nullptr;
         }
     }
     else {
@@ -144,5 +171,6 @@ GfVec4f Texture2D::Evaluate(const GfVec2f &uv) const
 Texture2D::~Texture2D()
 {
     free(storageSpec.data);
+    storageSpec.data = nullptr;
 }
 RUZINO_NAMESPACE_CLOSE_SCOPE

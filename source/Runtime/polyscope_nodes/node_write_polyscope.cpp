@@ -40,6 +40,84 @@ bool legal(const std::string& string)
     return false;
 }
 
+namespace {
+
+using StbiImagePtr = std::unique_ptr<unsigned char, decltype(&stbi_image_free)>;
+
+struct LoadedTextureImage {
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    StbiImagePtr pixels{ nullptr, stbi_image_free };
+
+    [[nodiscard]] size_t pixel_count() const
+    {
+        return static_cast<size_t>(width) * static_cast<size_t>(height);
+    }
+};
+
+LoadedTextureImage LoadTextureImageRgba(const std::string& texture_file_path)
+{
+    LoadedTextureImage image;
+    image.pixels.reset(stbi_load(
+        texture_file_path.c_str(),
+        &image.width,
+        &image.height,
+        &image.channels,
+        4));
+    return image;
+}
+
+std::vector<std::array<float, 3>> BuildTextureColorBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<std::array<float, 3>> image_color(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        image_color[pixel_index] = {
+            pixels[pix_ind + 0] / 255.f,
+            pixels[pix_ind + 1] / 255.f,
+            pixels[pix_ind + 2] / 255.f,
+        };
+    }
+    return image_color;
+}
+
+std::vector<float> BuildTextureScalarBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<float> image_scalar(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        const float r = pixels[pix_ind + 0] / 255.f;
+        const float g = pixels[pix_ind + 1] / 255.f;
+        const float b = pixels[pix_ind + 2] / 255.f;
+        image_scalar[pixel_index] = (r + g + b) / 3.f;
+    }
+    return image_scalar;
+}
+
+std::vector<std::array<float, 4>> BuildTextureColorAlphaBuffer(
+    const unsigned char* pixels,
+    size_t pixel_count)
+{
+    std::vector<std::array<float, 4>> image_color_alpha(pixel_count);
+    for (size_t pixel_index = 0; pixel_index < pixel_count; ++pixel_index) {
+        const size_t pix_ind = pixel_index * 4;
+        image_color_alpha[pixel_index] = {
+            pixels[pix_ind + 0] / 255.f,
+            pixels[pix_ind + 1] / 255.f,
+            pixels[pix_ind + 2] / 255.f,
+            pixels[pix_ind + 3] / 255.f,
+        };
+    }
+    return image_color_alpha;
+}
+
+}  // namespace
+
 // TODO: Test and add support for materials and textures
 // The current implementation has not been fully tested yet
 NODE_EXECUTION_FUNCTION(write_polyscope)
@@ -261,52 +339,61 @@ NODE_EXECUTION_FUNCTION(write_polyscope)
             if (legal(std::string(material_component->textures[0].c_str()))) {
                 auto texture_name =
                     std::string(material_component->textures[0].c_str());
-                int width, height, channels;
-                unsigned char* data = stbi_load(
-                    texture_name.c_str(), &width, &height, &channels, 4);
-                if (!data) {
+                auto image = LoadTextureImageRgba(texture_name);
+                if (!image.pixels || image.width <= 0 || image.height <= 0) {
                     std::cerr << "failed to load image from " << texture_name
                               << std::endl;
                     return false;
                 }
-                bool has_alpha = (channels == 4);
-                // Parse the data in to a float array
-                std::vector<std::array<float, 3>> image_color(width * height);
-                std::vector<std::array<float, 4>> image_color_alpha(
-                    width * height);
-                std::vector<float> image_scalar(width * height);
-                for (int j = 0; j < height; j++) {
-                    for (int i = 0; i < width; i++) {
-                        int pix_ind = (j * width + i) * 4;
-                        unsigned char p_r = data[pix_ind + 0];
-                        unsigned char p_g = data[pix_ind + 1];
-                        unsigned char p_b = data[pix_ind + 2];
-                        unsigned char p_a = 255;
-                        if (channels == 4) {
-                            p_a = data[pix_ind + 3];
-                        }
-
-                        // color
-                        std::array<float, 3> val{ p_r / 255.f,
-                                                  p_g / 255.f,
-                                                  p_b / 255.f };
-                        image_color[j * width + i] = val;
-
-                        // scalar
-                        image_scalar[j * width + i] =
-                            (val[0] + val[1] + val[2]) / 3.;
-
-                        // color alpha
-                        std::array<float, 4> val_a{
-                            p_r / 255.f, p_g / 255.f, p_b / 255.f, p_a / 255.f
-                        };
-                        image_color_alpha[j * width + i] = val_a;
-                    }
-                }
+                const bool has_alpha = (image.channels == 4);
+                const size_t pixel_count = image.pixel_count();
 
                 // 需要将structure转换为surface_mesh
                 auto surface_mesh =
                     dynamic_cast<polyscope::SurfaceMesh*>(structure);
+
+                auto register_color_quantities = [&](const auto& names, const std::string& prefix) {
+                    auto image_color =
+                        BuildTextureColorBuffer(image.pixels.get(), pixel_count);
+                    for (const auto& name : names) {
+                        surface_mesh->addTextureColorQuantity(
+                            prefix + name,
+                            name,
+                            image.width,
+                            image.height,
+                            image_color,
+                            polyscope::ImageOrigin::UpperLeft);
+                    }
+                };
+
+                auto register_scalar_quantities = [&](const auto& names, const std::string& prefix) {
+                    auto image_scalar =
+                        BuildTextureScalarBuffer(image.pixels.get(), pixel_count);
+                    for (const auto& name : names) {
+                        surface_mesh->addTextureScalarQuantity(
+                            prefix + name,
+                            name,
+                            image.width,
+                            image.height,
+                            image_scalar,
+                            polyscope::ImageOrigin::UpperLeft);
+                    }
+                };
+
+                auto register_alpha_quantities = [&](const auto& names, const std::string& prefix) {
+                    auto image_color_alpha =
+                        BuildTextureColorAlphaBuffer(
+                            image.pixels.get(), pixel_count);
+                    for (const auto& name : names) {
+                        surface_mesh->addTextureColorQuantity(
+                            prefix + name,
+                            name,
+                            image.width,
+                            image.height,
+                            image_color_alpha,
+                            polyscope::ImageOrigin::UpperLeft);
+                    }
+                };
 
                 try {
                     // surface_mesh->addColorImageQuantity(
@@ -330,55 +417,30 @@ NODE_EXECUTION_FUNCTION(write_polyscope)
                     //         image_color_alpha,
                     //         polyscope::ImageOrigin::UpperLeft);
                     // }
-                    for (auto& name : vertex_parameterization_quantity_names) {
-                        surface_mesh->addTextureColorQuantity(
-                            "vertex texture color " + name,
-                            name,
-                            width,
-                            height,
-                            image_color,
-                            polyscope::ImageOrigin::UpperLeft);
-                        surface_mesh->addTextureScalarQuantity(
-                            "vertex texture scalar " + name,
-                            name,
-                            width,
-                            height,
-                            image_scalar,
-                            polyscope::ImageOrigin::UpperLeft);
+                    if (!vertex_parameterization_quantity_names.empty()) {
+                        register_color_quantities(
+                            vertex_parameterization_quantity_names,
+                            "vertex texture color ");
+                        register_scalar_quantities(
+                            vertex_parameterization_quantity_names,
+                            "vertex texture scalar ");
                         if (has_alpha) {
-                            surface_mesh->addTextureColorQuantity(
-                                "vertex texture color alpha " + name,
-                                name,
-                                width,
-                                height,
-                                image_color_alpha,
-                                polyscope::ImageOrigin::UpperLeft);
+                            register_alpha_quantities(
+                                vertex_parameterization_quantity_names,
+                                "vertex texture color alpha ");
                         }
                     }
-                    for (auto& name :
-                         face_corner_parameterization_quantity_names) {
-                        surface_mesh->addTextureColorQuantity(
-                            "face corner texture color " + name,
-                            name,
-                            width,
-                            height,
-                            image_color,
-                            polyscope::ImageOrigin::UpperLeft);
-                        surface_mesh->addTextureScalarQuantity(
-                            "face corner texture scalar " + name,
-                            name,
-                            width,
-                            height,
-                            image_scalar,
-                            polyscope::ImageOrigin::UpperLeft);
+                    if (!face_corner_parameterization_quantity_names.empty()) {
+                        register_color_quantities(
+                            face_corner_parameterization_quantity_names,
+                            "face corner texture color ");
+                        register_scalar_quantities(
+                            face_corner_parameterization_quantity_names,
+                            "face corner texture scalar ");
                         if (has_alpha) {
-                            surface_mesh->addTextureColorQuantity(
-                                "face corner texture color alpha " + name,
-                                name,
-                                width,
-                                height,
-                                image_color_alpha,
-                                polyscope::ImageOrigin::UpperLeft);
+                            register_alpha_quantities(
+                                face_corner_parameterization_quantity_names,
+                                "face corner texture color alpha ");
                         }
                     }
                 }
@@ -386,7 +448,6 @@ NODE_EXECUTION_FUNCTION(write_polyscope)
                     std::cerr << e.what() << std::endl;
                     return false;
                 }
-                stbi_image_free(data);
             }
             else {
                 // TODO: Throw something

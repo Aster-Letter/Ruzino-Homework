@@ -27,11 +27,11 @@ class Texture2D {
     }
 
    private:
-    unsigned _component_count;
+    unsigned _component_count = 0;
 
     SdfAssetPath textureFileName;
     HioImageSharedPtr texture = nullptr;
-    HioImage::StorageSpec storageSpec;
+    HioImage::StorageSpec storageSpec{};
 };
 
 RUZINO_NAMESPACE_CLOSE_SCOPE
