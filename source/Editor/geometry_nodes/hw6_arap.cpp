@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
@@ -26,10 +27,18 @@ enum class ConstraintMode {
     HardElimination = 1,
 };
 
+enum class ParameterizationAlgorithm {
+    ARAP = 0,
+    ASAP = 1,
+    Hybrid = 2,
+};
+
 struct ArapOptions {
     int max_iterations = 10;
+    ParameterizationAlgorithm algorithm = ParameterizationAlgorithm::ARAP;
     ConstraintMode constraint_mode = ConstraintMode::SoftPenalty;
     double soft_penalty_weight = 1e8;
+    double hybrid_lambda = 0.0;
 };
 
 struct ArapConstraints {
@@ -42,11 +51,29 @@ struct FacePrecomputation {
     std::array<Eigen::Vector2d, 3> rest_positions{};
     std::array<double, 3> cotangent_weights{};
     bool is_valid = false;
+    std::array<Eigen::Vector2d, 3> opposite_edges{};
+    double doubled_area = 0.0;
 };
 
 struct UvQualityStats {
     int flipped_face_count = 0;
     int degenerate_face_count = 0;
+};
+
+struct HybridLocalConstants {
+    double c1 = 0.0;
+    double c2 = 0.0;
+    double c3 = 0.0;
+};
+
+struct ConstraintIndexMaps {
+    std::vector<char> is_fixed;
+    std::vector<int> fixed_slot;
+};
+
+struct FreeVertexMapping {
+    std::vector<int> free_vertex_ids;
+    std::vector<int> full_to_free;
 };
 
 struct ArapPrecomputation {
@@ -62,16 +89,224 @@ struct ArapPrecomputation {
 
 struct ArapState {
     std::vector<glm::vec2> current_uv;
-    std::vector<Eigen::Matrix2d> local_rotations;
+    std::vector<Eigen::Matrix2d> local_transforms;
     UvQualityStats quality_stats;
 };
 
 using TriangleSignature = std::array<int, 3>;
 
+bool collect_triangle_vertices(
+    const MeshType& mesh,
+    const MeshType::FaceHandle& face,
+    std::array<int, 3>& vertex_ids);
+
 ConstraintMode parse_constraint_mode(int raw_mode)
 {
     return raw_mode == 1 ? ConstraintMode::HardElimination
                          : ConstraintMode::SoftPenalty;
+}
+
+ParameterizationAlgorithm parse_parameterization_algorithm(int raw_algorithm)
+{
+    switch (std::clamp(raw_algorithm, 0, 2)) {
+    case 1:
+        return ParameterizationAlgorithm::ASAP;
+    case 2:
+        return ParameterizationAlgorithm::Hybrid;
+    case 0:
+    default:
+        return ParameterizationAlgorithm::ARAP;
+    }
+}
+
+Eigen::Matrix2d make_similarity_transform(double a, double b)
+{
+    Eigen::Matrix2d transform;
+    transform << a, b,
+        -b, a;
+    return transform;
+}
+
+std::vector<double> solve_depressed_cubic_real_roots(
+    double cubic_coeff,
+    double linear_coeff,
+    double constant_coeff)
+{
+    constexpr double kEps = 1e-12;
+    std::vector<double> roots;
+
+    if (std::abs(cubic_coeff) <= kEps) {
+        if (std::abs(linear_coeff) <= kEps) {
+            return roots;
+        }
+
+        roots.push_back(-constant_coeff / linear_coeff);
+        return roots;
+    }
+
+    const double p = linear_coeff / cubic_coeff;
+    const double q = constant_coeff / cubic_coeff;
+    const double discriminant =
+        0.25 * q * q + (p * p * p) / 27.0;
+
+    if (discriminant > kEps) {
+        const double sqrt_discriminant = std::sqrt(discriminant);
+        const double u = std::cbrt(-0.5 * q + sqrt_discriminant);
+        const double v = std::cbrt(-0.5 * q - sqrt_discriminant);
+        roots.push_back(u + v);
+        return roots;
+    }
+
+    if (std::abs(discriminant) <= kEps) {
+        const double u = std::cbrt(-0.5 * q);
+        roots.push_back(2.0 * u);
+        roots.push_back(-u);
+        return roots;
+    }
+
+    const double radius = 2.0 * std::sqrt(-p / 3.0);
+    const double angle = std::acos(
+        std::clamp(
+            -0.5 * q / std::sqrt(-(p * p * p) / 27.0),
+            -1.0,
+            1.0));
+    constexpr double kTwoPi = 6.28318530717958647692;
+    for (int branch = 0; branch < 3; ++branch) {
+        roots.push_back(radius * std::cos((angle + kTwoPi * branch) / 3.0));
+    }
+
+    return roots;
+}
+
+HybridLocalConstants compute_hybrid_local_constants(
+    const FacePrecomputation& face_data,
+    const std::vector<glm::vec2>& uv)
+{
+    static constexpr std::array<std::array<int, 2>, 3> kOppositeEdgeEndpoints = {
+        std::array<int, 2>{1, 2},
+        std::array<int, 2>{2, 0},
+        std::array<int, 2>{0, 1},
+    };
+
+    HybridLocalConstants constants;
+    for (int edge_index = 0; edge_index < 3; ++edge_index) {
+        const double weight = face_data.cotangent_weights[edge_index];
+        if (std::abs(weight) <= 1e-12) {
+            continue;
+        }
+
+        const int from = face_data.vertex_ids[kOppositeEdgeEndpoints[edge_index][0]];
+        const int to = face_data.vertex_ids[kOppositeEdgeEndpoints[edge_index][1]];
+        const Eigen::Vector2d du(
+            static_cast<double>(uv[from].x - uv[to].x),
+            static_cast<double>(uv[from].y - uv[to].y));
+        const Eigen::Vector2d& dv = face_data.opposite_edges[edge_index];
+
+        constants.c1 += weight * dv.squaredNorm();
+        constants.c2 += weight * du.dot(dv);
+        constants.c3 += weight * (du.x() * dv.y() - du.y() * dv.x());
+    }
+
+    return constants;
+}
+
+double evaluate_hybrid_local_energy(
+    const HybridLocalConstants& constants,
+    double lambda,
+    double a,
+    double b)
+{
+    const double squared_scale = a * a + b * b;
+    const double data_term =
+        constants.c1 * squared_scale -
+        2.0 * constants.c2 * a -
+        2.0 * constants.c3 * b;
+    const double penalty_term =
+        std::max(0.0, lambda) * std::pow(squared_scale - 1.0, 2.0);
+    return data_term + penalty_term;
+}
+
+Eigen::Matrix2d compute_hybrid_local_transform(
+    const FacePrecomputation& face_data,
+    const std::vector<glm::vec2>& uv,
+    double lambda)
+{
+    const HybridLocalConstants constants =
+        compute_hybrid_local_constants(face_data, uv);
+    const double magnitude = std::hypot(constants.c2, constants.c3);
+    if (magnitude <= 1e-12) {
+        return Eigen::Matrix2d::Identity();
+    }
+
+    if (lambda <= 1e-12) {
+        return make_similarity_transform(
+            constants.c2 / constants.c1,
+            constants.c3 / constants.c1);
+    }
+
+    const double cubic_coeff = 2.0 * lambda;
+    const double linear_coeff = constants.c1 - 2.0 * lambda;
+    const double constant_coeff = -magnitude;
+    const std::vector<double> candidate_scales =
+        solve_depressed_cubic_real_roots(cubic_coeff, linear_coeff, constant_coeff);
+
+    double best_energy = std::numeric_limits<double>::infinity();
+    Eigen::Matrix2d best_transform = Eigen::Matrix2d::Identity();
+    for (const double scale : candidate_scales) {
+        const double a = scale * constants.c2 / magnitude;
+        const double b = scale * constants.c3 / magnitude;
+        const double energy = evaluate_hybrid_local_energy(constants, lambda, a, b);
+        if (energy < best_energy) {
+            best_energy = energy;
+            best_transform = make_similarity_transform(a, b);
+        }
+    }
+
+    return best_transform;
+}
+
+ConstraintIndexMaps build_constraint_index_maps(
+    const ArapConstraints& constraints,
+    int num_vertices)
+{
+    ConstraintIndexMaps maps;
+    maps.is_fixed.assign(static_cast<size_t>(num_vertices), 0);
+    maps.fixed_slot.assign(num_vertices, -1);
+
+    int compact_fixed_index = 0;
+    for (const int vertex_id : constraints.fixed_vertex_ids) {
+        if (vertex_id < 0 || vertex_id >= num_vertices) {
+            continue;
+        }
+        if (maps.is_fixed[vertex_id]) {
+            continue;
+        }
+
+        maps.is_fixed[vertex_id] = 1;
+        maps.fixed_slot[vertex_id] = compact_fixed_index++;
+    }
+
+    return maps;
+}
+
+FreeVertexMapping build_free_vertex_mapping(
+    const std::vector<char>& is_fixed,
+    int num_vertices)
+{
+    FreeVertexMapping mapping;
+    mapping.full_to_free.assign(num_vertices, -1);
+
+    for (int vertex_id = 0; vertex_id < num_vertices; ++vertex_id) {
+        if (is_fixed[vertex_id]) {
+            continue;
+        }
+
+        mapping.full_to_free[vertex_id] =
+            static_cast<int>(mapping.free_vertex_ids.size());
+        mapping.free_vertex_ids.push_back(vertex_id);
+    }
+
+    return mapping;
 }
 
 TriangleSignature build_triangle_signature(
@@ -362,6 +597,13 @@ FacePrecomputation build_face_precomputation(
     }
 
     face_data.rest_positions = build_rest_triangle_coordinates(rest_edges);
+    face_data.opposite_edges[0] =
+        face_data.rest_positions[2] - face_data.rest_positions[1];
+    face_data.opposite_edges[1] =
+        face_data.rest_positions[0] - face_data.rest_positions[2];
+    face_data.opposite_edges[2] =
+        face_data.rest_positions[1] - face_data.rest_positions[0];
+    face_data.doubled_area = std::abs(rest_edges.determinant());
     face_data.cotangent_weights[0] = compute_cotangent_2d(
         face_data.rest_positions[1] - face_data.rest_positions[0],
         face_data.rest_positions[2] - face_data.rest_positions[0]);
@@ -386,7 +628,7 @@ public:
         state_.current_uv = std::move(init_uv);
         precomputation_.num_vertices = static_cast<int>(mesh_.n_vertices());
         precomputation_.num_faces = static_cast<int>(mesh_.n_faces());
-        state_.local_rotations.assign(
+        state_.local_transforms.assign(
             precomputation_.num_faces,
             Eigen::Matrix2d::Identity());
     }
@@ -398,15 +640,17 @@ public:
     {
         select_fixed_points();
         precompute_face_data();
+
+        if (options_.algorithm == ParameterizationAlgorithm::ASAP) {
+            solve_asap();
+            update_quality_stats();
+            return state_.current_uv;
+        }
+
         precompute_global_system();
         update_quality_stats();
 
-        for (int i = 0; i < options_.max_iterations; ++i) {
-            local_phase();
-            if (!global_phase()) {
-                break;
-            }
-        }
+        run_iterations();
 
         return state_.current_uv;
     }
@@ -423,6 +667,17 @@ private:
     void precompute_global_system();
     void local_phase();
     bool global_phase();
+    void solve_asap();
+    void run_iterations();
+    void assemble_global_rhs(Eigen::VectorXd& rhs_x, Eigen::VectorXd& rhs_y) const;
+    void solve_soft_global_step(const Eigen::VectorXd& rhs_x, const Eigen::VectorXd& rhs_y);
+    void solve_hard_global_step(const Eigen::VectorXd& rhs_x, const Eigen::VectorXd& rhs_y);
+    void write_full_uv_solution(const Eigen::VectorXd& solved_x, const Eigen::VectorXd& solved_y);
+    void write_hard_constraint_solution(
+        const Eigen::VectorXd& solved_free_x,
+        const Eigen::VectorXd& solved_free_y,
+        const Eigen::VectorXd& fixed_x,
+        const Eigen::VectorXd& fixed_y);
     void update_quality_stats();
     void precompute_hard_constraint_system();
     void precompute_soft_constraint_system();
@@ -501,6 +756,129 @@ int ArapSolver::degenerate_face_count() const
 {
     return state_.quality_stats.degenerate_face_count;
 }
+
+void ArapSolver::run_iterations()
+{
+    for (int iteration = 0; iteration < options_.max_iterations; ++iteration) {
+        local_phase();
+        if (!global_phase()) {
+            break;
+        }
+    }
+}
+
+void ArapSolver::solve_asap()
+{
+    const int num_vertices = precomputation_.num_vertices;
+    const int num_faces = precomputation_.num_faces;
+
+    if (num_vertices <= 0 || num_faces <= 0) {
+        return;
+    }
+
+    const ConstraintIndexMaps constraint_maps =
+        build_constraint_index_maps(constraints_, num_vertices);
+    const int num_fixed = static_cast<int>(
+        std::count(
+            constraint_maps.is_fixed.begin(),
+            constraint_maps.is_fixed.end(),
+            static_cast<char>(1)));
+    if (num_fixed < 2 ||
+        constraints_.fixed_positions.size() < static_cast<size_t>(num_fixed)) {
+        throw std::runtime_error("ARAP: ASAP solve requires at least two fixed points.");
+    }
+
+    const FreeVertexMapping free_mapping =
+        build_free_vertex_mapping(constraint_maps.is_fixed, num_vertices);
+    const int free_count = static_cast<int>(free_mapping.free_vertex_ids.size());
+
+    if (free_count == 0) {
+        for (int fixed_index = 0; fixed_index < num_fixed; ++fixed_index) {
+            const int vertex_id = constraints_.fixed_vertex_ids[fixed_index];
+            state_.current_uv[vertex_id] = glm::vec2(
+                static_cast<float>(constraints_.fixed_positions[fixed_index].x()),
+                static_cast<float>(constraints_.fixed_positions[fixed_index].y()));
+        }
+        return;
+    }
+
+    Eigen::VectorXd fixed_values = Eigen::VectorXd::Zero(2 * num_fixed);
+    for (int fixed_index = 0; fixed_index < num_fixed; ++fixed_index) {
+        fixed_values[fixed_index] = constraints_.fixed_positions[fixed_index].x();
+        fixed_values[fixed_index + num_fixed] = constraints_.fixed_positions[fixed_index].y();
+    }
+
+    Eigen::SparseMatrix<double> A(2 * num_faces, 2 * free_count);
+    Eigen::SparseMatrix<double> B(2 * num_faces, 2 * num_fixed);
+    std::vector<Eigen::Triplet<double>> a_triplets;
+    std::vector<Eigen::Triplet<double>> b_triplets;
+    a_triplets.reserve(static_cast<size_t>(num_faces) * 12);
+    b_triplets.reserve(static_cast<size_t>(num_faces) * 12);
+
+    for (int face_index = 0; face_index < num_faces; ++face_index) {
+        const auto& face_data = precomputation_.face_data[face_index];
+        if (!face_data.is_valid || face_data.doubled_area <= 1e-12) {
+            continue;
+        }
+
+        const double coeff = std::sqrt(face_data.doubled_area);
+        for (int local_index = 0; local_index < 3; ++local_index) {
+            const int vertex_id = face_data.vertex_ids[local_index];
+            const double dx = face_data.opposite_edges[local_index].x() / coeff;
+            const double dy = face_data.opposite_edges[local_index].y() / coeff;
+
+            const int fixed_index = constraint_maps.fixed_slot[vertex_id];
+            if (fixed_index >= 0) {
+                b_triplets.emplace_back(face_index, fixed_index, dx);
+                b_triplets.emplace_back(face_index + num_faces, fixed_index, dy);
+                b_triplets.emplace_back(face_index, fixed_index + num_fixed, -dy);
+                b_triplets.emplace_back(face_index + num_faces, fixed_index + num_fixed, dx);
+                continue;
+            }
+
+            const int free_index = free_mapping.full_to_free[vertex_id];
+            if (free_index < 0) {
+                continue;
+            }
+
+            a_triplets.emplace_back(face_index, free_index, dx);
+            a_triplets.emplace_back(face_index + num_faces, free_index, dy);
+            a_triplets.emplace_back(face_index, free_index + free_count, -dy);
+            a_triplets.emplace_back(face_index + num_faces, free_index + free_count, dx);
+        }
+    }
+
+    A.setFromTriplets(a_triplets.begin(), a_triplets.end());
+    B.setFromTriplets(b_triplets.begin(), b_triplets.end());
+    A.makeCompressed();
+    B.makeCompressed();
+
+    Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
+    solver.compute(A);
+    if (solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to factorize ASAP least-squares system.");
+    }
+
+    const Eigen::VectorXd rhs = -B * fixed_values;
+    const Eigen::VectorXd solution = solver.solve(rhs);
+    if (solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve ASAP least-squares system.");
+    }
+
+    for (int vertex_id = 0; vertex_id < num_vertices; ++vertex_id) {
+        const int fixed_index = constraint_maps.fixed_slot[vertex_id];
+        if (fixed_index >= 0) {
+            state_.current_uv[vertex_id] = glm::vec2(
+                static_cast<float>(constraints_.fixed_positions[fixed_index].x()),
+                static_cast<float>(constraints_.fixed_positions[fixed_index].y()));
+            continue;
+        }
+
+        const int free_index = free_mapping.full_to_free[vertex_id];
+        state_.current_uv[vertex_id] = glm::vec2(
+            static_cast<float>(solution[free_index]),
+            static_cast<float>(solution[free_index + free_count]));
+    }
 }
 
 /**
@@ -565,25 +943,14 @@ void ArapSolver::precompute_soft_constraint_system()
 
 void ArapSolver::precompute_hard_constraint_system()
 {
-    precomputation_.free_vertex_ids.clear();
-    precomputation_.full_to_free.assign(precomputation_.num_vertices, -1);
-
-    std::vector<char> is_fixed(
-        static_cast<size_t>(precomputation_.num_vertices),
-        0);
-    for (const int fixed_vertex_id : constraints_.fixed_vertex_ids) {
-        if (fixed_vertex_id >= 0 && fixed_vertex_id < precomputation_.num_vertices) {
-            is_fixed[fixed_vertex_id] = 1;
-        }
-    }
-
-    for (int vertex_id = 0; vertex_id < precomputation_.num_vertices; ++vertex_id) {
-        if (!is_fixed[vertex_id]) {
-            precomputation_.full_to_free[vertex_id] =
-                static_cast<int>(precomputation_.free_vertex_ids.size());
-            precomputation_.free_vertex_ids.push_back(vertex_id);
-        }
-    }
+    const ConstraintIndexMaps constraint_maps =
+        build_constraint_index_maps(constraints_, precomputation_.num_vertices);
+    const FreeVertexMapping free_mapping =
+        build_free_vertex_mapping(
+            constraint_maps.is_fixed,
+            precomputation_.num_vertices);
+    precomputation_.free_vertex_ids = free_mapping.free_vertex_ids;
+    precomputation_.full_to_free = free_mapping.full_to_free;
 
     std::vector<Eigen::Triplet<double>> reduced_triplets;
     reduced_triplets.reserve(
@@ -635,7 +1002,16 @@ void ArapSolver::local_phase()
          ++face_index) {
         const auto& face_data = precomputation_.face_data[face_index];
         if (!face_data.is_valid) {
-            state_.local_rotations[face_index] = Eigen::Matrix2d::Identity();
+            state_.local_transforms[face_index] = Eigen::Matrix2d::Identity();
+            continue;
+        }
+
+        if (options_.algorithm == ParameterizationAlgorithm::Hybrid) {
+            state_.local_transforms[face_index] =
+                compute_hybrid_local_transform(
+                    face_data,
+                    state_.current_uv,
+                    options_.hybrid_lambda);
             continue;
         }
 
@@ -666,7 +1042,7 @@ void ArapSolver::local_phase()
         accumulate_covariance(1, 2, face_data.cotangent_weights[0]);
         accumulate_covariance(2, 0, face_data.cotangent_weights[1]);
 
-        state_.local_rotations[face_index] =
+        state_.local_transforms[face_index] =
             compute_closest_rotation(covariance);
     }
 }
@@ -676,21 +1052,42 @@ void ArapSolver::local_phase()
  */
 bool ArapSolver::global_phase()
 {
-    if (state_.local_rotations.size() != static_cast<size_t>(precomputation_.num_faces)) {
-        throw std::runtime_error("ARAP: Rotation state size does not match face count.");
+    if (state_.local_transforms.size() != static_cast<size_t>(precomputation_.num_faces)) {
+        throw std::runtime_error("ARAP: Local transform state size does not match face count.");
     }
 
     Eigen::VectorXd rhs_x = Eigen::VectorXd::Zero(precomputation_.num_vertices);
     Eigen::VectorXd rhs_y = Eigen::VectorXd::Zero(precomputation_.num_vertices);
 
+    assemble_global_rhs(rhs_x, rhs_y);
+
+    if (options_.constraint_mode == ConstraintMode::SoftPenalty) {
+        solve_soft_global_step(rhs_x, rhs_y);
+    }
+    else {
+        solve_hard_global_step(rhs_x, rhs_y);
+    }
+
+    update_quality_stats();
+
+    return true;
+}
+
+void ArapSolver::assemble_global_rhs(Eigen::VectorXd& rhs_x, Eigen::VectorXd& rhs_y) const
+{
+    if (rhs_x.size() != precomputation_.num_vertices ||
+        rhs_y.size() != precomputation_.num_vertices) {
+        throw std::runtime_error("ARAP: RHS buffers do not match vertex count.");
+    }
+
     auto accumulate_edge_contribution =
-        [&](int from, int to, double cotangent, const Eigen::Matrix2d& rotation, const std::array<Eigen::Vector2d, 3>& rest_positions, int local_from, int local_to) {
+        [&](int from, int to, double cotangent, const Eigen::Matrix2d& local_transform, const std::array<Eigen::Vector2d, 3>& rest_positions, int local_from, int local_to) {
             if (std::abs(cotangent) <= 1e-12) {
                 return;
             }
 
             const Eigen::Vector2d rotated_edge =
-                0.5 * cotangent * rotation * (rest_positions[local_from] - rest_positions[local_to]);
+                0.5 * cotangent * local_transform * (rest_positions[local_from] - rest_positions[local_to]);
 
             rhs_x[from] += rotated_edge.x();
             rhs_y[from] += rotated_edge.y();
@@ -706,12 +1103,12 @@ bool ArapSolver::global_phase()
             continue;
         }
 
-        const Eigen::Matrix2d& rotation = state_.local_rotations[face_index];
+        const Eigen::Matrix2d& local_transform = state_.local_transforms[face_index];
         accumulate_edge_contribution(
             face_data.vertex_ids[0],
             face_data.vertex_ids[1],
             face_data.cotangent_weights[2],
-            rotation,
+            local_transform,
             face_data.rest_positions,
             0,
             1);
@@ -719,7 +1116,7 @@ bool ArapSolver::global_phase()
             face_data.vertex_ids[1],
             face_data.vertex_ids[2],
             face_data.cotangent_weights[0],
-            rotation,
+            local_transform,
             face_data.rest_positions,
             1,
             2);
@@ -727,148 +1124,208 @@ bool ArapSolver::global_phase()
             face_data.vertex_ids[2],
             face_data.vertex_ids[0],
             face_data.cotangent_weights[1],
-            rotation,
+            local_transform,
             face_data.rest_positions,
             2,
             0);
     }
+}
 
-    if (options_.constraint_mode == ConstraintMode::SoftPenalty) {
-        for (size_t constraint_index = 0;
-             constraint_index < constraints_.fixed_vertex_ids.size() &&
-             constraint_index < constraints_.fixed_positions.size();
-             ++constraint_index) {
-            const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
-            if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
-                continue;
-            }
+void ArapSolver::solve_soft_global_step(
+    const Eigen::VectorXd& rhs_x,
+    const Eigen::VectorXd& rhs_y)
+{
+    Eigen::VectorXd constrained_rhs_x = rhs_x;
+    Eigen::VectorXd constrained_rhs_y = rhs_y;
 
-            rhs_x[vertex_id] +=
-                options_.soft_penalty_weight * constraints_.fixed_positions[constraint_index].x();
-            rhs_y[vertex_id] +=
-                options_.soft_penalty_weight * constraints_.fixed_positions[constraint_index].y();
+    for (size_t constraint_index = 0;
+         constraint_index < constraints_.fixed_vertex_ids.size() &&
+         constraint_index < constraints_.fixed_positions.size();
+         ++constraint_index) {
+        const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
+        if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
+            continue;
         }
 
-        const Eigen::VectorXd solved_x = precomputation_.solver.solve(rhs_x);
-        if (precomputation_.solver.info() != Eigen::Success) {
-            throw std::runtime_error("ARAP: Failed to solve x-component in soft global phase.");
-        }
-
-        const Eigen::VectorXd solved_y = precomputation_.solver.solve(rhs_y);
-        if (precomputation_.solver.info() != Eigen::Success) {
-            throw std::runtime_error("ARAP: Failed to solve y-component in soft global phase.");
-        }
-
-        for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
-            state_.current_uv[vertex_index] = glm::vec2(
-                static_cast<float>(solved_x[vertex_index]),
-                static_cast<float>(solved_y[vertex_index]));
-        }
-    }
-    else {
-        Eigen::VectorXd fixed_x = Eigen::VectorXd::Zero(precomputation_.num_vertices);
-        Eigen::VectorXd fixed_y = Eigen::VectorXd::Zero(precomputation_.num_vertices);
-        for (size_t constraint_index = 0;
-             constraint_index < constraints_.fixed_vertex_ids.size() &&
-             constraint_index < constraints_.fixed_positions.size();
-             ++constraint_index) {
-            const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
-            if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
-                continue;
-            }
-
-            fixed_x[vertex_id] = constraints_.fixed_positions[constraint_index].x();
-            fixed_y[vertex_id] = constraints_.fixed_positions[constraint_index].y();
-        }
-
-        const Eigen::VectorXd adjusted_rhs_x =
-            rhs_x - precomputation_.laplacian_matrix * fixed_x;
-        const Eigen::VectorXd adjusted_rhs_y =
-            rhs_y - precomputation_.laplacian_matrix * fixed_y;
-
-        Eigen::VectorXd reduced_rhs_x(
-            static_cast<int>(precomputation_.free_vertex_ids.size()));
-        Eigen::VectorXd reduced_rhs_y(
-            static_cast<int>(precomputation_.free_vertex_ids.size()));
-        for (size_t free_index = 0;
-             free_index < precomputation_.free_vertex_ids.size();
-             ++free_index) {
-            const int full_index = precomputation_.free_vertex_ids[free_index];
-            reduced_rhs_x[static_cast<int>(free_index)] = adjusted_rhs_x[full_index];
-            reduced_rhs_y[static_cast<int>(free_index)] = adjusted_rhs_y[full_index];
-        }
-
-        const Eigen::VectorXd solved_free_x =
-            precomputation_.solver.solve(reduced_rhs_x);
-        if (precomputation_.solver.info() != Eigen::Success) {
-            throw std::runtime_error("ARAP: Failed to solve x-component in hard global phase.");
-        }
-
-        const Eigen::VectorXd solved_free_y =
-            precomputation_.solver.solve(reduced_rhs_y);
-        if (precomputation_.solver.info() != Eigen::Success) {
-            throw std::runtime_error("ARAP: Failed to solve y-component in hard global phase.");
-        }
-
-        for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
-            state_.current_uv[vertex_index] = glm::vec2(0.0f);
-        }
-
-        for (size_t constraint_index = 0;
-             constraint_index < constraints_.fixed_vertex_ids.size() &&
-             constraint_index < constraints_.fixed_positions.size();
-             ++constraint_index) {
-            const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
-            if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
-                continue;
-            }
-
-            state_.current_uv[vertex_id] = glm::vec2(
-                static_cast<float>(constraints_.fixed_positions[constraint_index].x()),
-                static_cast<float>(constraints_.fixed_positions[constraint_index].y()));
-        }
-
-        for (size_t free_index = 0;
-             free_index < precomputation_.free_vertex_ids.size();
-             ++free_index) {
-            const int full_index = precomputation_.free_vertex_ids[free_index];
-            state_.current_uv[full_index] = glm::vec2(
-                static_cast<float>(solved_free_x[static_cast<int>(free_index)]),
-                static_cast<float>(solved_free_y[static_cast<int>(free_index)]));
-        }
+        constrained_rhs_x[vertex_id] +=
+            options_.soft_penalty_weight * constraints_.fixed_positions[constraint_index].x();
+        constrained_rhs_y[vertex_id] +=
+            options_.soft_penalty_weight * constraints_.fixed_positions[constraint_index].y();
     }
 
-    update_quality_stats();
+    const Eigen::VectorXd solved_x = precomputation_.solver.solve(constrained_rhs_x);
+    if (precomputation_.solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve x-component in soft global phase.");
+    }
 
-    return true;
+    const Eigen::VectorXd solved_y = precomputation_.solver.solve(constrained_rhs_y);
+    if (precomputation_.solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve y-component in soft global phase.");
+    }
+
+    write_full_uv_solution(solved_x, solved_y);
+}
+
+void ArapSolver::solve_hard_global_step(
+    const Eigen::VectorXd& rhs_x,
+    const Eigen::VectorXd& rhs_y)
+{
+    Eigen::VectorXd fixed_x = Eigen::VectorXd::Zero(precomputation_.num_vertices);
+    Eigen::VectorXd fixed_y = Eigen::VectorXd::Zero(precomputation_.num_vertices);
+    for (size_t constraint_index = 0;
+         constraint_index < constraints_.fixed_vertex_ids.size() &&
+         constraint_index < constraints_.fixed_positions.size();
+         ++constraint_index) {
+        const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
+        if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
+            continue;
+        }
+
+        fixed_x[vertex_id] = constraints_.fixed_positions[constraint_index].x();
+        fixed_y[vertex_id] = constraints_.fixed_positions[constraint_index].y();
+    }
+
+    const Eigen::VectorXd adjusted_rhs_x =
+        rhs_x - precomputation_.laplacian_matrix * fixed_x;
+    const Eigen::VectorXd adjusted_rhs_y =
+        rhs_y - precomputation_.laplacian_matrix * fixed_y;
+
+    Eigen::VectorXd reduced_rhs_x(
+        static_cast<int>(precomputation_.free_vertex_ids.size()));
+    Eigen::VectorXd reduced_rhs_y(
+        static_cast<int>(precomputation_.free_vertex_ids.size()));
+    for (size_t free_index = 0;
+         free_index < precomputation_.free_vertex_ids.size();
+         ++free_index) {
+        const int full_index = precomputation_.free_vertex_ids[free_index];
+        reduced_rhs_x[static_cast<int>(free_index)] = adjusted_rhs_x[full_index];
+        reduced_rhs_y[static_cast<int>(free_index)] = adjusted_rhs_y[full_index];
+    }
+
+    const Eigen::VectorXd solved_free_x =
+        precomputation_.solver.solve(reduced_rhs_x);
+    if (precomputation_.solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve x-component in hard global phase.");
+    }
+
+    const Eigen::VectorXd solved_free_y =
+        precomputation_.solver.solve(reduced_rhs_y);
+    if (precomputation_.solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve y-component in hard global phase.");
+    }
+
+    write_hard_constraint_solution(solved_free_x, solved_free_y, fixed_x, fixed_y);
+}
+
+void ArapSolver::write_full_uv_solution(
+    const Eigen::VectorXd& solved_x,
+    const Eigen::VectorXd& solved_y)
+{
+    for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
+        state_.current_uv[vertex_index] = glm::vec2(
+            static_cast<float>(solved_x[vertex_index]),
+            static_cast<float>(solved_y[vertex_index]));
+    }
+}
+
+void ArapSolver::write_hard_constraint_solution(
+    const Eigen::VectorXd& solved_free_x,
+    const Eigen::VectorXd& solved_free_y,
+    const Eigen::VectorXd& fixed_x,
+    const Eigen::VectorXd& fixed_y)
+{
+    for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
+        state_.current_uv[vertex_index] = glm::vec2(0.0f);
+    }
+
+    for (size_t constraint_index = 0;
+         constraint_index < constraints_.fixed_vertex_ids.size() &&
+         constraint_index < constraints_.fixed_positions.size();
+         ++constraint_index) {
+        const int vertex_id = constraints_.fixed_vertex_ids[constraint_index];
+        if (vertex_id < 0 || vertex_id >= precomputation_.num_vertices) {
+            continue;
+        }
+
+        state_.current_uv[vertex_id] = glm::vec2(
+            static_cast<float>(fixed_x[vertex_id]),
+            static_cast<float>(fixed_y[vertex_id]));
+    }
+
+    for (size_t free_index = 0;
+         free_index < precomputation_.free_vertex_ids.size();
+         ++free_index) {
+        const int full_index = precomputation_.free_vertex_ids[free_index];
+        state_.current_uv[full_index] = glm::vec2(
+            static_cast<float>(solved_free_x[static_cast<int>(free_index)]),
+            static_cast<float>(solved_free_y[static_cast<int>(free_index)]));
+    }
+}
 }  // namespace
 
 NODE_DEF_OPEN_SCOPE
 NODE_DECLARATION_FUNCTION(hw6_arap)
 {
+    // Original 3D mesh to parameterize. This should be a triangulated mesh
+    // with boundary. If the node returns false here, first check whether a
+    // MeshComponent exists on the incoming Geometry.
     b.add_input<Geometry>("Input");
-    b.add_input<Geometry>("InitUV_Mesh");
-    b.add_input<int>("Iterations");
-    b.add_input<int>("Constraint Mode");
-    b.add_input<int>("Soft Constraint Log10");
 
+    // Initialization mesh. Its vertex x/y coordinates are read as the initial
+    // UV guess, so it must have the same topology as Input. In practice this
+    // is usually the output of a HW5 parameterization branch.
+    b.add_input<Geometry>("InitUV_Mesh");
+
+    // Number of local/global iterations. Only used by ARAP and Hybrid.
+    b.add_input<int>("Iterations").default_val(10).min(1).max(100);
+
+    // Parameterization model selector:
+    // 0 = ARAP, 1 = ASAP, 2 = Hybrid.
+    // Use the same scene and init UV to compare distortion across models.
+    b.add_input<int>("Algorithm").default_val(0).min(0).max(2);
+
+    // Hybrid-only parameter lambda in [0, +inf). It is ignored by ARAP and ASAP.
+    b.add_input<float>("Hybrid Lambda").default_val(1.0f).min(0.0f).max(100.0f);
+
+    // Constraint handling mode for ARAP / Hybrid global solve.
+    // ASAP uses its own least-squares solve and ignores this setting.
+    b.add_input<int>("Constraint Mode").default_val(0).min(0).max(1);
+
+    // Log10 of the soft penalty weight. Only used when Algorithm != ASAP and Constraint Mode = 0.
+    // Example: 8 means a penalty weight of 10^8.
+    b.add_input<int>("Soft Constraint Log10").default_val(8).min(2).max(12);
+
+    // UV buffer to be written back into a mesh via
+    // mesh_add_vertex_parameterization_quantity for visualization/debugging.
     b.add_output<std::vector<glm::vec2>>("OutputUV");
+
+    // Count of triangles whose signed UV area becomes negative. A non-zero
+    // value usually means flips caused by bad initialization or unstable setup.
     b.add_output<int>("FlippedFaceCount");
+
+    // Count of triangles whose UV area nearly collapses to zero. This is useful
+    // for spotting shrinkage or near-singular local/global updates.
     b.add_output<int>("DegenerateFaceCount");
 }
 
 NODE_EXECUTION_FUNCTION(hw6_arap)
 {
     try {
+        // Read node inputs from the execution context. Keep these names aligned
+        // with the declaration above, otherwise the GUI sockets and code will
+        // silently disagree.
         auto input = params.get_input<Geometry>("Input");
         auto init_uv_mesh = params.get_input<Geometry>("InitUV_Mesh");
         const auto raw_iterations = params.get_input<int>("Iterations");
+        const auto raw_algorithm = params.get_input<int>("Algorithm");
+        const auto raw_hybrid_lambda = params.get_input<float>("Hybrid Lambda");
         const auto raw_constraint_mode = params.get_input<int>("Constraint Mode");
         const auto raw_soft_constraint_log10 =
             params.get_input<int>("Soft Constraint Log10");
+        const auto algorithm = parse_parameterization_algorithm(raw_algorithm);
         const auto iterations = raw_iterations > 0
-                                    ? std::clamp(raw_iterations, 0, 100)
-                                    : 10;
+                        ? std::clamp(raw_iterations, 1, 100)
+                        : 10;
 
         if (!input.get_component<MeshComponent>()) {
             return false;
@@ -884,11 +1341,22 @@ NODE_EXECUTION_FUNCTION(hw6_arap)
         }
 
         ArapOptions options;
-        options.max_iterations = iterations;
-        options.constraint_mode = parse_constraint_mode(raw_constraint_mode);
+        options.algorithm = algorithm;
+        options.max_iterations =
+            algorithm == ParameterizationAlgorithm::ASAP ? 1 : iterations;
+        options.hybrid_lambda =
+            algorithm == ParameterizationAlgorithm::Hybrid
+                ? std::max(0.0, static_cast<double>(raw_hybrid_lambda))
+                : 0.0;
+        options.constraint_mode =
+            algorithm == ParameterizationAlgorithm::ASAP
+                ? ConstraintMode::HardElimination
+                : parse_constraint_mode(raw_constraint_mode);
         options.soft_penalty_weight =
-            penalty_weight_from_slider(
-                raw_soft_constraint_log10 > 0 ? raw_soft_constraint_log10 : 8);
+            algorithm == ParameterizationAlgorithm::ASAP
+                ? 0.0
+                : penalty_weight_from_slider(
+                      raw_soft_constraint_log10 > 0 ? raw_soft_constraint_log10 : 8);
 
         auto init_uv = extract_uv_from_mesh(*mesh_uv);
         ArapSolver solver(*mesh_3d, std::move(init_uv), options);
