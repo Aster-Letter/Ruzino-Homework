@@ -150,6 +150,13 @@ void ImGui_Console::ClearHistory()
 bool ImGui_Console::BuildUI()
 {
     if (ImGui::BeginPopupContextItem()) {
+        if (ImGui::MenuItem("Copy Visible Log")) {
+            CopyLogToClipboard(true);
+        }
+        if (ImGui::MenuItem("Copy All Log")) {
+            CopyLogToClipboard(false);
+        }
+        ImGui::Separator();
         if (ImGui::MenuItem("Close Console")) {
             // For IWidget, we don't directly control closing, return false to
             // indicate widget should close
@@ -159,10 +166,16 @@ bool ImGui_Console::BuildUI()
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Edit")) {
+            bool copyVisible = ImGui::MenuItem("Copy Visible Log");
+            bool copyAll = ImGui::MenuItem("Copy All Log");
             bool clearLog = ImGui::MenuItem("Clear Log");
             bool clearHistory = ImGui::MenuItem("Clear History");
             bool clearAll = ImGui::MenuItem("Clear All");
 
+            if (copyVisible)
+                this->CopyLogToClipboard(true);
+            if (copyAll)
+                this->CopyLogToClipboard(false);
             if (clearLog || clearAll)
                 this->ClearLog();
             if (clearHistory || clearAll)
@@ -186,6 +199,11 @@ bool ImGui_Console::BuildUI()
 
     // right click popup on log panel
     if (ImGui::BeginPopupContextWindow()) {
+        if (ImGui::Selectable("Copy Visible Log"))
+            CopyLogToClipboard(true);
+        if (ImGui::Selectable("Copy All Log"))
+            CopyLogToClipboard(false);
+        ImGui::Separator();
         if (ImGui::Selectable("Clear"))
             ClearLog();
         ImGui::EndPopup();
@@ -195,17 +213,7 @@ bool ImGui_Console::BuildUI()
         ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));  // Tighten spacing
 
     for (auto const& item : m_ItemsLog) {
-        bool showItem = true;
-        switch (item.severity) {
-            case LogSeverity::Info: showItem = m_Options.show_info; break;
-            case LogSeverity::Warning:
-                showItem = m_Options.show_warnings;
-                break;
-            case LogSeverity::Error: showItem = m_Options.show_errors; break;
-            default: break;
-        }
-
-        if (showItem) {
+        if (ShouldShowItem(item)) {
             ImGui::PushStyleColor(ImGuiCol_Text, item.textColor);
             ImGui::TextUnformatted(item.text.c_str());
             ImGui::PopStyleColor();
@@ -279,6 +287,30 @@ bool ImGui_Console::BuildUI()
 std::string ImGui_Console::GetWindowUniqueName()
 {
     return "Python Console";
+}
+
+bool ImGui_Console::ShouldShowItem(const LogItem& item) const
+{
+    switch (item.severity) {
+        case LogSeverity::Info: return m_Options.show_info;
+        case LogSeverity::Warning: return m_Options.show_warnings;
+        case LogSeverity::Error: return m_Options.show_errors;
+        default: return true;
+    }
+}
+
+void ImGui_Console::CopyLogToClipboard(bool only_visible) const
+{
+    std::string text;
+    for (const auto& item : m_ItemsLog) {
+        if (only_visible && !ShouldShowItem(item)) {
+            continue;
+        }
+        text += item.text;
+        text.push_back('\n');
+    }
+
+    ImGui::SetClipboardText(text.c_str());
 }
 
 static void printLines(ImGui_Console& console, std::string const& output)

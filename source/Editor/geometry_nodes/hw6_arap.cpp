@@ -6,9 +6,14 @@
 
 #include <algorithm>
 #include <array>
-#include <limits>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 #include "GCore/Components.h"
@@ -18,6 +23,7 @@
 #include "geom_node_base.h"
 #include "nodes/core/def/node_def.hpp"
 #include "geom_node_base.h"
+#include "spdlog/spdlog.h"
 
 namespace {
 using MeshType = OpenMesh::PolyMesh_ArrayKernelT<>;
@@ -91,6 +97,53 @@ struct ArapState {
     std::vector<glm::vec2> current_uv;
     std::vector<Eigen::Matrix2d> local_transforms;
     UvQualityStats quality_stats;
+    double last_max_uv_delta_sq = std::numeric_limits<double>::infinity();
+};
+
+struct AsapSystemCacheKey {
+    int num_vertices = 0;
+    int num_faces = 0;
+    std::size_t fingerprint = 0;
+
+    bool operator==(const AsapSystemCacheKey& rhs) const
+    {
+        return num_vertices == rhs.num_vertices &&
+               num_faces == rhs.num_faces &&
+               fingerprint == rhs.fingerprint;
+    }
+};
+
+struct AsapSystemCacheKeyHasher {
+    std::size_t operator()(const AsapSystemCacheKey& key) const noexcept
+    {
+        std::size_t seed = std::hash<int>{}(key.num_vertices);
+        seed ^= std::hash<int>{}(key.num_faces) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= key.fingerprint + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+    }
+};
+
+struct AsapSystemCacheEntry {
+    int num_fixed = 0;
+    std::vector<int> free_vertex_ids;
+    std::vector<int> full_to_free;
+    Eigen::SparseMatrix<double> coupling_matrix;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+};
+
+struct Hw6SweepStorage {
+    static constexpr bool has_storage = false;
+
+    int step_index = 0;
+    float elapsed_time = 0.0f;
+    bool initialized = false;
+};
+
+struct Hw6MetricsLoggerStorage {
+    static constexpr bool has_storage = false;
+
+    int last_logged_step = std::numeric_limits<int>::min();
+    bool header_printed = false;
 };
 
 using TriangleSignature = std::array<int, 3>;
@@ -99,6 +152,14 @@ bool collect_triangle_vertices(
     const MeshType& mesh,
     const MeshType::FaceHandle& face,
     std::array<int, 3>& vertex_ids);
+
+ConstraintIndexMaps build_constraint_index_maps(
+    const ArapConstraints& constraints,
+    int num_vertices);
+
+FreeVertexMapping build_free_vertex_mapping(
+    const std::vector<char>& is_fixed,
+    int num_vertices);
 
 ConstraintMode parse_constraint_mode(int raw_mode)
 {
@@ -176,6 +237,175 @@ std::vector<double> solve_depressed_cubic_real_roots(
     }
 
     return roots;
+}
+
+constexpr double kHybridAsapLambdaEps = 1e-12;
+constexpr double kIterationConvergenceTolSq = 1e-12;
+
+std::mutex g_asap_system_cache_mutex;
+std::unordered_map<
+    AsapSystemCacheKey,
+    std::shared_ptr<AsapSystemCacheEntry>,
+    AsapSystemCacheKeyHasher>
+    g_asap_system_cache;
+
+void hash_combine(std::size_t& seed, std::size_t value)
+{
+    seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+void hash_combine_double(std::size_t& seed, double value)
+{
+    std::uint64_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    hash_combine(seed, std::hash<std::uint64_t>{}(bits));
+}
+
+AsapSystemCacheKey build_asap_system_cache_key(
+    const ArapPrecomputation& precomputation,
+    const ArapConstraints& constraints)
+{
+    std::size_t fingerprint = 0;
+    hash_combine(fingerprint, std::hash<int>{}(precomputation.num_vertices));
+    hash_combine(fingerprint, std::hash<int>{}(precomputation.num_faces));
+
+    for (const int vertex_id : constraints.fixed_vertex_ids) {
+        hash_combine(fingerprint, std::hash<int>{}(vertex_id));
+    }
+
+    for (const auto& face_data : precomputation.face_data) {
+        hash_combine(fingerprint, std::hash<int>{}(face_data.is_valid ? 1 : 0));
+        for (const int vertex_id : face_data.vertex_ids) {
+            hash_combine(fingerprint, std::hash<int>{}(vertex_id));
+        }
+        for (const auto& edge : face_data.opposite_edges) {
+            hash_combine_double(fingerprint, edge.x());
+            hash_combine_double(fingerprint, edge.y());
+        }
+        hash_combine_double(fingerprint, face_data.doubled_area);
+    }
+
+    return AsapSystemCacheKey{
+        precomputation.num_vertices,
+        precomputation.num_faces,
+        fingerprint,
+    };
+}
+
+double hybrid_lambda_from_log10_slider(float raw_log10)
+{
+    const double clamped = std::clamp(static_cast<double>(raw_log10), -8.0, 2.0);
+    if (clamped <= -8.0 + 1e-9) {
+        return 0.0;
+    }
+
+    return std::pow(10.0, clamped);
+}
+
+void reset_hw6_sweep_storage(Hw6SweepStorage& storage)
+{
+    storage.step_index = 0;
+    storage.elapsed_time = 0.0f;
+    storage.initialized = true;
+}
+
+std::shared_ptr<AsapSystemCacheEntry> get_or_create_asap_system_cache_entry(
+    const ArapPrecomputation& precomputation,
+    const ArapConstraints& constraints)
+{
+    const AsapSystemCacheKey key =
+        build_asap_system_cache_key(precomputation, constraints);
+
+    {
+        std::lock_guard<std::mutex> lock(g_asap_system_cache_mutex);
+        const auto cached = g_asap_system_cache.find(key);
+        if (cached != g_asap_system_cache.end()) {
+            return cached->second;
+        }
+    }
+
+    const ConstraintIndexMaps constraint_maps =
+        build_constraint_index_maps(constraints, precomputation.num_vertices);
+    const FreeVertexMapping free_mapping =
+        build_free_vertex_mapping(constraint_maps.is_fixed, precomputation.num_vertices);
+    const int num_fixed = static_cast<int>(
+        std::count(
+            constraint_maps.is_fixed.begin(),
+            constraint_maps.is_fixed.end(),
+            static_cast<char>(1)));
+    const int free_count = static_cast<int>(free_mapping.free_vertex_ids.size());
+
+    auto entry = std::make_shared<AsapSystemCacheEntry>();
+    entry->num_fixed = num_fixed;
+    entry->free_vertex_ids = free_mapping.free_vertex_ids;
+    entry->full_to_free = free_mapping.full_to_free;
+
+    if (free_count == 0 || num_fixed == 0) {
+        std::lock_guard<std::mutex> lock(g_asap_system_cache_mutex);
+        g_asap_system_cache[key] = entry;
+        return entry;
+    }
+
+    Eigen::SparseMatrix<double> A(2 * precomputation.num_faces, 2 * free_count);
+    Eigen::SparseMatrix<double> B(2 * precomputation.num_faces, 2 * num_fixed);
+    std::vector<Eigen::Triplet<double>> a_triplets;
+    std::vector<Eigen::Triplet<double>> b_triplets;
+    a_triplets.reserve(static_cast<size_t>(precomputation.num_faces) * 12);
+    b_triplets.reserve(static_cast<size_t>(precomputation.num_faces) * 12);
+
+    for (int face_index = 0; face_index < precomputation.num_faces; ++face_index) {
+        const auto& face_data = precomputation.face_data[face_index];
+        if (!face_data.is_valid || face_data.doubled_area <= 1e-12) {
+            continue;
+        }
+
+        const double coeff = std::sqrt(face_data.doubled_area);
+        for (int local_index = 0; local_index < 3; ++local_index) {
+            const int vertex_id = face_data.vertex_ids[local_index];
+            const double dx = face_data.opposite_edges[local_index].x() / coeff;
+            const double dy = face_data.opposite_edges[local_index].y() / coeff;
+
+            const int fixed_index = constraint_maps.fixed_slot[vertex_id];
+            if (fixed_index >= 0) {
+                b_triplets.emplace_back(face_index, fixed_index, dx);
+                b_triplets.emplace_back(face_index + precomputation.num_faces, fixed_index, dy);
+                b_triplets.emplace_back(face_index, fixed_index + num_fixed, -dy);
+                b_triplets.emplace_back(face_index + precomputation.num_faces, fixed_index + num_fixed, dx);
+                continue;
+            }
+
+            const int free_index = free_mapping.full_to_free[vertex_id];
+            if (free_index < 0) {
+                continue;
+            }
+
+            a_triplets.emplace_back(face_index, free_index, dx);
+            a_triplets.emplace_back(face_index + precomputation.num_faces, free_index, dy);
+            a_triplets.emplace_back(face_index, free_index + free_count, -dy);
+            a_triplets.emplace_back(face_index + precomputation.num_faces, free_index + free_count, dx);
+        }
+    }
+
+    A.setFromTriplets(a_triplets.begin(), a_triplets.end());
+    B.setFromTriplets(b_triplets.begin(), b_triplets.end());
+    A.makeCompressed();
+    B.makeCompressed();
+
+    Eigen::SparseMatrix<double> normal_matrix = A.transpose() * A;
+    Eigen::SparseMatrix<double> coupling_matrix = A.transpose() * B;
+    normal_matrix.makeCompressed();
+    coupling_matrix.makeCompressed();
+
+    entry->coupling_matrix = std::move(coupling_matrix);
+    entry->solver.compute(normal_matrix);
+    if (entry->solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to factorize cached ASAP normal-equation system.");
+    }
+
+    std::lock_guard<std::mutex> lock(g_asap_system_cache_mutex);
+    g_asap_system_cache[key] = entry;
+    return entry;
 }
 
 HybridLocalConstants compute_hybrid_local_constants(
@@ -641,7 +871,9 @@ public:
         select_fixed_points();
         precompute_face_data();
 
-        if (options_.algorithm == ParameterizationAlgorithm::ASAP) {
+        if (options_.algorithm == ParameterizationAlgorithm::ASAP ||
+            (options_.algorithm == ParameterizationAlgorithm::Hybrid &&
+             options_.hybrid_lambda <= kHybridAsapLambdaEps)) {
             solve_asap();
             update_quality_stats();
             return state_.current_uv;
@@ -788,9 +1020,9 @@ void ArapSolver::solve_asap()
         throw std::runtime_error("ARAP: ASAP solve requires at least two fixed points.");
     }
 
-    const FreeVertexMapping free_mapping =
-        build_free_vertex_mapping(constraint_maps.is_fixed, num_vertices);
-    const int free_count = static_cast<int>(free_mapping.free_vertex_ids.size());
+    const std::shared_ptr<AsapSystemCacheEntry> cache_entry =
+        get_or_create_asap_system_cache_entry(precomputation_, constraints_);
+    const int free_count = static_cast<int>(cache_entry->free_vertex_ids.size());
 
     if (free_count == 0) {
         for (int fixed_index = 0; fixed_index < num_fixed; ++fixed_index) {
@@ -808,61 +1040,10 @@ void ArapSolver::solve_asap()
         fixed_values[fixed_index + num_fixed] = constraints_.fixed_positions[fixed_index].y();
     }
 
-    Eigen::SparseMatrix<double> A(2 * num_faces, 2 * free_count);
-    Eigen::SparseMatrix<double> B(2 * num_faces, 2 * num_fixed);
-    std::vector<Eigen::Triplet<double>> a_triplets;
-    std::vector<Eigen::Triplet<double>> b_triplets;
-    a_triplets.reserve(static_cast<size_t>(num_faces) * 12);
-    b_triplets.reserve(static_cast<size_t>(num_faces) * 12);
-
-    for (int face_index = 0; face_index < num_faces; ++face_index) {
-        const auto& face_data = precomputation_.face_data[face_index];
-        if (!face_data.is_valid || face_data.doubled_area <= 1e-12) {
-            continue;
-        }
-
-        const double coeff = std::sqrt(face_data.doubled_area);
-        for (int local_index = 0; local_index < 3; ++local_index) {
-            const int vertex_id = face_data.vertex_ids[local_index];
-            const double dx = face_data.opposite_edges[local_index].x() / coeff;
-            const double dy = face_data.opposite_edges[local_index].y() / coeff;
-
-            const int fixed_index = constraint_maps.fixed_slot[vertex_id];
-            if (fixed_index >= 0) {
-                b_triplets.emplace_back(face_index, fixed_index, dx);
-                b_triplets.emplace_back(face_index + num_faces, fixed_index, dy);
-                b_triplets.emplace_back(face_index, fixed_index + num_fixed, -dy);
-                b_triplets.emplace_back(face_index + num_faces, fixed_index + num_fixed, dx);
-                continue;
-            }
-
-            const int free_index = free_mapping.full_to_free[vertex_id];
-            if (free_index < 0) {
-                continue;
-            }
-
-            a_triplets.emplace_back(face_index, free_index, dx);
-            a_triplets.emplace_back(face_index + num_faces, free_index, dy);
-            a_triplets.emplace_back(face_index, free_index + free_count, -dy);
-            a_triplets.emplace_back(face_index + num_faces, free_index + free_count, dx);
-        }
-    }
-
-    A.setFromTriplets(a_triplets.begin(), a_triplets.end());
-    B.setFromTriplets(b_triplets.begin(), b_triplets.end());
-    A.makeCompressed();
-    B.makeCompressed();
-
-    Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
-    solver.compute(A);
-    if (solver.info() != Eigen::Success) {
-        throw std::runtime_error("ARAP: Failed to factorize ASAP least-squares system.");
-    }
-
-    const Eigen::VectorXd rhs = -B * fixed_values;
-    const Eigen::VectorXd solution = solver.solve(rhs);
-    if (solver.info() != Eigen::Success) {
-        throw std::runtime_error("ARAP: Failed to solve ASAP least-squares system.");
+    const Eigen::VectorXd rhs = -cache_entry->coupling_matrix * fixed_values;
+    const Eigen::VectorXd solution = cache_entry->solver.solve(rhs);
+    if (cache_entry->solver.info() != Eigen::Success) {
+        throw std::runtime_error("ARAP: Failed to solve cached ASAP normal-equation system.");
     }
 
     for (int vertex_id = 0; vertex_id < num_vertices; ++vertex_id) {
@@ -874,7 +1055,7 @@ void ArapSolver::solve_asap()
             continue;
         }
 
-        const int free_index = free_mapping.full_to_free[vertex_id];
+        const int free_index = cache_entry->full_to_free[vertex_id];
         state_.current_uv[vertex_id] = glm::vec2(
             static_cast<float>(solution[free_index]),
             static_cast<float>(solution[free_index + free_count]));
@@ -997,9 +1178,11 @@ void ArapSolver::local_phase()
         throw std::runtime_error("ARAP: UV state size does not match vertex count.");
     }
 
-    for (size_t face_index = 0;
-         face_index < precomputation_.face_data.size();
-         ++face_index) {
+    const int face_count = static_cast<int>(precomputation_.face_data.size());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int face_index = 0; face_index < face_count; ++face_index) {
         const auto& face_data = precomputation_.face_data[face_index];
         if (!face_data.is_valid) {
             state_.local_transforms[face_index] = Eigen::Matrix2d::Identity();
@@ -1070,7 +1253,7 @@ bool ArapSolver::global_phase()
 
     update_quality_stats();
 
-    return true;
+    return state_.last_max_uv_delta_sq > kIterationConvergenceTolSq;
 }
 
 void ArapSolver::assemble_global_rhs(Eigen::VectorXd& rhs_x, Eigen::VectorXd& rhs_y) const
@@ -1221,11 +1404,21 @@ void ArapSolver::write_full_uv_solution(
     const Eigen::VectorXd& solved_x,
     const Eigen::VectorXd& solved_y)
 {
+    double max_uv_delta_sq = 0.0;
     for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
+        const double new_x = solved_x[vertex_index];
+        const double new_y = solved_y[vertex_index];
+        const double old_x = static_cast<double>(state_.current_uv[vertex_index].x);
+        const double old_y = static_cast<double>(state_.current_uv[vertex_index].y);
+        const double dx = new_x - old_x;
+        const double dy = new_y - old_y;
+        max_uv_delta_sq = std::max(max_uv_delta_sq, dx * dx + dy * dy);
+
         state_.current_uv[vertex_index] = glm::vec2(
-            static_cast<float>(solved_x[vertex_index]),
-            static_cast<float>(solved_y[vertex_index]));
+            static_cast<float>(new_x),
+            static_cast<float>(new_y));
     }
+    state_.last_max_uv_delta_sq = max_uv_delta_sq;
 }
 
 void ArapSolver::write_hard_constraint_solution(
@@ -1234,7 +1427,13 @@ void ArapSolver::write_hard_constraint_solution(
     const Eigen::VectorXd& fixed_x,
     const Eigen::VectorXd& fixed_y)
 {
+    double max_uv_delta_sq = 0.0;
     for (int vertex_index = 0; vertex_index < precomputation_.num_vertices; ++vertex_index) {
+        const double old_x = static_cast<double>(state_.current_uv[vertex_index].x);
+        const double old_y = static_cast<double>(state_.current_uv[vertex_index].y);
+        const double dx = -old_x;
+        const double dy = -old_y;
+        max_uv_delta_sq = std::max(max_uv_delta_sq, dx * dx + dy * dy);
         state_.current_uv[vertex_index] = glm::vec2(0.0f);
     }
 
@@ -1247,23 +1446,102 @@ void ArapSolver::write_hard_constraint_solution(
             continue;
         }
 
+        const double new_x = fixed_x[vertex_id];
+        const double new_y = fixed_y[vertex_id];
+        const double old_x = static_cast<double>(state_.current_uv[vertex_id].x);
+        const double old_y = static_cast<double>(state_.current_uv[vertex_id].y);
+        const double dx = new_x - old_x;
+        const double dy = new_y - old_y;
+        max_uv_delta_sq = std::max(max_uv_delta_sq, dx * dx + dy * dy);
+
         state_.current_uv[vertex_id] = glm::vec2(
-            static_cast<float>(fixed_x[vertex_id]),
-            static_cast<float>(fixed_y[vertex_id]));
+            static_cast<float>(new_x),
+            static_cast<float>(new_y));
     }
 
     for (size_t free_index = 0;
          free_index < precomputation_.free_vertex_ids.size();
          ++free_index) {
         const int full_index = precomputation_.free_vertex_ids[free_index];
+        const double new_x = solved_free_x[static_cast<int>(free_index)];
+        const double new_y = solved_free_y[static_cast<int>(free_index)];
+        const double old_x = static_cast<double>(state_.current_uv[full_index].x);
+        const double old_y = static_cast<double>(state_.current_uv[full_index].y);
+        const double dx = new_x - old_x;
+        const double dy = new_y - old_y;
+        max_uv_delta_sq = std::max(max_uv_delta_sq, dx * dx + dy * dy);
+
         state_.current_uv[full_index] = glm::vec2(
-            static_cast<float>(solved_free_x[static_cast<int>(free_index)]),
-            static_cast<float>(solved_free_y[static_cast<int>(free_index)]));
+            static_cast<float>(new_x),
+            static_cast<float>(new_y));
     }
+
+    state_.last_max_uv_delta_sq = max_uv_delta_sq;
 }
 }  // namespace
 
 NODE_DEF_OPEN_SCOPE
+
+bool execute_hw6_parameterization_node(ExeParams params, const ArapOptions& options)
+{
+    auto input = params.get_input<Geometry>("Input");
+    auto init_uv_mesh = params.get_input<Geometry>("InitUV_Mesh");
+
+    if (!input.get_component<MeshComponent>()) {
+        return false;
+    }
+    if (!init_uv_mesh.get_component<MeshComponent>()) {
+        return false;
+    }
+
+    auto mesh_3d = operand_to_openmesh(&input);
+    auto mesh_uv = operand_to_openmesh(&init_uv_mesh);
+    if (!meshes_have_compatible_topology(*mesh_3d, *mesh_uv)) {
+        return false;
+    }
+
+    auto init_uv = extract_uv_from_mesh(*mesh_uv);
+    ArapSolver solver(*mesh_3d, std::move(init_uv), options);
+    auto uv_result = solver.solve();
+
+    Geometry flattened_geometry;
+    if (auto input_mesh_component = input.get_component<MeshComponent>()) {
+        auto flattened_mesh_component =
+            std::make_shared<MeshComponent>(&flattened_geometry);
+
+        std::vector<glm::vec3> flattened_vertices;
+        flattened_vertices.reserve(uv_result.size());
+        for (const auto& uv : uv_result) {
+            flattened_vertices.emplace_back(uv.x, uv.y, 0.0f);
+        }
+
+        std::vector<glm::vec3> flattened_normals;
+        const auto& input_normals = input_mesh_component->get_normals();
+        if (input_normals.size() == flattened_vertices.size()) {
+            flattened_normals = input_normals;
+        }
+        else {
+            flattened_normals.assign(
+                flattened_vertices.size(),
+                glm::vec3(0.0f, 0.0f, 1.0f));
+        }
+
+        flattened_mesh_component->set_vertices(flattened_vertices);
+        flattened_mesh_component->set_face_vertex_counts(
+            input_mesh_component->get_face_vertex_counts());
+        flattened_mesh_component->set_face_vertex_indices(
+            input_mesh_component->get_face_vertex_indices());
+        flattened_mesh_component->set_normals(flattened_normals);
+        flattened_geometry.attach_component(flattened_mesh_component);
+    }
+
+    params.set_output("OutputUV", std::move(uv_result));
+    params.set_output("FlattenedMesh", flattened_geometry);
+    params.set_output("FlippedFaceCount", solver.flipped_face_count());
+    params.set_output("DegenerateFaceCount", solver.degenerate_face_count());
+    return true;
+}
+
 NODE_DECLARATION_FUNCTION(hw6_arap)
 {
     // Original 3D mesh to parameterize. This should be a triangulated mesh
@@ -1276,28 +1554,23 @@ NODE_DECLARATION_FUNCTION(hw6_arap)
     // is usually the output of a HW5 parameterization branch.
     b.add_input<Geometry>("InitUV_Mesh");
 
-    // Number of local/global iterations. Only used by ARAP and Hybrid.
+    // Number of local/global iterations.
     b.add_input<int>("Iterations").default_val(10).min(1).max(100);
 
-    // Parameterization model selector:
-    // 0 = ARAP, 1 = ASAP, 2 = Hybrid.
-    // Use the same scene and init UV to compare distortion across models.
-    b.add_input<int>("Algorithm").default_val(0).min(0).max(2);
-
-    // Hybrid-only parameter lambda in [0, +inf). It is ignored by ARAP and ASAP.
-    b.add_input<float>("Hybrid Lambda").default_val(1.0f).min(0.0f).max(100.0f);
-
-    // Constraint handling mode for ARAP / Hybrid global solve.
-    // ASAP uses its own least-squares solve and ignores this setting.
+    // Constraint handling mode for ARAP global solve.
     b.add_input<int>("Constraint Mode").default_val(0).min(0).max(1);
 
-    // Log10 of the soft penalty weight. Only used when Algorithm != ASAP and Constraint Mode = 0.
+    // Log10 of the soft penalty weight. Only used when Constraint Mode = 0.
     // Example: 8 means a penalty weight of 10^8.
     b.add_input<int>("Soft Constraint Log10").default_val(8).min(2).max(12);
 
     // UV buffer to be written back into a mesh via
     // mesh_add_vertex_parameterization_quantity for visualization/debugging.
     b.add_output<std::vector<glm::vec2>>("OutputUV");
+
+    // Flattened 2D mesh built from the UV result. This is the direct
+    // "peeled" geometry visualization output.
+    b.add_output<Geometry>("FlattenedMesh");
 
     // Count of triangles whose signed UV area becomes negative. A non-zero
     // value usually means flips caused by bad initialization or unstable setup.
@@ -1311,65 +1584,256 @@ NODE_DECLARATION_FUNCTION(hw6_arap)
 NODE_EXECUTION_FUNCTION(hw6_arap)
 {
     try {
-        // Read node inputs from the execution context. Keep these names aligned
-        // with the declaration above, otherwise the GUI sockets and code will
-        // silently disagree.
-        auto input = params.get_input<Geometry>("Input");
-        auto init_uv_mesh = params.get_input<Geometry>("InitUV_Mesh");
         const auto raw_iterations = params.get_input<int>("Iterations");
-        const auto raw_algorithm = params.get_input<int>("Algorithm");
-        const auto raw_hybrid_lambda = params.get_input<float>("Hybrid Lambda");
         const auto raw_constraint_mode = params.get_input<int>("Constraint Mode");
         const auto raw_soft_constraint_log10 =
             params.get_input<int>("Soft Constraint Log10");
-        const auto algorithm = parse_parameterization_algorithm(raw_algorithm);
         const auto iterations = raw_iterations > 0
                         ? std::clamp(raw_iterations, 1, 100)
                         : 10;
 
-        if (!input.get_component<MeshComponent>()) {
-            return false;
-        }
-        if (!init_uv_mesh.get_component<MeshComponent>()) {
-            return false;
-        }
+        ArapOptions options;
+        options.algorithm = ParameterizationAlgorithm::ARAP;
+        options.max_iterations = iterations;
+        options.hybrid_lambda = 0.0;
+        options.constraint_mode = parse_constraint_mode(raw_constraint_mode);
+        options.soft_penalty_weight =
+            penalty_weight_from_slider(
+                raw_soft_constraint_log10 > 0 ? raw_soft_constraint_log10 : 8);
 
-        auto mesh_3d = operand_to_openmesh(&input);
-        auto mesh_uv = operand_to_openmesh(&init_uv_mesh);
-        if (!meshes_have_compatible_topology(*mesh_3d, *mesh_uv)) {
-            return false;
-        }
+        return execute_hw6_parameterization_node(params, options);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+NODE_DECLARATION_FUNCTION(hw6_asap)
+{
+    // Original 3D mesh to parameterize. This should be a triangulated mesh
+    // with boundary.
+    b.add_input<Geometry>("Input");
+
+    // Initialization mesh whose x/y coordinates provide the fixed-point frame.
+    b.add_input<Geometry>("InitUV_Mesh");
+
+    b.add_output<std::vector<glm::vec2>>("OutputUV");
+    b.add_output<Geometry>("FlattenedMesh");
+    b.add_output<int>("FlippedFaceCount");
+    b.add_output<int>("DegenerateFaceCount");
+}
+
+NODE_EXECUTION_FUNCTION(hw6_asap)
+{
+    try {
+        ArapOptions options;
+        options.algorithm = ParameterizationAlgorithm::ASAP;
+        options.max_iterations = 1;
+        options.hybrid_lambda = 0.0;
+        options.constraint_mode = ConstraintMode::HardElimination;
+        options.soft_penalty_weight = 0.0;
+        return execute_hw6_parameterization_node(params, options);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+NODE_DECLARATION_FUNCTION(hw6_hybrid)
+{
+    // Original 3D mesh to parameterize. This should be a triangulated mesh
+    // with boundary.
+    b.add_input<Geometry>("Input");
+
+    // Initialization mesh. Its vertex x/y coordinates are read as the initial
+    // UV guess.
+    b.add_input<Geometry>("InitUV_Mesh");
+
+    // Number of local/global iterations.
+    b.add_input<int>("Iterations").default_val(10).min(1).max(100);
+
+    // Log10(lambda) for the Hybrid local penalty. The minimum value is treated
+    // as the ASAP limit lambda = 0, while larger values explore the transition
+    // toward ARAP on a denser logarithmic scale.
+    b.add_input<float>("Hybrid Lambda Log10").default_val(-4.0f).min(-8.0f).max(2.0f);
+
+    // Constraint handling mode for the Hybrid global solve.
+    b.add_input<int>("Constraint Mode").default_val(0).min(0).max(1);
+
+    // Log10 of the soft penalty weight. Only used when Constraint Mode = 0.
+    b.add_input<int>("Soft Constraint Log10").default_val(8).min(2).max(12);
+
+    b.add_output<std::vector<glm::vec2>>("OutputUV");
+    b.add_output<Geometry>("FlattenedMesh");
+    b.add_output<int>("FlippedFaceCount");
+    b.add_output<int>("DegenerateFaceCount");
+}
+
+NODE_EXECUTION_FUNCTION(hw6_hybrid)
+{
+    try {
+        const auto raw_iterations = params.get_input<int>("Iterations");
+        const auto raw_hybrid_lambda_log10 = params.get_input<float>("Hybrid Lambda Log10");
+        const auto raw_constraint_mode = params.get_input<int>("Constraint Mode");
+        const auto raw_soft_constraint_log10 =
+            params.get_input<int>("Soft Constraint Log10");
+        const auto iterations = raw_iterations > 0
+                        ? std::clamp(raw_iterations, 1, 100)
+                        : 10;
 
         ArapOptions options;
-        options.algorithm = algorithm;
-        options.max_iterations =
-            algorithm == ParameterizationAlgorithm::ASAP ? 1 : iterations;
+        options.algorithm = ParameterizationAlgorithm::Hybrid;
+        options.max_iterations = iterations;
         options.hybrid_lambda =
-            algorithm == ParameterizationAlgorithm::Hybrid
-                ? std::max(0.0, static_cast<double>(raw_hybrid_lambda))
-                : 0.0;
-        options.constraint_mode =
-            algorithm == ParameterizationAlgorithm::ASAP
-                ? ConstraintMode::HardElimination
-                : parse_constraint_mode(raw_constraint_mode);
+            hybrid_lambda_from_log10_slider(raw_hybrid_lambda_log10);
+        options.constraint_mode = parse_constraint_mode(raw_constraint_mode);
         options.soft_penalty_weight =
-            algorithm == ParameterizationAlgorithm::ASAP
-                ? 0.0
-                : penalty_weight_from_slider(
-                      raw_soft_constraint_log10 > 0 ? raw_soft_constraint_log10 : 8);
+            penalty_weight_from_slider(
+                raw_soft_constraint_log10 > 0 ? raw_soft_constraint_log10 : 8);
 
-        auto init_uv = extract_uv_from_mesh(*mesh_uv);
-        ArapSolver solver(*mesh_3d, std::move(init_uv), options);
-        auto uv_result = solver.solve();
-
-        params.set_output("OutputUV", std::move(uv_result));
-        params.set_output("FlippedFaceCount", solver.flipped_face_count());
-        params.set_output("DegenerateFaceCount", solver.degenerate_face_count());
-        return true;
+        return execute_hw6_parameterization_node(params, options);
     } catch (const std::exception&) {
         return false;
     }
 }
 
 NODE_DECLARATION_UI(hw6_arap);
+NODE_DECLARATION_UI(hw6_asap);
+NODE_DECLARATION_UI(hw6_hybrid);
+
+NODE_DECLARATION_FUNCTION(hw6_param_sweep)
+{
+    // When enabled, the node advances one discrete step per simulation frame.
+    b.add_input<bool>("Enabled").default_val(true);
+
+    // Manual reset signal. Useful when restarting a sweep without rebuilding
+    // the graph.
+    b.add_input<bool>("Reset").default_val(false);
+
+    // Sweep value at step index 0.
+    b.add_input<float>("Start Value").default_val(0.0f).min(-100.0f).max(100.0f);
+
+    // Constant increment applied each step.
+    b.add_input<float>("Step Value").default_val(1.0f).min(-100.0f).max(100.0f);
+
+    // Number of sweep positions.
+    b.add_input<int>("Step Count").default_val(10).min(1).max(1000);
+
+    // Whether to wrap around after the final step.
+    b.add_input<bool>("Loop").default_val(false);
+
+    b.add_output<float>("Current Value");
+    b.add_output<int>("Step Index");
+    b.add_output<float>("Normalized T");
+    b.add_output<float>("Elapsed Time");
+    b.add_output<float>("Delta Time");
+}
+
+NODE_EXECUTION_FUNCTION(hw6_param_sweep)
+{
+    auto& global_payload = params.get_global_payload<GeomPayload&>();
+    auto& storage = params.get_storage<Hw6SweepStorage&>();
+
+    const bool enabled = params.get_input<bool>("Enabled");
+    const bool reset = params.get_input<bool>("Reset");
+    const float start_value = params.get_input<float>("Start Value");
+    const float step_value = params.get_input<float>("Step Value");
+    const int step_count = std::max(1, params.get_input<int>("Step Count"));
+    const bool loop = params.get_input<bool>("Loop");
+
+    if (!storage.initialized || reset || !global_payload.is_simulating) {
+        reset_hw6_sweep_storage(storage);
+    }
+
+    const int clamped_step_index = std::clamp(storage.step_index, 0, step_count - 1);
+    const float current_value = start_value + step_value * static_cast<float>(clamped_step_index);
+    const float normalized_t =
+        step_count > 1
+            ? static_cast<float>(clamped_step_index) / static_cast<float>(step_count - 1)
+            : 0.0f;
+
+    params.set_output("Current Value", current_value);
+    params.set_output("Step Index", clamped_step_index);
+    params.set_output("Normalized T", normalized_t);
+    params.set_output("Elapsed Time", storage.elapsed_time);
+    params.set_output("Delta Time", global_payload.delta_time);
+
+    if (enabled && global_payload.is_simulating) {
+        storage.elapsed_time += global_payload.delta_time;
+        if (loop) {
+            storage.step_index = (clamped_step_index + 1) % step_count;
+        }
+        else if (clamped_step_index < step_count - 1) {
+            storage.step_index = clamped_step_index + 1;
+        }
+    }
+
+    return true;
+}
+
+NODE_DECLARATION_ALWAYS_DIRTY(hw6_param_sweep);
+
+NODE_DECLARATION_FUNCTION(hw6_metrics_logger)
+{
+    b.add_input<bool>("Enabled").default_val(true);
+    b.add_input<bool>("Reset").default_val(false);
+    b.add_input<std::string>("Experiment Name").default_val("hw6_sweep");
+    b.add_input<std::string>("Param Name").default_val("param");
+    b.add_input<int>("Step Index").default_val(0).min(0).max(100000);
+    b.add_input<float>("Param Value").default_val(0.0f).min(-1000.0f).max(1000.0f);
+    b.add_input<float>("Elapsed Time").default_val(0.0f).min(0.0f).max(100000.0f);
+    b.add_input<int>("FlippedFaceCount").default_val(0).min(0).max(100000000);
+    b.add_input<int>("DegenerateFaceCount").default_val(0).min(0).max(100000000);
+}
+
+NODE_EXECUTION_FUNCTION(hw6_metrics_logger)
+{
+    auto& storage = params.get_storage<Hw6MetricsLoggerStorage&>();
+
+    const bool enabled = params.get_input<bool>("Enabled");
+    const bool reset = params.get_input<bool>("Reset");
+    const std::string experiment_name =
+        std::string(params.get_input<std::string>("Experiment Name").c_str());
+    const std::string param_name =
+        std::string(params.get_input<std::string>("Param Name").c_str());
+    const int step_index = params.get_input<int>("Step Index");
+    const float param_value = params.get_input<float>("Param Value");
+    const float elapsed_time = params.get_input<float>("Elapsed Time");
+    const int flipped_face_count = params.get_input<int>("FlippedFaceCount");
+    const int degenerate_face_count = params.get_input<int>("DegenerateFaceCount");
+
+    if (reset) {
+        storage.last_logged_step = std::numeric_limits<int>::min();
+        storage.header_printed = false;
+        return true;
+    }
+
+    if (!enabled) {
+        return true;
+    }
+
+    if (!storage.header_printed) {
+        spdlog::warn(
+            "[HW6_METRICS][{}] step_index,param_name,param_value,elapsed_time,flipped_face_count,degenerate_face_count",
+            experiment_name);
+        storage.header_printed = true;
+    }
+
+    if (step_index != storage.last_logged_step) {
+        spdlog::warn(
+            "[HW6_METRICS][{}] {},{},{:.6f},{:.6f},{},{}",
+            experiment_name,
+            step_index,
+            param_name,
+            param_value,
+            elapsed_time,
+            flipped_face_count,
+            degenerate_face_count);
+        storage.last_logged_step = step_index;
+    }
+
+    return true;
+}
+
+NODE_DECLARATION_UI(hw6_param_sweep);
+NODE_DECLARATION_REQUIRED(hw6_metrics_logger);
+NODE_DECLARATION_UI(hw6_metrics_logger);
 NODE_DEF_CLOSE_SCOPE

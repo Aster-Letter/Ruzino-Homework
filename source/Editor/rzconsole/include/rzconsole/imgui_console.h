@@ -150,6 +150,10 @@ class RZCONSOLE_API ImGui_Console : public IWidget {
         std::string text;
     };
 
+    bool ShouldShowItem(const LogItem& item) const;
+
+    void CopyLogToClipboard(bool only_visible) const;
+
     std::vector<LogItem> m_ItemsLog;
     std::vector<std::string> m_History;
     int m_HistoryPos = -1;

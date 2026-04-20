@@ -134,7 +134,7 @@ class PythonConsoleWidgetFactory : public IWidgetFactory {
         opts.show_info = true;
         opts.show_warnings = true;
         opts.show_errors = true;
-        opts.capture_log = false;
+        opts.capture_log = true;
 
         auto console = std::make_unique<ImGui_Console>(interpreter, opts);
 

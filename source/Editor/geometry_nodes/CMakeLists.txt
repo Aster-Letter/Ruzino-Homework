@@ -14,6 +14,11 @@ add_nodes(
 	COMPILE_DEFS ${GEOMETRY_NODES_COMPILE_DEFS}
 )
 
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+	target_link_libraries(hw6_arap PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
 target_link_libraries(node_points_to_mesh PRIVATE usd hioOpenVDB)
 
 add_library(tetgen STATIC ${CMAKE_CURRENT_SOURCE_DIR}/tetgen/tetgen.cxx ${CMAKE_CURRENT_SOURCE_DIR}/tetgen/tetgen.h ${CMAKE_CURRENT_SOURCE_DIR}/tetgen/predicates.cxx)
