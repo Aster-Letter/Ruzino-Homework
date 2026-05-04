@@ -4,6 +4,10 @@ struct PathTracingConstants {
     uint materialFetchCallableBaseIndex;
     uint materialOpacityCallableOffset;  // Offset to add to fetch index for
                                          // opacity callables
+    uint samplesPerPixel;
+    uint maxDepth;
+    uint reserved0;
+    uint reserved1;
 };
 
 ConstantBuffer<PathTracingConstants> ptConstants;

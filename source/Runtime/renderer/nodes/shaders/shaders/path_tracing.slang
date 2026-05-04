@@ -43,12 +43,12 @@ void RayGen()
 
     Spectrum output_color = Spectrum(0.0);
 
-    const int spp = 1;
-    const int max_depth = 20;
+    const uint spp = max(ptConstants.samplesPerPixel, 1u);
+    const uint max_depth = max(ptConstants.maxDepth, 1u);
 
     ray.TMax = 50000.0;
 
-    for (int i = 0; i < spp; i++) {
+    for (uint i = 0; i < spp; i++) {
         Spectrum accumulated_color = Spectrum(0.0);
         Spectrum current_throughput = Spectrum(1.0);
 
@@ -58,7 +58,7 @@ void RayGen()
         uint id = DispatchRaysIndex().x;
 
         // Iterative path tracing loop
-        for (int depth = 0; depth < max_depth; depth++) {
+        for (uint depth = 0; depth < max_depth; depth++) {
             payload.depth = depth;
             payload.hit = false;
 
@@ -216,7 +216,7 @@ void RayGen()
             }
 
             // Add direct lighting contribution
-            if (lightSample.valid) {
+            if (lightSample.valid && lightSample.pdf > 0.0) {
                 Spectrum directContrib = div(
                     mul(Spectrum(
                             lightSample.intensity *
@@ -239,6 +239,9 @@ void RayGen()
             if (depth >= 3) {
                 float3 thr = current_throughput.toFloat3();
                 float rrProbability = min(0.95, max(thr.x, max(thr.y, thr.z)));
+                if (rrProbability <= 0.0) {
+                    break;
+                }
                 if (random_float(payload.seed) > rrProbability) {
                     break;
                 }

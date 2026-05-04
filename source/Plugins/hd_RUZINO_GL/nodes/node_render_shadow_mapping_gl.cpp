@@ -3,7 +3,6 @@
 #include "../geometries/mesh.h"
 #include "../light.h"
 #include "nodes/core/def/node_def.hpp"
-#include "pxr/base/gf/frustum.h"
 #include "pxr/imaging/glf/simpleLight.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "render_node_base.h"
@@ -12,7 +11,15 @@
 NODE_DEF_OPEN_SCOPE
 NODE_DECLARATION_FUNCTION(shadow_mapping)
 {
+    // Shadow map resolution. Raise this first when edge aliasing dominates,
+    // but note that resolution alone won't fix projection distortion.
     b.add_input<int>("resolution").default_val(1024).min(256).max(4096);
+
+    // Shared shadow camera parameters. These should match the values used by
+    // deferred_lighting so the shadow test uses the same light frustum.
+    DeclareShadowCameraInputs(b);
+
+    // Shader override for quick experiments with depth visualization.
     b.add_input<std::string>("Shader").default_val("shaders/shadow_mapping.fs");
 
     b.add_output<GLTextureHandle>("Shadow Maps");
@@ -21,12 +28,13 @@ NODE_DECLARATION_FUNCTION(shadow_mapping)
 NODE_EXECUTION_FUNCTION(shadow_mapping)
 {
     auto resolution = params.get_input<int>("resolution");
+    auto shadow_camera_settings = ReadShadowCameraSettings(params);
 
     GLTextureDesc texture_desc;
     texture_desc.array_size = lights.size();
     // texture_desc.array_size = 1;
     texture_desc.size = GfVec2i(resolution);
-    texture_desc.format = HdFormatUNorm8Vec4;
+    texture_desc.format = HdFormatFloat32;
     auto shadow_map_texture = resource_allocator.create(texture_desc);
 
     auto shaderPath = params.get_input<std::string>("Shader");
@@ -58,38 +66,20 @@ NODE_EXECUTION_FUNCTION(shadow_mapping)
             GlfSimpleLight light_params =
                 lights[light_id]->Get(HdTokens->params).Get<GlfSimpleLight>();
 
-            // HW6: The matrices for lights information is here! Current value
-            // is set that "it just works". However, you should try to modify
-            // the values to see how it affects the performance of the shadow
-            // maps.
-
-            GfMatrix4f light_view_mat;
-            GfMatrix4f light_projection_mat;
-
-            bool has_light = false;
-            if (lights[light_id]->GetLightType() ==
-                HdPrimTypeTokens->sphereLight) {
-                GfFrustum frustum;
-                GfVec3f light_position = { light_params.GetPosition()[0],
-                                           light_params.GetPosition()[1],
-                                           light_params.GetPosition()[2] };
-
-                light_view_mat = GfMatrix4f().SetLookAt(
-                    light_position, GfVec3f(0, 0, 0), GfVec3f(0, 0, 1));
-                frustum.SetPerspective(120.f, 1.0, 1, 25.f);
-                light_projection_mat =
-                    GfMatrix4f(frustum.ComputeProjectionMatrix());
-
-                has_light = true;
-            }
-
-            if (!has_light) {
+            ShadowCameraInfo shadow_camera;
+            if (!TryBuildShadowCameraInfo(
+                    *lights[light_id],
+                    light_params,
+                    shadow_camera_settings,
+                    light_id,
+                    shadow_camera)) {
                 continue;
             }
 
-            shader_handle->shader.setMat4("light_view", light_view_mat);
             shader_handle->shader.setMat4(
-                "light_projection", GfMatrix4f(light_projection_mat));
+                "light_view", shadow_camera.light_view);
+            shader_handle->shader.setMat4(
+                "light_projection", shadow_camera.light_projection);
 
             glFramebufferTextureLayer(
                 GL_FRAMEBUFFER,
@@ -139,12 +129,12 @@ NODE_EXECUTION_FUNCTION(shadow_mapping)
         resource_allocator.destroy(depth_texture);
     }
 
+    auto shader_error = shader_handle->shader.get_error();
+
     resource_allocator.destroy(shader_handle);
     glDeleteFramebuffers(1, &framebuffer);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    auto shader_error = shader_handle->shader.get_error();
 
     params.set_output("Shadow Maps", shadow_map_texture);
     if (!shader_error.empty()) {

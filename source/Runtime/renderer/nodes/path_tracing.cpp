@@ -27,6 +27,14 @@ NODE_DECLARATION_FUNCTION(path_tracing)
     b.add_input<nvrhi::BufferHandle>("Rays");
     b.add_input<nvrhi::BufferHandle>("Random Seeds");
     b.add_input<bool>("Use Sampled Spectrum").default_val(false);
+    b.add_input<int>("Samples Per Pixel")
+        .min(1)
+        .max(64)
+        .default_val(1);
+    b.add_input<int>("Max Depth")
+        .min(1)
+        .max(64)
+        .default_val(20);
 
     b.add_output<nvrhi::TextureHandle>("Output");
 
@@ -239,7 +247,6 @@ NODE_EXECUTION_FUNCTION(path_tracing)
                     "Null material found in path tracing node, {}",
                     material.first.GetText());
                 return false;
-                continue;
             }
             auto location = material.second->GetMaterialLocation();
             if (location == -1) {
@@ -299,10 +306,9 @@ void fetch_)" + material.second->GetMaterialName() +
             }
             else {
                 // Regular MaterialX material - use fetch+eval pattern
-                program_desc.add_source_code(
-                    material.second->GetShader(shader_factory));
-
-                auto callable = material.second->GetShader(shader_factory);
+                auto material_shader_source =
+                    material.second->GetShader(shader_factory);
+                program_desc.add_source_code(material_shader_source);
                 storage.callable_shaders[location] =
                     material.second->GetMaterialName();
             }
@@ -407,6 +413,10 @@ void fetch_)" + material.second->GetMaterialName() +
             uint32_t domeLightCallableIndex;
             uint32_t materialFetchCallableBaseIndex;
             uint32_t materialOpacityCallableOffset;
+            uint32_t samplesPerPixel;
+            uint32_t maxDepth;
+            uint32_t reserved0;
+            uint32_t reserved1;
         };
 
         PathTracingConstants constants;
@@ -428,6 +438,14 @@ void fetch_)" + material.second->GetMaterialName() +
         // Opacity callables are placed right after fetch callables
         // Offset is the number of materials (each has a fetch callable)
         constants.materialOpacityCallableOffset = num_materials;
+        constants.samplesPerPixel = static_cast<uint32_t>(std::max(
+            1,
+            params.get_input<int>("Samples Per Pixel")));
+        constants.maxDepth = static_cast<uint32_t>(std::max(
+            1,
+            params.get_input<int>("Max Depth")));
+        constants.reserved0 = 0;
+        constants.reserved1 = 0;
 
         if (storage.pathTracingConstantsBuffer)
             resource_allocator.destroy(storage.pathTracingConstantsBuffer);

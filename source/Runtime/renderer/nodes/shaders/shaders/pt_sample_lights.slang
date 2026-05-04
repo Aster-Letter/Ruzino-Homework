@@ -193,7 +193,7 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
         float NdotL = max(0.0, dot(hitNormal, lightDir));
         float LdotN = max(0.0, dot(-lightDir, light.dirW));
 
-        if (LdotN > 0.0) {
+        if (NdotL > 0.0 && LdotN > 0.0 && light.surfaceArea > 1E-6) {
             RayDesc shadowRay;
             shadowRay.Origin = hitPos + hitNormal * 0.0001;
             shadowRay.Direction = lightDir;
@@ -217,11 +217,11 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
             seed = shadowPayload.seed;
 
             if (shadowPayload.isVisible) {
-                float geometricTerm =
-                    (NdotL * LdotN) / (lightDistance * lightDistance);
                 areaPdf = 1.0 / light.surfaceArea;
                 sample.direction = lightDir;
-                sample.intensity = light.intensity * geometricTerm;
+                sample.intensity =
+                    light.intensity *
+                    (LdotN / max(lightDistance * lightDistance, 1E-6));
                 sample.pdf = lightPdf * areaPdf;
                 sample.valid = true;
             }
@@ -242,7 +242,7 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
         float NdotL = max(0.0, dot(hitNormal, lightDir));
         float LdotN = max(0.0, dot(-lightDir, light.dirW));
 
-        if (NdotL > 0.0 && LdotN > 0.0) {
+        if (NdotL > 0.0 && LdotN > 0.0 && light.surfaceArea > 1E-6) {
             RayDesc shadowRay;
             shadowRay.Origin = hitPos + hitNormal * 0.0001;
             shadowRay.Direction = lightDir;
@@ -267,11 +267,11 @@ LightSample sampleLights(float3 hitPos, float3 hitNormal, inout uint seed)
             seed = shadowPayload.seed;
 
             if (shadowPayload.isVisible) {
-                float geometricTerm =
-                    (NdotL * LdotN) / (lightDistance * lightDistance);
                 areaPdf = 1.0 / light.surfaceArea;
                 sample.direction = lightDir;
-                sample.intensity = light.intensity * geometricTerm;
+                sample.intensity =
+                    light.intensity *
+                    (LdotN / max(lightDistance * lightDistance, 1E-6));
                 sample.pdf = lightPdf * areaPdf;
                 sample.valid = true;
             }

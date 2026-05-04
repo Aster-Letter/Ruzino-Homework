@@ -29,24 +29,32 @@ void main() {
     diffuseColor = texture2D(diffuseColorSampler, vTexcoord).xyz;
     metallicRoughness = texture2D(metallicRoughnessSampler, vTexcoord).zy;
 
-    vec3 normalmap_value = texture2D(normalMapSampler, vTexcoord).xyz;
-    normal = normalize(vertexNormal);
-
-    // HW6_TODO: Apply normal map here. Use normal textures to modify vertex normals.
-
-    // Calculate tangent and bitangent
+    // --- TBN矩阵与法线贴图 ---
+    // 1. 计算切线和副切线
     vec3 edge1 = dFdx(vertexPosition);
     vec3 edge2 = dFdy(vertexPosition);
     vec2 deltaUV1 = dFdx(vTexcoord);
     vec2 deltaUV2 = dFdy(vTexcoord);
 
     vec3 tangent = edge1 * deltaUV2.y - edge2 * deltaUV1.y;
+    vec3 n = normalize(vertexNormal);
 
-    // Robust tangent and bitangent evaluation
+    // Robust tangent和bitangent
     if(length(tangent) < 1E-7) {
         vec3 bitangent = -edge1 * deltaUV2.x + edge2 * deltaUV1.x;
-        tangent = normalize(cross(bitangent, normal));
+        tangent = normalize(cross(bitangent, n));
     }
-    tangent = normalize(tangent - dot(tangent, normal) * normal);
-    vec3 bitangent = normalize(cross(tangent,normal));
+    tangent = normalize(tangent - dot(tangent, n) * n);
+    vec3 bitangent = normalize(cross(tangent, n));
+
+    // 2. 构建TBN矩阵
+    mat3 TBN = mat3(tangent, bitangent, n);
+
+    // 3. 采样法线贴图并反归一化到[-1,1]
+    vec3 normalmap_value = texture2D(normalMapSampler, vTexcoord).xyz;
+    vec3 normal_tangent = normalize(normalmap_value * 2.0 - 1.0);
+
+    // 4. 切线空间法线变换到世界空间
+    vec3 normal_world = normalize(TBN * normal_tangent);
+    normal = normal_world;
 }

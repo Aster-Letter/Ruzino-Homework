@@ -118,8 +118,6 @@ Color Hd_RUZINO_Sphere_Light::Sample(
 
     auto basis = constructONB(-distanceVec.GetNormalized());
 
-    auto distance = distanceVec.GetLength();
-
     // A sphere light is treated as all points on the surface spreads energy
     // uniformly:
     float sample_pos_pdf;
@@ -132,18 +130,27 @@ Color Hd_RUZINO_Sphere_Light::Sample(
     sampled_light_pos = sampledPosOnSurface;
 
     // Then we can decide the direction.
-    dir = (sampledPosOnSurface - pos).GetNormalized();
+    auto toLight = sampledPosOnSurface - pos;
+    float distance2 = GfDot(toLight, toLight);
+    if (distance2 < 1e-8f) {
+        sample_light_pdf = 0.0f;
+        return Color{ 0.0f };
+    }
+    float distance = std::sqrt(distance2);
+    dir = toLight / distance;
 
     // and the pdf (with the measure of solid angle):
     float cosVal = GfDot(-dir, worldSampledDir.GetNormalized());
 
-    sample_light_pdf =
-        sample_pos_pdf / radius / radius / cosVal * distance * distance;
-
-    // Finally we calculate the radiance
-    if (cosVal < 0) {
-        return Color{ 0 };
+    if (cosVal <= 1e-6f || radius <= 1e-8f) {
+        sample_light_pdf = 0.0f;
+        return Color{ 0.0f };
     }
+
+    sample_light_pdf =
+        sample_pos_pdf * distance2 / (radius * radius * cosVal);
+
+    // Finally we calculate the radiance.
     return irradiance / M_PI;
 }
 
@@ -155,6 +162,14 @@ Color Hd_RUZINO_Sphere_Light::Intersect(const GfRay& ray, float& depth)
                        position + GfVec3d{ radius } })) {
         if (ray.Intersect(position, radius, &distance)) {
             depth = distance;
+
+            GfVec3f hitPos = GfVec3f(ray.GetPoint(distance));
+            GfVec3f lightNormal = (hitPos - position).GetNormalized();
+            float cosThetaLight = GfDot(lightNormal, -GfVec3f(ray.GetDirection()).GetNormalized());
+            if (cosThetaLight <= 1e-6f) {
+                depth = std::numeric_limits<float>::infinity();
+                return Color{ 0.0f };
+            }
 
             return irradiance / M_PI;
         }
@@ -341,13 +356,59 @@ Color Hd_RUZINO_Rect_Light::Sample(
     float& sample_light_pdf,
     const std::function<float()>& uniform_float)
 {
-    return {};
+    float offset_x = (uniform_float() - 0.5f) * width;
+    float offset_y = (uniform_float() - 0.5f) * height;
+
+    sampled_light_pos = center + tangent_x * offset_x + tangent_y * offset_y;
+
+    GfVec3f to_light = sampled_light_pos - pos;
+    float distance2 = GfDot(to_light, to_light);
+    if (distance2 < 1e-8f) {
+        sample_light_pdf = 0.0f;
+        return Color{ 0.0f };
+    }
+
+    float distance = std::sqrt(distance2);
+    dir = to_light / distance;
+
+    float cos_theta_light = GfDot(normal, -dir);
+    if (cos_theta_light <= 1e-6f || area <= 1e-8f) {
+        sample_light_pdf = 0.0f;
+        return Color{ 0.0f };
+    }
+
+    float area_pdf = 1.0f / area;
+    sample_light_pdf = area_pdf * distance2 / cos_theta_light;
+    return radiance;
 }
 
 // HW7_TODO: implement the intersect function for rectangle light, you can refer to the sphere light, but you need to consider the fact that rectangle light is not a point light source.
 Color Hd_RUZINO_Rect_Light::Intersect(const GfRay& ray, float& depth)
 {
-    return {};
+    float denom = GfDot(ray.GetDirection(), normal);
+    if (std::abs(denom) < 1e-6f || denom >= 0.0f) {
+        depth = std::numeric_limits<float>::infinity();
+        return Color{ 0.0f };
+    }
+
+    depth = GfDot(center - GfVec3f(ray.GetStartPoint()), normal) / denom;
+    if (depth <= 1e-6f) {
+        depth = std::numeric_limits<float>::infinity();
+        return Color{ 0.0f };
+    }
+
+    GfVec3f hit_pos = GfVec3f(ray.GetPoint(depth));
+    GfVec3f local = hit_pos - center;
+
+    float local_x = GfDot(local, tangent_x);
+    float local_y = GfDot(local, tangent_y);
+
+    if (std::abs(local_x) > width * 0.5f || std::abs(local_y) > height * 0.5f) {
+        depth = std::numeric_limits<float>::infinity();
+        return Color{ 0.0f };
+    }
+
+    return radiance;
 }
 
 void Hd_RUZINO_Rect_Light::Sync(
@@ -374,13 +435,23 @@ void Hd_RUZINO_Rect_Light::Sync(
     corner3 = GfVec3f(
         transform.TransformAffine(GfVec3f(0.5 * width, 0.5 * height, 0)));
 
+    auto edge_x = corner2 - corner0;
+    auto edge_y = corner1 - corner0;
+    width = edge_x.GetLength();
+    height = edge_y.GetLength();
+    tangent_x = width > 1e-8f ? edge_x / width : GfVec3f(1, 0, 0);
+    tangent_y = height > 1e-8f ? edge_y / height : GfVec3f(0, 1, 0);
+    normal = GfCross(tangent_x, tangent_y).GetNormalized();
+    center = (corner0 + corner1 + corner2 + corner3) * 0.25f;
+    area = width * height;
+
     auto diffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse)
                        .Get<float>();
     power = sceneDelegate->GetLightParamValue(id, HdLightTokens->color)
                 .Get<GfVec3f>() *
             diffuse;
 
-    // HW7_TODO: calculate irradiance
+    radiance = area > 1e-8f ? power / area / float(M_PI) : GfVec3f(0.0f);
 }
 
 RUZINO_NAMESPACE_CLOSE_SCOPE
