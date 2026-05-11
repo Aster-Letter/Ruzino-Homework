@@ -20,6 +20,7 @@ message(STATUS "Python3_ROOT_DIR is set to ${Python3_ROOT_DIR}")
 set(Python3_FIND_STRATEGY LOCATION)
 set(Python3_FIND_REGISTRY NEVER)
 set(Python3_FIND_FRAMEWORK NEVER)
+set(Python3_EXECUTABLE "${Python3_ROOT_DIR}/python.exe" CACHE FILEPATH "Path to the Python3 executable")
 
 # Find Python early to ensure it's available for all subdirectories
 find_package(Python3 COMPONENTS Development Interpreter REQUIRED)
@@ -34,6 +35,8 @@ set(Python_ROOT_DIR "${Python3_ROOT_DIR}")
 set(Python_FIND_STRATEGY LOCATION)
 set(Python_FIND_REGISTRY NEVER)
 set(Python_FIND_FRAMEWORK NEVER)
+set(Python_EXECUTABLE "${Python_ROOT_DIR}/python.exe" CACHE FILEPATH "Path to the Python executable")
+
 find_package(Python 3.8
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
