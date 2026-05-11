@@ -7,10 +7,13 @@ endif()
 # Add shader directory definition
 list(APPEND GEOMETRY_NODES_COMPILE_DEFS GEOM_NODES_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 
+# add mass spring subdir
+add_subdirectory(mass_spring)
+
 add_nodes(
 	TARGET_NAME geometry_nodes 
 	SRC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
-	DEP_LIBS stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle RZFemBem
+	DEP_LIBS stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle RZFemBem mass_spring_utils
 	COMPILE_DEFS ${GEOMETRY_NODES_COMPILE_DEFS}
 )
 
