@@ -25,18 +25,23 @@ NODE_DECLARATION_FUNCTION(hw9_mass_spring)
 {
     b.add_input<Geometry>("Mesh");
 
-    // Simulation parameters
+    // Core simulation parameters shared by all integrators.
     b.add_input<float>("stiffness").default_val(1000).min(100).max(10000);
     b.add_input<float>("h").default_val(0.0333333333f).min(0.0).max(0.5);
     b.add_input<float>("damping").default_val(0.995).min(0.0).max(1.0);
     b.add_input<float>("gravity").default_val(-9.8).min(-20.).max(20.);
 
-    // --------- HW Optional: if you implement sphere collision, please
-    // uncomment the following lines ------------
+    // Optional sphere collider. The solver treats collision as an explicit
+    // linear penalty + normal damping force. Higher penalty values reduce
+    // penetration but stiffen the system; damping reduces inward normal speed.
     b.add_input<float>("collision penalty_k")
         .default_val(10000)
         .min(100)
         .max(100000);
+    b.add_input<float>("collision damping")
+        .default_val(50)
+        .min(0)
+        .max(10000);
     b.add_input<float>("collision scale factor")
         .default_val(1.1)
         .min(1.0)
@@ -48,17 +53,18 @@ NODE_DECLARATION_FUNCTION(hw9_mass_spring)
     b.add_input<float>("sphere center z").default_val(0.0);
     // -----------------------------------------------------------------------------------------------------------
 
-    // Useful switches (0 or 1). You can add more if you like.
+    // Solver switches: 0 for implicit Euler, 1 for semi-implicit Euler.
     b.add_input<int>("time integrator type")
         .default_val(0)
         .min(0)
-        .max(1);  // 0 for implicit Euler, 1 for semi-implicit Euler
+        .max(1);
     b.add_input<int>("enable time profiling").default_val(0).min(0).max(1);
     b.add_input<int>("enable damping").default_val(0).min(0).max(1);
     b.add_input<int>("enable debug output").default_val(0).min(0).max(1);
 
-    // Optional switches
+    // Optional assignment features.
     b.add_input<int>("enable Liu13").default_val(0).min(0).max(1);
+    b.add_input<int>("Liu13 max iter").default_val(20).min(1).max(200);
     b.add_input<int>("enable sphere collision").default_val(0).min(0).max(1);
 
     // Output
@@ -100,8 +106,11 @@ NODE_EXECUTION_FUNCTION(hw9_mass_spring)
                 params.get_input<int>("enable Liu13") == 1 ? true : false;
             if (enable_liu13) {
                 // HW Optional
-                mass_spring =
+                auto fast_mass_spring =
                     std::make_shared<FastMassSpring>(vertices, edges, k, h);
+                fast_mass_spring->max_iter =
+                    params.get_input<int>("Liu13 max iter");
+                mass_spring = fast_mass_spring;
             }
             else
                 mass_spring = std::make_shared<MassSpring>(vertices, edges);
@@ -117,6 +126,8 @@ NODE_EXECUTION_FUNCTION(hw9_mass_spring)
             // uncomment the following lines ------------
             mass_spring->collision_penalty_k =
                 params.get_input<float>("collision penalty_k");
+            mass_spring->collision_damping =
+                params.get_input<float>("collision damping");
             mass_spring->collision_scale_factor =
                 params.get_input<float>("collision scale factor");
             float c[3];

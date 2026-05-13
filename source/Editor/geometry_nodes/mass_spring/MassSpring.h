@@ -36,10 +36,11 @@ class MassSpring {
 
     MassSpring(const Eigen::MatrixXd &X, const EdgeSet &E);
 
+    // Advance the simulation by one time step using the selected integrator.
     virtual void step();
     void reset();
 
-    // energy related function
+    // Spring energy and derivatives for E = 0.5 * k * sum((|x_i-x_j|-L)^2).
     virtual double computeEnergy(double stiffness);
     virtual Eigen::MatrixXd computeGrad(double stiffness);
     virtual Eigen::SparseMatrix<double> computeHessianSparse(double stiffness);
@@ -58,19 +59,21 @@ class MassSpring {
         return X;
     }
 
-    // Detect collision and compute the penalty-based collision force with given
-    // sphere
+    // Linear penalty + normal damping force from a sphere collider. The
+    // returned value is force, not acceleration; step() divides it by the
+    // lumped vertex mass.
     Eigen::MatrixXd getSphereCollisionForce(
         Eigen::Vector3d center,
-        double radius);
+        double radius) const;
 
+    // Dirichlet boundary helpers. The mask marks fixed simulated vertices.
     bool set_dirichlet_bc_mask(const std::vector<bool> &mask);
     bool update_dirichlet_bc_vertices(const MatrixXd &control_vertices);
     bool init_dirichlet_bc_vertices_control_pair(
         const MatrixXd &control_vertices,
         const std::vector<bool> &control_mask);
 
-    // Simulation parameters
+    // Simulation parameters configured by hw9_mass_spring node inputs.
     double stiffness = 1000.0;
     double damping = 0.995;
     enum TimeIntegrator time_integrator = IMPLICIT_EULER;
@@ -83,13 +86,14 @@ class MassSpring {
         0
     };  // (HW TODO) feel free to change the wind acceleration
 
-    // (HW Optional) sphere collision parameters
+    // Optional sphere-collision parameters.
     double collision_penalty_k = 10000.0;
+    double collision_damping = 50.0;
     double collision_scale_factor = 1.1;
     Eigen::Vector3f sphere_center = Eigen::Vector3f(0, -0.5, 0.2);
     double sphere_radius = 0.4;
 
-    // Useful switches
+    // Feature switches configured by hw9_mass_spring node inputs.
     bool enable_sphere_collision = false;
     bool enable_time_profiling = false;
     bool enable_make_SPD = false;
