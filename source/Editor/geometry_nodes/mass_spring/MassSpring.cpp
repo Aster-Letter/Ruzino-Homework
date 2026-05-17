@@ -26,6 +26,15 @@ bool is_fixed_dof(const std::vector<bool>& mask, int dof_id)
     return is_fixed_vertex(mask, dof_id / 3);
 }
 
+double max_stiffness_scale(const std::vector<double>& scales)
+{
+    double max_scale = 1.0;
+    for (double scale : scales) {
+        max_scale = std::max(max_scale, scale);
+    }
+    return max_scale;
+}
+
 void add_sparse_block(
     std::vector<Trip_d>& triplets,
     int row_vertex,
@@ -113,18 +122,62 @@ void zero_fixed_rows(Eigen::MatrixXd& values, const std::vector<bool>& mask)
     }
 }
 
-void restore_fixed_vertices(
+void restore_fixed_positions(
     Eigen::MatrixXd& X,
-    Eigen::MatrixXd& vel,
     const Eigen::MatrixXd& init_X,
     const std::vector<bool>& mask)
 {
     for (int i = 0; i < X.rows(); ++i) {
         if (is_fixed_vertex(mask, i)) {
             X.row(i) = init_X.row(i);
+        }
+    }
+}
+
+void restore_fixed_vertices(
+    Eigen::MatrixXd& X,
+    Eigen::MatrixXd& vel,
+    const Eigen::MatrixXd& init_X,
+    const std::vector<bool>& mask)
+{
+    restore_fixed_positions(X, init_X, mask);
+    for (int i = 0; i < vel.rows(); ++i) {
+        if (is_fixed_vertex(mask, i)) {
             vel.row(i).setZero();
         }
     }
+}
+
+void report_motion_statistics(
+    const Eigen::MatrixXd& X,
+    const Eigen::MatrixXd& init_X,
+    const Eigen::MatrixXd& vel,
+    const std::vector<bool>& fixed_mask)
+{
+    int free_vertices = 0;
+    int nearly_static_vertices = 0;
+    double max_speed = 0.0;
+    double max_displacement = 0.0;
+
+    for (int i = 0; i < X.rows(); ++i) {
+        if (is_fixed_vertex(fixed_mask, i)) {
+            continue;
+        }
+
+        ++free_vertices;
+        const double speed = vel.row(i).norm();
+        const double displacement = (X.row(i) - init_X.row(i)).norm();
+        max_speed = std::max(max_speed, speed);
+        max_displacement = std::max(max_displacement, displacement);
+        if (speed < 1e-6) {
+            ++nearly_static_vertices;
+        }
+    }
+
+    std::cout << "Mass Spring motion stats: free vertices = " << free_vertices
+              << ", nearly static free vertices = " << nearly_static_vertices
+              << ", max speed = " << max_speed
+              << ", max displacement = " << max_displacement << std::endl;
 }
 }  // namespace
 
@@ -142,6 +195,7 @@ MassSpring::MassSpring(const Eigen::MatrixXd& X, const EdgeSet& E)
         Eigen::Vector3d x0 = X.row(e.first);
         Eigen::Vector3d x1 = X.row(e.second);
         this->E_rest_length.push_back((x0 - x1).norm());
+        this->E_stiffness_scale.push_back(1.0);
     }
 
     // Initialize the mask for Dirichlet boundary condition
@@ -176,75 +230,144 @@ void MassSpring::step()
     if (time_integrator == IMPLICIT_EULER) {
         TIC(step)
 
-        // One Newton iteration for the implicit Euler increment potential:
+        // Newton iterations for the implicit Euler increment potential:
         //   g(x) = 1/(2h^2) (x-y)^T M (x-y) + E(x).
-        // We start at current X, solve A * delta = -grad_g, and set
-        // X_new = X_old + delta.
+        // The previous single-iteration variant is sensitive to large
+        // h*sqrt(k/m): it solves only a local linearization and can leave a
+        // stretched, visually pulled configuration near fixed vertices.
+        // Rebuilding the gradient/Hessian at the current Newton iterate gives
+        // the spring force several chances to rebalance before the frame ends.
         Eigen::MatrixXd X_old = X;
         Eigen::MatrixXd y = X_old + h * vel;
         y.rowwise() += (h * h * acceleration_ext).transpose();
         y += (h * h / mass_per_vertex) * collision_force;
 
-        Eigen::SparseMatrix<double> A =
-            add_lumped_mass_term(computeHessianSparse(stiffness),
-                                 mass_per_vertex,
-                                 h);
+        const int max_newton_iter = std::max(1, implicit_newton_iterations);
+        for (int iter = 0; iter < max_newton_iter; ++iter) {
+            Eigen::SparseMatrix<double> A =
+                add_lumped_mass_term(computeHessianSparse(stiffness),
+                                     mass_per_vertex,
+                                     h);
 
-        Eigen::MatrixXd grad_g = computeGrad(stiffness);
-        grad_g += (mass_per_vertex / (h * h)) * (X - y);
-        zero_fixed_rows(grad_g, dirichlet_bc_mask);
+            Eigen::MatrixXd grad_g = computeGrad(stiffness);
+            grad_g += (mass_per_vertex / (h * h)) * (X - y);
+            zero_fixed_rows(grad_g, dirichlet_bc_mask);
 
-        Eigen::MatrixXd rhs = -flatten(grad_g);
-        for (int i = 0; i < static_cast<int>(dirichlet_bc_mask.size()); ++i) {
-            if (!dirichlet_bc_mask[i]) {
-                continue;
+            Eigen::MatrixXd rhs = -flatten(grad_g);
+            for (int i = 0; i < static_cast<int>(dirichlet_bc_mask.size());
+                 ++i) {
+                if (!dirichlet_bc_mask[i]) {
+                    continue;
+                }
+                for (int d = 0; d < 3; ++d) {
+                    rhs(3 * i + d, 0) = 0.0;
+                }
             }
-            for (int d = 0; d < 3; ++d) {
-                rhs(3 * i + d, 0) = 0.0;
+
+            A = apply_dirichlet_delta_constraints(A, dirichlet_bc_mask);
+
+            Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+            solver.compute(A);
+            if (solver.info() != Eigen::Success) {
+                std::cerr << "Decomposition failed in implicit Euler."
+                          << std::endl;
+                return;
+            }
+
+            Eigen::MatrixXd delta_flat = solver.solve(rhs);
+            if (solver.info() != Eigen::Success) {
+                std::cerr << "Linear solve failed in implicit Euler."
+                          << std::endl;
+                return;
+            }
+
+            Eigen::MatrixXd delta_X = unflatten(delta_flat);
+            X += delta_X;
+            restore_fixed_positions(X, init_X, dirichlet_bc_mask);
+
+            const double delta_norm = delta_X.norm();
+            if (enable_debug_output) {
+                std::cout << "Implicit Euler Newton iter " << iter
+                          << ": |delta_x| = " << delta_norm << std::endl;
+            }
+            if (delta_norm < implicit_delta_tolerance) {
+                break;
             }
         }
 
-        A = apply_dirichlet_delta_constraints(A, dirichlet_bc_mask);
-
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-        solver.compute(A);
-        if (solver.info() != Eigen::Success) {
-            std::cerr << "Decomposition failed in implicit Euler."
-                      << std::endl;
-            return;
-        }
-
-        Eigen::MatrixXd delta_flat = solver.solve(rhs);
-        if (solver.info() != Eigen::Success) {
-            std::cerr << "Linear solve failed in implicit Euler." << std::endl;
-            return;
-        }
-
-        X = X_old + unflatten(delta_flat);
-        restore_fixed_vertices(X, vel, init_X, dirichlet_bc_mask);
         vel = (X - X_old) / h;
         zero_fixed_rows(vel, dirichlet_bc_mask);
+        if (enable_debug_output) {
+            report_motion_statistics(X, init_X, vel, dirichlet_bc_mask);
+        }
 
         TOC(step)
     }
     else if (time_integrator == SEMI_IMPLICIT_EULER) {
-        // Semi-implicit Euler
-        // Force is -grad(E). We divide by the lumped vertex mass to obtain
-        // acceleration, then update velocity before position.
-        Eigen::MatrixXd acceleration =
-            -computeGrad(stiffness) / mass_per_vertex;
-        acceleration.rowwise() += acceleration_ext.transpose();
+        // Semi-implicit Euler is still conditionally stable. Large UI time
+        // steps such as h=0.1 with stiff springs can explode into long spikes,
+        // especially near fixed vertices. Substepping keeps the assignment's
+        // semi-implicit integrator usable while preserving the same public h.
+        const double effective_stiffness =
+            std::max(1e-12, stiffness * max_stiffness_scale(E_stiffness_scale));
+        const double suggested_dt =
+            0.2 * std::sqrt(mass_per_vertex / effective_stiffness);
+        const int automatic_substeps =
+            suggested_dt > 0.0
+                ? std::max(1, static_cast<int>(std::ceil(h / suggested_dt)))
+                : 1;
+        constexpr int kMaxAutomaticSubsteps = 200;
+        const int n_substeps =
+            semi_implicit_substeps > 0
+                ? semi_implicit_substeps
+                : std::min(kMaxAutomaticSubsteps, automatic_substeps);
+        const double sub_h = h / static_cast<double>(n_substeps);
+        const double substep_damping =
+            enable_damping ? std::pow(damping, 1.0 / n_substeps) : 1.0;
 
-        acceleration += collision_force / mass_per_vertex;
-        zero_fixed_rows(acceleration, dirichlet_bc_mask);
-
-        vel += acceleration * h;
-        if (enable_damping) {
-            vel *= damping;
+        if (semi_implicit_substeps <= 0 &&
+            automatic_substeps > kMaxAutomaticSubsteps) {
+            std::cerr
+                << "Mass Spring: semi-implicit Euler automatic substeps hit "
+                << "the cap (required " << automatic_substeps << ", using "
+                << kMaxAutomaticSubsteps
+                << "). Current h/stiffness/mass may still be outside the "
+                << "stable range; reduce h or stiffness, increase mass, or "
+                << "set more manual substeps for comparison runs."
+                << std::endl;
         }
-        zero_fixed_rows(vel, dirichlet_bc_mask);
-        X += vel * h;
-        restore_fixed_vertices(X, vel, init_X, dirichlet_bc_mask);
+
+        if (enable_debug_output) {
+            std::cout << "Semi-implicit Euler substeps = " << n_substeps
+                      << ", sub_h = " << sub_h << std::endl;
+        }
+
+        for (int substep = 0; substep < n_substeps; ++substep) {
+            Eigen::MatrixXd current_collision_force =
+                Eigen::MatrixXd::Zero(X.rows(), X.cols());
+            if (enable_sphere_collision) {
+                current_collision_force = getSphereCollisionForce(
+                    sphere_center.cast<double>(), sphere_radius);
+            }
+
+            // Force is -grad(E). We divide by the lumped vertex mass to obtain
+            // acceleration, then update velocity before position.
+            Eigen::MatrixXd acceleration =
+                -computeGrad(stiffness) / mass_per_vertex;
+            acceleration.rowwise() += acceleration_ext.transpose();
+
+            acceleration += current_collision_force / mass_per_vertex;
+            zero_fixed_rows(acceleration, dirichlet_bc_mask);
+
+            vel += acceleration * sub_h;
+            vel *= substep_damping;
+            zero_fixed_rows(vel, dirichlet_bc_mask);
+            X += vel * sub_h;
+            restore_fixed_vertices(X, vel, init_X, dirichlet_bc_mask);
+        }
+        if (enable_debug_output) {
+            report_motion_statistics(X, init_X, vel, dirichlet_bc_mask);
+        }
     }
     else {
         std::cerr << "Unknown time integrator!" << std::endl;
@@ -265,7 +388,9 @@ double MassSpring::computeEnergy(double stiffness)
     for (const auto& e : E) {
         auto diff = X.row(e.first) - X.row(e.second);
         auto l = E_rest_length[i];
-        sum += 0.5 * stiffness * std::pow((diff.norm() - l), 2);
+        sum +=
+            0.5 * stiffness * E_stiffness_scale[i] *
+            std::pow((diff.norm() - l), 2);
         i++;
     }
     return sum;
@@ -288,7 +413,8 @@ Eigen::MatrixXd MassSpring::computeGrad(double stiffness)
         const double len = d.norm();
 
         if (len > kLengthEps) {
-            Eigen::Vector3d grad = stiffness * (len - L) * d / len;
+            Eigen::Vector3d grad =
+                stiffness * E_stiffness_scale[i] * (len - L) * d / len;
             g.row(a) += grad;
             g.row(b) -= grad;
         }
@@ -306,7 +432,6 @@ Eigen::SparseMatrix<double> MassSpring::computeHessianSparse(double stiffness)
     triplets.reserve(E.size() * 36);  // Each edge contributes at most 36 non-zero entries
 
     unsigned i = 0;
-    auto k = stiffness;
     const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
     for (const auto& e : E) {
         const int a = e.first;
@@ -315,6 +440,7 @@ Eigen::SparseMatrix<double> MassSpring::computeHessianSparse(double stiffness)
         Eigen::Vector3d d = X.row(a) - X.row(b);
         const double L = E_rest_length[i];
         const double len = d.norm();
+        const double k = stiffness * E_stiffness_scale[i];
 
         if (len > kLengthEps) {
             Eigen::Matrix3d outer = d * d.transpose() / (len * len);
@@ -412,6 +538,24 @@ bool MassSpring::set_dirichlet_bc_mask(const std::vector<bool>& mask)
     }
     else
         return false;
+}
+
+bool MassSpring::set_edge_stiffness_scales(
+    const std::map<Edge, double>& scales)
+{
+    if (E_stiffness_scale.size() != E.size()) {
+        E_stiffness_scale.assign(E.size(), 1.0);
+    }
+
+    int i = 0;
+    for (const auto& edge : E) {
+        const auto iter = scales.find(edge);
+        E_stiffness_scale[i] = iter == scales.end()
+                                   ? 1.0
+                                   : std::max(0.0, iter->second);
+        ++i;
+    }
+    return true;
 }
 
 bool MassSpring::update_dirichlet_bc_vertices(const MatrixXd& control_vertices)

@@ -71,5 +71,6 @@ class FastMassSpring : public MassSpring {
     double cached_h_ = -1.0;
     double cached_mass_ = -1.0;
     std::vector<bool> cached_dirichlet_bc_mask_;
+    std::vector<double> cached_edge_stiffness_scale_;
 };
 }  // namespace USTC_CG::mass_spring

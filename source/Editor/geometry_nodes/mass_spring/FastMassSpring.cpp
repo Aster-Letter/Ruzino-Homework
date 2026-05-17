@@ -100,6 +100,7 @@ void FastMassSpring::rebuild_prefactorized_system()
     cached_h_ = h;
     cached_mass_ = mass;
     cached_dirichlet_bc_mask_ = dirichlet_bc_mask;
+    cached_edge_stiffness_scale_ = E_stiffness_scale;
 
     if (!system_prefactorized_) {
         std::cerr << "FastMassSpring: failed to prefactorize system matrix."
@@ -123,15 +124,18 @@ Eigen::SparseMatrix<double> FastMassSpring::build_system_matrix() const
         }
     }
 
-    const Eigen::Matrix3d edge_block =
-        (h * h * stiffness) * Eigen::Matrix3d::Identity();
     // Laplacian part: each spring contributes k * [[I, -I], [-I, I]].
     // The h^2 factor comes from the implicit time integration objective.
+    unsigned edge_id = 0;
     for (const auto& edge : E) {
+        const Eigen::Matrix3d edge_block =
+            (h * h * stiffness * E_stiffness_scale[edge_id]) *
+            Eigen::Matrix3d::Identity();
         add_block(triplets, edge.first, edge.first, edge_block);
         add_block(triplets, edge.second, edge.second, edge_block);
         add_block(triplets, edge.first, edge.second, -edge_block);
         add_block(triplets, edge.second, edge.first, -edge_block);
+        ++edge_id;
     }
 
     std::vector<Trip_d> constrained_triplets;
@@ -220,7 +224,8 @@ Eigen::MatrixXd FastMassSpring::build_global_rhs(
     unsigned edge_id = 0;
     for (const auto& edge : E) {
         const Eigen::Vector3d contribution =
-            h * h * stiffness * edge_projections[edge_id];
+            h * h * stiffness * E_stiffness_scale[edge_id] *
+            edge_projections[edge_id];
         rhs.row(edge.first) += contribution.transpose();
         rhs.row(edge.second) -= contribution.transpose();
         ++edge_id;
@@ -229,12 +234,14 @@ Eigen::MatrixXd FastMassSpring::build_global_rhs(
     // Fixed-position constraints are enforced by removing fixed columns from A.
     // Compensate the free RHS by subtracting the omitted A_free,fixed * x_fixed
     // terms, where each spring contributes -h^2*k*I to the off-diagonal block.
-    const double edge_coeff = h * h * stiffness;
+    edge_id = 0;
     for (const auto& edge : E) {
         const bool first_fixed =
             is_fixed_vertex(dirichlet_bc_mask, edge.first);
         const bool second_fixed =
             is_fixed_vertex(dirichlet_bc_mask, edge.second);
+        const double edge_coeff =
+            h * h * stiffness * E_stiffness_scale[edge_id];
 
         if (first_fixed && !second_fixed) {
             rhs.row(edge.second) += edge_coeff * init_X.row(edge.first);
@@ -242,6 +249,7 @@ Eigen::MatrixXd FastMassSpring::build_global_rhs(
         else if (!first_fixed && second_fixed) {
             rhs.row(edge.first) += edge_coeff * init_X.row(edge.second);
         }
+        ++edge_id;
     }
 
     for (int vertex = 0; vertex < static_cast<int>(dirichlet_bc_mask.size());
@@ -299,7 +307,8 @@ bool FastMassSpring::needs_refactorization() const
 {
     return !system_prefactorized_ || cached_stiffness_ != stiffness ||
            cached_h_ != h || cached_mass_ != mass ||
-           cached_dirichlet_bc_mask_ != dirichlet_bc_mask;
+           cached_dirichlet_bc_mask_ != dirichlet_bc_mask ||
+           cached_edge_stiffness_scale_ != E_stiffness_scale;
 }
 
 }  // namespace USTC_CG::mass_spring
