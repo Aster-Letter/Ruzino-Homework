@@ -9,11 +9,13 @@ list(APPEND GEOMETRY_NODES_COMPILE_DEFS GEOM_NODES_SHADER_DIR="${CMAKE_CURRENT_S
 
 # add mass spring subdir
 add_subdirectory(mass_spring)
+# add sph dir
+add_subdirectory(sph_fluid)
 
 add_nodes(
 	TARGET_NAME geometry_nodes 
 	SRC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
-	DEP_LIBS stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle RZFemBem mass_spring_utils
+	DEP_LIBS stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle RZFemBem mass_spring_utils sph_fluid_utils
 	COMPILE_DEFS ${GEOMETRY_NODES_COMPILE_DEFS}
 )
 
