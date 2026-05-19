@@ -3,6 +3,7 @@
 #include "particle_system.h"
 #include <memory>
 #include <chrono>
+#include <cstddef>
 
 namespace USTC_CG::sph_fluid {
 #define TIC(name) auto start_##name = std::chrono::high_resolution_clock::now();
@@ -17,6 +18,19 @@ namespace USTC_CG::sph_fluid {
 
 class SPHBase {
    public:
+    struct Diagnostics {
+        int particle_count = 0;
+        double min_density = 0.0;
+        double max_density = 0.0;
+        double avg_density = 0.0;
+        double avg_relative_density_error = 0.0;
+        double max_velocity = 0.0;
+        double kinetic_energy = 0.0;
+        double avg_neighbor_count = 0.0;
+        int pressure_iterations = 0;
+        double pressure_residual = 0.0;
+    };
+
     SPHBase() = default;
     SPHBase(const Eigen::MatrixXd& X, const Vector3d& box_min, const Vector3d& box_max);
     virtual ~SPHBase() = default;
@@ -80,8 +94,15 @@ class SPHBase {
 
     // for display: generate color for each particle based on its velocity
     MatrixXd get_vel_color_jet(); 
+
+    const Diagnostics& diagnostics() const
+    {
+        return diagnostics_;
+    }
    
   protected:
+    void update_diagnostics(int pressure_iterations = 0, double pressure_residual = 0.0);
+
     ParticleSystem ps_;
     double dt_ = 0.005;  // You can adjust this parameter in the UI of node "SPH Fluid"
     double viscosity_ = 0.03; // You can adjust this parameter in the UI of node "SPH Fluid"
@@ -91,5 +112,6 @@ class SPHBase {
     Eigen::MatrixXd init_X_;
     Eigen::MatrixXd X_;
     Eigen::MatrixXd vel_;
+    Diagnostics diagnostics_;
 };
 }  // namespace USTC_CG::node_sph_fluid

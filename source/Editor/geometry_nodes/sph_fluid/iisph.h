@@ -3,6 +3,7 @@
 #include "particle_system.h"
 #include "sph_base.h"
 #include <Eigen/Dense>
+#include <vector>
 
 namespace USTC_CG::sph_fluid {
 
@@ -30,15 +31,25 @@ class IISPH : public SPHBase {
     {
         return omega_;
     }
+    double& pressure_clamp()
+    {
+        return pressure_clamp_;
+    }
 
    protected:
+    void resize_solver_storage();
+
     int max_iter_ = 50;
     double omega_ = 0.5;
+    double pressure_clamp_ = 1e5;
+    int last_pressure_iterations_ = 0;
+    double last_pressure_residual_ = 0.0;
 
-    // (HW TODO) Feel free to modify this part to remove or add necessary member variables
     VectorXd predict_density_;
     VectorXd aii_;
     VectorXd Api_;  
     VectorXd last_pressure_;
+    VectorXd pressure_old_;
+    std::vector<Vector3d> pressure_acc_;
 };
 }  // namespace USTC_CG::node_sph_fluid

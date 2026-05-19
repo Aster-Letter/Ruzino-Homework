@@ -1,11 +1,16 @@
 # c/cpp only
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} THISSRCS)
 
+find_package(OpenMP)
+
 # interface
 add_library(sph_fluid_utils INTERFACE)
 target_link_libraries(sph_fluid_utils INTERFACE
     stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(sph_fluid_utils INTERFACE OpenMP::OpenMP_CXX)
+endif()
 target_include_directories(sph_fluid_utils INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # static lib
@@ -19,6 +24,9 @@ if(THISSRCS)
     target_link_libraries(sph_fluid_utils_static
         stage nodes_system usd geometry usdShade Eigen3::Eigen autodiff igl::core igl_restricted::triangle
     )
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(sph_fluid_utils_static OpenMP::OpenMP_CXX)
+    endif()
 
     # link to the interface
     target_link_libraries(

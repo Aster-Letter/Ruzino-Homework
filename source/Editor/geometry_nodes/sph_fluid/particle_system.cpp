@@ -7,6 +7,10 @@ using namespace Eigen;
 using namespace std;
 #define M_PI 3.14159265358979323846
 
+namespace {
+constexpr int kParallelParticleThreshold = 256;
+}
+
 ParticleSystem::ParticleSystem(const MatrixXd &X, const Vector3d &box_min, const Vector3d &box_max)
     : num_particles_(X.rows())
 {
@@ -51,8 +55,11 @@ ParticleSystem::ParticleSystem(const MatrixXd &X, const Vector3d &box_min, const
 
 void ParticleSystem::search_neighbors()
 {
-    // update the neighbors for each particle
-    for (auto &p : particles_) {
+    const int n_particles = static_cast<int>(particles_.size());
+
+#pragma omp parallel for if(n_particles > kParallelParticleThreshold) schedule(static)
+    for (int i = 0; i < n_particles; i++) {
+        auto& p = particles_[i];
         p->neighbors_.clear();
         if (p->type_ == Particle::BOUNDARY) {
             // TODO: do we need to search neighbors for boundary particles?

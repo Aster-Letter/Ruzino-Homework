@@ -1,13 +1,21 @@
 #include "sph_base.h"
+#include <algorithm>
 #include <cmath>
 #define M_PI 3.14159265358979323846
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <iostream>
+#include <limits>
 #include "colormap_jet.h"
 
 namespace USTC_CG::sph_fluid {
 using namespace Eigen;
 using Real = double;
+
+namespace {
+constexpr int kParallelParticleThreshold = 256;
+}
 
 SPHBase::SPHBase(const Eigen::MatrixXd& X, const Vector3d& box_min, const Vector3d& box_max)
     : init_X_(X),
@@ -75,18 +83,22 @@ Vector3d SPHBase::grad_W(const Vector3d& r, double h)
 
 void SPHBase::compute_density()
 {
-    // (HW TODO) Traverse all particles to compute each particle's density
-    // (Optional) This operation can be done in parallel using OpenMP 
-    for (auto& p : ps_.particles()) {
+    auto& particles = ps_.particles();
 
-        // ... necessary initialization of particle p's density here  
+    const double mass = ps_.mass();
+    const double h = ps_.h();
+    const double w0 = W_zero(h);
+    const int n_particles = static_cast<int>(particles.size());
 
-        // Then traverse all neighbor fluid particles of p
-        for (auto& q : p->neighbors()) {
+#pragma omp parallel for if(n_particles > kParallelParticleThreshold) schedule(static)
+    for (int i = 0; i < n_particles; i++) {
+        const auto& p = particles[i];
 
-            // ... compute the density contribution from q to p
-
+        double density = mass * w0;
+        for (const auto& q : p->neighbors()) {
+            density += mass * W(p->x() - q->x(), h);
         }
+        p->density() = density;
     }
 }
 
@@ -97,19 +109,19 @@ void SPHBase::compute_pressure()
 
 void SPHBase::compute_non_pressure_acceleration()
 {
-    // (HW TODO) Traverse all particles to compute each particle's non-pressure acceleration 
-    for (auto& p : ps_.particles()) {
+    auto& particles = ps_.particles();
+    const int n_particles = static_cast<int>(particles.size());
 
-        // necessary code here to compute particle p's acceleration include gravity and viscosity
-        // We do not consider surface tension in this assignment, but you can add it if you like
+#pragma omp parallel for if(n_particles > kParallelParticleThreshold) schedule(static)
+    for (int i = 0; i < n_particles; i++) {
+        const auto& p = particles[i];
+        Vector3d acceleration = gravity_;
 
-        //for (auto& q : p->neighbors()) {
-        // 
-        // Prompt: use the "compute_viscosity_acceleration" function to compute the viscosity acceleration between p and q"
-        // 
-        //}
+        for (const auto& q : p->neighbors()) {
+            acceleration += compute_viscosity_acceleration(p, q);
+        }
 
-
+        p->acceleration() = acceleration;
     }
 }
 
@@ -118,22 +130,61 @@ Vector3d SPHBase::compute_viscosity_acceleration(
     const std::shared_ptr<Particle>& p,
     const std::shared_ptr<Particle>& q)
 {
-    auto v_ij = p->vel() - q->vel();
-    auto x_ij = p->x() - q->x();
-    Vector3d grad = grad_W(p->x() - q->x(), ps_.h());
+    const Vector3d v_ij = p->vel() - q->vel();
+    const Vector3d x_ij = p->x() - q->x();
 
-    // Vector3d laplace_v = ... 
+    const double h = ps_.h();
+    const Vector3d grad = grad_W(x_ij, h);
+    const double denom = x_ij.squaredNorm() + 0.01 * h * h;
+    const double mass = ps_.mass();
+    const double density_j = q->density();
+    const int dim = 3;
 
-    //return this->viscosity_ * laplace_v;
+    if (density_j <= 1e-12) {
+        return Vector3d::Zero();
+    }
 
-    return Vector3d::Zero();
+    const Vector3d laplace_v =
+        2.0 * (dim + 2.0) * (mass / density_j) *
+        (v_ij.dot(x_ij) / denom) * grad;
+    return viscosity_ * laplace_v;
 }
 
 // Traverse all particles and compute pressure gradient acceleration
 void SPHBase::compute_pressure_gradient_acceleration()
 {
-    for (auto& p : ps_.particles()) {
-        // (HW TODO) Traverse all particles and compute each particle's acceleration from pressure gradient force
+    auto& particles = ps_.particles();
+    const int n_particles = static_cast<int>(particles.size());
+    const double mass = ps_.mass();
+    const double h = ps_.h();
+
+#pragma omp parallel for if(n_particles > kParallelParticleThreshold) schedule(static)
+    for (int i = 0; i < n_particles; i++) {
+        const auto& p = particles[i];
+        Vector3d acc_p = Vector3d::Zero();
+
+        const double rho_i = p->density();
+        const double p_i = p->pressure();
+        if (rho_i <= 1e-12) {
+            continue;
+        }
+
+        for (const auto& q : p->neighbors()) {
+            const double rho_j = q->density();
+            const double p_j = q->pressure();
+            if (rho_j <= 1e-12) {
+                continue;
+            }
+
+            const Vector3d grad = grad_W(p->x() - q->x(), h);
+
+            const double coeff =
+                mass *
+                (p_i / (rho_i * rho_i) + p_j / (rho_j * rho_j));
+
+            acc_p -= coeff * grad;
+        }
+        p->acceleration() += acc_p;
     }
 }
 
@@ -145,16 +196,17 @@ void SPHBase::step()
 
 void SPHBase::advect()
 {
-    for (auto& p : ps_.particles())  
-    {
+    auto& particles = ps_.particles();
+    const int n_particles = static_cast<int>(particles.size());
 
-        // ---------------------------------------------------------
-        // (HW TODO) Implement the advection step of each particle
-        // Remember to check collision after advection
+#pragma omp parallel for if(n_particles > kParallelParticleThreshold) schedule(static)
+    for (int i = 0; i < n_particles; i++) {
+        const auto& p = particles[i];
+        p->vel() += p->acceleration() * dt_;
+        p->x() += p->vel() * dt_;
 
-        // Your code here 
+        check_collision(p);
 
-        // ---------------------------------------------------------
         vel_.row(p->idx()) = p->vel().transpose();
         X_.row(p->idx()) = p->x().transpose();
     }
@@ -211,6 +263,64 @@ void SPHBase::reset()
     for (auto& p : ps_.particles()) {
         p->vel() = Vector3d::Zero();
         p->x() = init_X_.row(p->idx()).transpose();
+    }
+    diagnostics_ = Diagnostics{};
+}
+
+void SPHBase::update_diagnostics(int pressure_iterations, double pressure_residual)
+{
+    const auto& particles = ps_.particles();
+    const int n_particles = static_cast<int>(particles.size());
+    diagnostics_ = Diagnostics{};
+    diagnostics_.particle_count = n_particles;
+    diagnostics_.pressure_iterations = pressure_iterations;
+    diagnostics_.pressure_residual = pressure_residual;
+
+    if (n_particles == 0) {
+        return;
+    }
+
+    const double density0 = ps_.density0();
+    double min_density = std::numeric_limits<double>::max();
+    double max_density = 0.0;
+    double density_sum = 0.0;
+    double relative_density_error_sum = 0.0;
+    double max_velocity = 0.0;
+    double kinetic_energy = 0.0;
+    double neighbor_count_sum = 0.0;
+
+    for (const auto& p : particles) {
+        const double density = p->density();
+        const double speed = p->vel().norm();
+
+        min_density = std::min(min_density, density);
+        max_density = std::max(max_density, density);
+        density_sum += density;
+        relative_density_error_sum += std::abs(density - density0) / density0;
+        max_velocity = std::max(max_velocity, speed);
+        kinetic_energy += 0.5 * ps_.mass() * p->vel().squaredNorm();
+        neighbor_count_sum += static_cast<double>(p->neighbors().size());
+    }
+
+    diagnostics_.min_density = min_density;
+    diagnostics_.max_density = max_density;
+    diagnostics_.avg_density = density_sum / n_particles;
+    diagnostics_.avg_relative_density_error =
+        relative_density_error_sum / n_particles;
+    diagnostics_.max_velocity = max_velocity;
+    diagnostics_.kinetic_energy = kinetic_energy;
+    diagnostics_.avg_neighbor_count = neighbor_count_sum / n_particles;
+
+    if (enable_debug_output) {
+        std::cout << "[SPH diagnostics] particles=" << diagnostics_.particle_count
+                  << " avg_density=" << diagnostics_.avg_density
+                  << " rel_density_error="
+                  << diagnostics_.avg_relative_density_error
+                  << " max_velocity=" << diagnostics_.max_velocity
+                  << " avg_neighbors=" << diagnostics_.avg_neighbor_count
+                  << " pressure_iters=" << diagnostics_.pressure_iterations
+                  << " pressure_residual=" << diagnostics_.pressure_residual
+                  << std::endl;
     }
 }
 

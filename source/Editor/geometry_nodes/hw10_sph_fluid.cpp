@@ -63,13 +63,10 @@ NODE_DECLARATION_FUNCTION(sph_fluid)
     b.add_input<float>("stiffness").default_val(500).min(100).max(10000);
     b.add_input<float>("exponent").default_val(7).min(1).max(10);
 
-    // --------- (HW Optional) if you implement IISPH, please uncomment the
-    // following lines ------------
-
-    // b.add_input<float>("omega").default_val(0.5).min(0.).max(1.);
-    // b.add_input<int>("max iter").default_val(20).min(0).max(1000);
-
-    // -----------------------------------------------------------------------------------------------------------
+    // IISPH parameters
+    b.add_input<float>("omega").default_val(0.5).min(0.).max(1.);
+    b.add_input<int>("max iter").default_val(50).min(1).max(1000);
+    b.add_input<float>("pressure clamp").default_val(100000.0f).min(1000.0f).max(1000000.0f);
 
     // Useful switches (0 or 1). You can add more if you like.
     b.add_input<int>("enable time profiling").default_val(0).min(0).max(1);
@@ -150,15 +147,11 @@ NODE_EXECUTION_FUNCTION(sph_fluid)
             params.get_input<int>("enable debug output") == 1 ? true : false;
 
         if (enable_IISPH) {
-            // --------- (HW Optional) if you implement IISPH please uncomment
-            // the following lines -----------
-
-            // std::dynamic_pointer_cast<IISPH>(sph_base)->max_iter() =
-            // params.get_input<int>("max iter");
-            // std::dynamic_pointer_cast<IISPH>(sph_base)->omega() =
-            // params.get_input<float>("omega");
-
-            // --------------------------------------------------------------------------------------------------------
+            auto iisph = std::dynamic_pointer_cast<IISPH>(sph_base);
+            iisph->max_iter() = params.get_input<int>("max iter");
+            iisph->omega() = params.get_input<float>("omega");
+            iisph->pressure_clamp() =
+                params.get_input<float>("pressure clamp");
         }
         else {
             std::dynamic_pointer_cast<WCSPH>(sph_base)->stiffness() =
